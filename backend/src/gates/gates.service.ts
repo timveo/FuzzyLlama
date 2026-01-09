@@ -5,27 +5,17 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { GateStateMachineService } from './services/gate-state-machine.service';
 import { CreateGateDto, GateType } from './dto/create-gate.dto';
 import { UpdateGateDto, GateStatus } from './dto/update-gate.dto';
 import { ApproveGateDto } from './dto/approve-gate.dto';
 
 @Injectable()
 export class GatesService {
-  // Gate progression order
-  private readonly GATE_ORDER = [
-    'G0_PENDING', 'G0_COMPLETE',
-    'G1_PENDING', 'G1_COMPLETE',
-    'G2_PENDING', 'G2_COMPLETE',
-    'G3_PENDING', 'G3_COMPLETE',
-    'G4_PENDING', 'G4_COMPLETE',
-    'G5_PENDING', 'G5_COMPLETE',
-    'G6_PENDING', 'G6_COMPLETE',
-    'G7_PENDING', 'G7_COMPLETE',
-    'G8_PENDING', 'G8_COMPLETE',
-    'G9_PENDING', 'G9_COMPLETE',
-  ];
-
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private stateMachine: GateStateMachineService,
+  ) {}
 
   async create(createGateDto: CreateGateDto, userId: string) {
     // Verify project ownership
@@ -185,9 +175,15 @@ export class GatesService {
       },
     });
 
-    // If approved, advance to next gate
+    // If approved, use state machine to handle gate transition
     if (approveGateDto.approved) {
-      await this.advanceToNextGate(gate.projectId, gate.gateType);
+      await this.stateMachine.approveGate(
+        gate.projectId,
+        gate.gateType,
+        userId,
+        'approved',
+        approveGateDto.reviewNotes,
+      );
     }
 
     return updatedGate;
@@ -284,20 +280,4 @@ export class GatesService {
     });
   }
 
-  private async advanceToNextGate(projectId: string, currentGateType: string) {
-    const currentIndex = this.GATE_ORDER.indexOf(currentGateType);
-
-    if (currentIndex === -1 || currentIndex >= this.GATE_ORDER.length - 1) {
-      // Already at last gate or invalid gate type
-      return;
-    }
-
-    const nextGateType = this.GATE_ORDER[currentIndex + 1];
-
-    // Update project state
-    await this.prisma.projectState.updateMany({
-      where: { projectId },
-      data: { currentGate: nextGateType },
-    });
-  }
 }
