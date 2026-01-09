@@ -13,6 +13,12 @@ export interface AIProviderResponse {
   finishReason: string;
 }
 
+export interface AIProviderStreamCallback {
+  onChunk: (chunk: string) => void;
+  onComplete: (response: AIProviderResponse) => void;
+  onError: (error: Error) => void;
+}
+
 @Injectable()
 export class AIProviderService {
   private anthropic: Anthropic;
@@ -129,5 +135,144 @@ export class AIProviderService {
 
   isOpenAIAvailable(): boolean {
     return !!this.openai;
+  }
+
+  async executeClaudePromptStream(
+    systemPrompt: string,
+    userPrompt: string,
+    callback: AIProviderStreamCallback,
+    model: string = 'claude-sonnet-4-20250514',
+    maxTokens: number = 8000,
+  ): Promise<void> {
+    if (!this.anthropic) {
+      callback.onError(new Error('Claude API key not configured'));
+      return;
+    }
+
+    try {
+      const stream = await this.anthropic.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+        stream: true,
+      });
+
+      let fullContent = '';
+      let inputTokens = 0;
+      let outputTokens = 0;
+      let finishReason = 'end_turn';
+
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta') {
+          if (event.delta.type === 'text_delta') {
+            const chunk = event.delta.text;
+            fullContent += chunk;
+            callback.onChunk(chunk);
+          }
+        } else if (event.type === 'message_start') {
+          inputTokens = event.message.usage.input_tokens;
+        } else if (event.type === 'message_delta') {
+          outputTokens = event.usage.output_tokens;
+          finishReason = event.delta.stop_reason || 'end_turn';
+        }
+      }
+
+      callback.onComplete({
+        content: fullContent,
+        model,
+        usage: {
+          inputTokens,
+          outputTokens,
+        },
+        finishReason,
+      });
+    } catch (error) {
+      callback.onError(error as Error);
+    }
+  }
+
+  async executeOpenAIPromptStream(
+    systemPrompt: string,
+    userPrompt: string,
+    callback: AIProviderStreamCallback,
+    model: string = 'gpt-4o',
+    maxTokens: number = 8000,
+  ): Promise<void> {
+    if (!this.openai) {
+      callback.onError(new Error('OpenAI API key not configured'));
+      return;
+    }
+
+    try {
+      const stream = await this.openai.chat.completions.create({
+        model,
+        max_tokens: maxTokens,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+        stream: true,
+      });
+
+      let fullContent = '';
+      let inputTokens = 0;
+      let outputTokens = 0;
+      let finishReason = 'stop';
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
+          fullContent += delta.content;
+          callback.onChunk(delta.content);
+        }
+
+        if (chunk.choices[0]?.finish_reason) {
+          finishReason = chunk.choices[0].finish_reason;
+        }
+
+        // OpenAI doesn't provide token counts in streaming mode
+        // We'll estimate or get them after completion
+      }
+
+      callback.onComplete({
+        content: fullContent,
+        model,
+        usage: {
+          inputTokens,
+          outputTokens,
+        },
+        finishReason,
+      });
+    } catch (error) {
+      callback.onError(error as Error);
+    }
+  }
+
+  async executePromptStream(
+    systemPrompt: string,
+    userPrompt: string,
+    callback: AIProviderStreamCallback,
+    model: string,
+    maxTokens: number = 8000,
+  ): Promise<void> {
+    if (model.startsWith('claude-')) {
+      return this.executeClaudePromptStream(systemPrompt, userPrompt, callback, model, maxTokens);
+    } else if (model.startsWith('gpt-')) {
+      return this.executeOpenAIPromptStream(systemPrompt, userPrompt, callback, model, maxTokens);
+    } else {
+      callback.onError(new Error(`Unsupported model: ${model}`));
+    }
   }
 }

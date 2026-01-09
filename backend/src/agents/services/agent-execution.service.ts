@@ -6,13 +6,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AgentTemplateLoaderService } from './agent-template-loader.service';
-import { AIProviderService } from './ai-provider.service';
+import { AIProviderService, AIProviderStreamCallback } from './ai-provider.service';
 import {
   AgentRole,
   AgentExecutionContext,
   AgentExecutionResult,
 } from '../interfaces/agent-template.interface';
 import { ExecuteAgentDto } from '../dto/execute-agent.dto';
+import { getAgentTemplate } from '../templates';
 
 @Injectable()
 export class AgentExecutionService {
@@ -153,6 +154,149 @@ export class AgentExecutionService {
 
       throw error;
     }
+  }
+
+  async executeAgentStream(
+    executeDto: ExecuteAgentDto,
+    userId: string,
+    streamCallback: AIProviderStreamCallback,
+  ): Promise<string> {
+    // Verify project ownership
+    const project = await this.prisma.project.findUnique({
+      where: { id: executeDto.projectId },
+      include: {
+        state: true,
+        owner: true,
+      },
+    });
+
+    if (!project) {
+      streamCallback.onError(new Error('Project not found'));
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.ownerId !== userId) {
+      streamCallback.onError(new Error('Forbidden'));
+      throw new ForbiddenException('You can only execute agents for your own projects');
+    }
+
+    // Check monthly execution limit
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { planTier: true, monthlyAgentExecutions: true },
+    });
+
+    const limits = {
+      FREE: 50,
+      PRO: 500,
+      TEAM: 2000,
+      ENTERPRISE: Infinity,
+    };
+
+    const executionLimit = limits[user.planTier] || limits.FREE;
+
+    if (user.monthlyAgentExecutions >= executionLimit) {
+      const error = new BadRequestException(
+        `Monthly agent execution limit reached. Your ${user.planTier} plan allows ${executionLimit} executions per month.`,
+      );
+      streamCallback.onError(error);
+      throw error;
+    }
+
+    // Get agent template from our new system
+    const template = getAgentTemplate(executeDto.agentType);
+
+    if (!template) {
+      streamCallback.onError(new Error(`Agent template not found: ${executeDto.agentType}`));
+      throw new NotFoundException(`Agent template not found: ${executeDto.agentType}`);
+    }
+
+    // Build execution context
+    const context = await this.buildExecutionContext(executeDto.projectId, userId);
+
+    // Create agent execution record
+    const agentExecution = await this.prisma.agent.create({
+      data: {
+        projectId: executeDto.projectId,
+        agentType: executeDto.agentType,
+        status: 'RUNNING',
+        inputPrompt: executeDto.userPrompt,
+        model: executeDto.model || template.defaultModel,
+        contextData: context as any,
+      },
+    });
+
+    // Increment user's monthly execution count
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        monthlyAgentExecutions: {
+          increment: 1,
+        },
+      },
+    });
+
+    // Build system prompt from template
+    const systemPrompt = this.buildSystemPromptFromNewTemplate(template, context);
+
+    // Execute AI prompt with streaming
+    await this.aiProvider.executePromptStream(
+      systemPrompt,
+      executeDto.userPrompt,
+      {
+        onChunk: (chunk: string) => {
+          // Forward chunk to callback
+          streamCallback.onChunk(chunk);
+        },
+        onComplete: async (response) => {
+          // Update agent execution record
+          await this.prisma.agent.update({
+            where: { id: agentExecution.id },
+            data: {
+              status: 'COMPLETED',
+              outputResult: response.content,
+              inputTokens: response.usage.inputTokens,
+              outputTokens: response.usage.outputTokens,
+              completedAt: new Date(),
+            },
+          });
+
+          streamCallback.onComplete(response);
+        },
+        onError: async (error) => {
+          // Update agent execution with error
+          await this.prisma.agent.update({
+            where: { id: agentExecution.id },
+            data: {
+              status: 'FAILED',
+              outputResult: error.message,
+              completedAt: new Date(),
+            },
+          });
+
+          streamCallback.onError(error);
+        },
+      },
+      executeDto.model || template.defaultModel,
+      template.maxTokens,
+    );
+
+    return agentExecution.id;
+  }
+
+  private buildSystemPromptFromNewTemplate(template: any, context: AgentExecutionContext): string {
+    return `${template.systemPrompt}
+
+## Current Project Context
+
+- **Project ID**: ${context.projectId}
+- **Current Phase**: ${context.currentPhase}
+- **Current Gate**: ${context.currentGate}
+- **Available Documents**: ${context.availableDocuments.join(', ') || 'None'}
+
+---
+
+Now, please proceed with your task.`;
   }
 
   private async buildExecutionContext(
