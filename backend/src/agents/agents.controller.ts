@@ -18,7 +18,7 @@ import { AgentTemplateLoaderService } from './services/agent-template-loader.ser
 import { ExecuteAgentDto } from './dto/execute-agent.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { WebSocketGateway as WSGateway } from '../websocket/websocket.gateway';
+import { AppWebSocketGateway } from '../websocket/websocket.gateway';
 
 @ApiTags('agents')
 @Controller('agents')
@@ -28,7 +28,7 @@ export class AgentsController {
   constructor(
     private readonly executionService: AgentExecutionService,
     private readonly templateLoader: AgentTemplateLoaderService,
-    private readonly wsGateway: WSGateway,
+    private readonly wsGateway: AppWebSocketGateway,
   ) {}
 
   @Get('templates')

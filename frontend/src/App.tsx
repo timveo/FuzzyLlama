@@ -6,6 +6,10 @@ import { useThemeStore } from './stores/theme';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
+import DashboardSelector from './pages/DashboardSelector';
+import DashboardV1MissionControl from './pages/DashboardV1MissionControl';
+import DashboardV2JourneyMap from './pages/DashboardV2JourneyMap';
+import DashboardV3LivingCanvas from './pages/DashboardV3LivingCanvas';
 import { CreateProject } from './pages/CreateProject';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Tasks } from './pages/Tasks';
@@ -103,6 +107,46 @@ function App() {
                 <MainLayout>
                   <Dashboard />
                 </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Dashboard Selector - Choose Your Experience */}
+          <Route
+            path="/dashboards"
+            element={
+              <ProtectedRoute>
+                <DashboardSelector />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Dashboard V1: Mission Control */}
+          <Route
+            path="/dashboard/mission-control"
+            element={
+              <ProtectedRoute>
+                <DashboardV1MissionControl />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Dashboard V2: Journey Map */}
+          <Route
+            path="/dashboard/journey-map"
+            element={
+              <ProtectedRoute>
+                <DashboardV2JourneyMap />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Dashboard V3: Living Canvas */}
+          <Route
+            path="/dashboard/living-canvas"
+            element={
+              <ProtectedRoute>
+                <DashboardV3LivingCanvas />
               </ProtectedRoute>
             }
           />

@@ -241,6 +241,88 @@ export const AgentExecution: React.FC = () => {
         )}
       </Card>
 
+      {/* Real-Time Terminal Output */}
+      {(isStreaming || currentOutput) && (
+        <Card padding="none" className="mb-8 overflow-hidden">
+          {/* Terminal Header */}
+          <div className="px-6 py-4 bg-dark-surface dark:bg-dark-elevated border-b border-dark-border flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+              </div>
+              <span className="text-sm font-mono text-dark-text-secondary">
+                LayerCake Agent Terminal
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              {isConnected ? (
+                <div className="flex items-center gap-2 text-green-400">
+                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-xs font-medium">Connected</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-red-400">
+                  <div className="w-2 h-2 rounded-full bg-red-400" />
+                  <span className="text-xs font-medium">Disconnected</span>
+                </div>
+              )}
+              {isStreaming && (
+                <div className="flex items-center gap-2 text-primary-400">
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="text-xs font-medium">Streaming...</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Terminal Output */}
+          <div
+            ref={outputRef}
+            className="p-6 bg-dark-bg dark:bg-[#0a0f0f] font-mono text-sm text-dark-text-primary overflow-y-auto"
+            style={{ maxHeight: '600px', minHeight: '300px' }}
+          >
+            {currentOutput ? (
+              <pre className="whitespace-pre-wrap break-words leading-relaxed text-primary-100">
+                {currentOutput}
+              </pre>
+            ) : (
+              <div className="flex items-center gap-2 text-dark-text-secondary">
+                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Waiting for agent to start...</span>
+              </div>
+            )}
+            {isStreaming && (
+              <span className="inline-block w-2 h-4 ml-1 bg-primary-400 animate-pulse" />
+            )}
+          </div>
+
+          {/* Terminal Footer */}
+          <div className="px-6 py-3 bg-dark-surface dark:bg-dark-elevated border-t border-dark-border flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-6 text-dark-text-secondary">
+              <span>Lines: {currentOutput.split('\n').length}</span>
+              <span>Characters: {currentOutput.length}</span>
+            </div>
+            <Button
+              onClick={() => {
+                setCurrentOutput('');
+                setIsStreaming(false);
+              }}
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+            >
+              Clear
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Execution History */}
       <Card padding="lg">
         <h2 className="text-xl font-semibold text-light-text-primary dark:text-dark-text-primary mb-4">

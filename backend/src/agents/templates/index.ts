@@ -1,22 +1,34 @@
 import { AgentTemplate } from '../interfaces/agent-template.interface';
 import { productManagerTemplate } from './product-manager.template';
+import { architectTemplate } from './architect.template';
+import { uxUiDesignerTemplate } from './ux-ui-designer.template';
+import { frontendDeveloperTemplate } from './frontend-developer.template';
+import { backendDeveloperTemplate } from './backend-developer.template';
+import { mlEngineerTemplate } from './ml-engineer.template';
+import { promptEngineerTemplate } from './prompt-engineer.template';
+import { modelEvaluatorTemplate } from './model-evaluator.template';
+import { dataEngineerTemplate } from './data-engineer.template';
+import { qaEngineerTemplate } from './qa-engineer.template';
+import { securityEngineerTemplate } from './security-engineer.template';
+import { devopsEngineerTemplate } from './devops-engineer.template';
+import { aiopsEngineerTemplate } from './aiops-engineer.template';
+import { orchestratorTemplate } from './orchestrator.template';
 
 export const agentTemplates: Record<string, AgentTemplate> = {
   PRODUCT_MANAGER: productManagerTemplate,
-  // TODO: Add remaining 13 agents
-  // ARCHITECT: architectTemplate,
-  // UX_UI_DESIGNER: uxUiDesignerTemplate,
-  // FRONTEND_DEVELOPER: frontendDeveloperTemplate,
-  // BACKEND_DEVELOPER: backendDeveloperTemplate,
-  // ML_ENGINEER: mlEngineerTemplate,
-  // PROMPT_ENGINEER: promptEngineerTemplate,
-  // MODEL_EVALUATOR: modelEvaluatorTemplate,
-  // DATA_ENGINEER: dataEngineerTemplate,
-  // QA_ENGINEER: qaEngineerTemplate,
-  // SECURITY_ENGINEER: securityEngineerTemplate,
-  // DEVOPS_ENGINEER: devopsEngineerTemplate,
-  // AIOPS_ENGINEER: aiopsEngineerTemplate,
-  // ORCHESTRATOR: orchestratorTemplate,
+  ARCHITECT: architectTemplate,
+  UX_UI_DESIGNER: uxUiDesignerTemplate,
+  FRONTEND_DEVELOPER: frontendDeveloperTemplate,
+  BACKEND_DEVELOPER: backendDeveloperTemplate,
+  ML_ENGINEER: mlEngineerTemplate,
+  PROMPT_ENGINEER: promptEngineerTemplate,
+  MODEL_EVALUATOR: modelEvaluatorTemplate,
+  DATA_ENGINEER: dataEngineerTemplate,
+  QA_ENGINEER: qaEngineerTemplate,
+  SECURITY_ENGINEER: securityEngineerTemplate,
+  DEVOPS_ENGINEER: devopsEngineerTemplate,
+  AIOPS_ENGINEER: aiopsEngineerTemplate,
+  ORCHESTRATOR: orchestratorTemplate,
 };
 
 export function getAgentTemplate(agentType: string): AgentTemplate | null {

@@ -8,7 +8,6 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AgentTemplateLoaderService } from './agent-template-loader.service';
 import { AIProviderService, AIProviderStreamCallback } from './ai-provider.service';
 import {
-  AgentRole,
   AgentExecutionContext,
   AgentExecutionResult,
 } from '../interfaces/agent-template.interface';
@@ -66,8 +65,7 @@ export class AgentExecutionService {
     }
 
     // Get agent template
-    const agentRole = executeDto.agentType as AgentRole;
-    const template = this.templateLoader.getTemplate(agentRole);
+    const template = this.templateLoader.getTemplate(executeDto.agentType);
 
     if (!template) {
       throw new NotFoundException(`Agent template not found: ${executeDto.agentType}`);
@@ -75,9 +73,7 @@ export class AgentExecutionService {
 
     // Check if agent is compatible with project type
     const projectType = project.type;
-    const isCompatible =
-      template.metadata.projectTypes.includes('all' as any) ||
-      template.metadata.projectTypes.some((type) => type === projectType);
+    const isCompatible = template.projectTypes.includes(projectType as any);
 
     if (!isCompatible) {
       throw new BadRequestException(
@@ -95,7 +91,7 @@ export class AgentExecutionService {
         agentType: executeDto.agentType,
         status: 'RUNNING',
         inputPrompt: executeDto.userPrompt,
-        model: executeDto.model || template.recommendedModel,
+        model: executeDto.model || template.defaultModel,
         contextData: context as any,
       },
     });
@@ -118,7 +114,7 @@ export class AgentExecutionService {
       const aiResponse = await this.aiProvider.executePrompt(
         systemPrompt,
         executeDto.userPrompt,
-        executeDto.model || template.recommendedModel,
+        executeDto.model || template.defaultModel,
       );
 
       // Parse AI response to extract actions
@@ -395,7 +391,7 @@ ${template.prompt.context}
     // Check if output mentions handoff to another agent
     const handoffMatch = output.match(/handoff to (\w+)/i);
     if (handoffMatch) {
-      result.nextAgent = handoffMatch[1] as AgentRole;
+      result.nextAgent = handoffMatch[1];
     }
 
     return result;
