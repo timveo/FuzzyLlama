@@ -12,6 +12,7 @@ import { GatesModule } from './gates/gates.module';
 import { DocumentsModule } from './documents/documents.module';
 import { SpecificationsModule } from './specifications/specifications.module';
 import { AgentsModule } from './agents/agents.module';
+import { WebSocketModule } from './websocket/websocket.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -29,6 +30,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     DocumentsModule,
     SpecificationsModule,
     AgentsModule,
+    WebSocketModule,
   ],
   controllers: [AppController],
   providers: [

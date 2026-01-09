@@ -1,0 +1,219 @@
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  ConnectedSocket,
+  MessageBody,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { Logger, UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../common/prisma/prisma.service';
+
+@WebSocketGateway({
+  cors: {
+    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    credentials: true,
+  },
+})
+export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server: Server;
+
+  private logger = new Logger('WebSocketGateway');
+  private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
+
+  constructor(
+    private jwtService: JwtService,
+    private prisma: PrismaService,
+  ) {}
+
+  async handleConnection(client: Socket) {
+    try {
+      // Get token from handshake auth
+      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+
+      if (!token) {
+        this.logger.warn(`Client ${client.id} attempted connection without token`);
+        client.disconnect();
+        return;
+      }
+
+      // Verify JWT token
+      const payload = await this.jwtService.verifyAsync(token);
+      const userId = payload.sub;
+
+      // Store socket for this user
+      if (!this.userSockets.has(userId)) {
+        this.userSockets.set(userId, new Set());
+      }
+      this.userSockets.get(userId).add(client.id);
+
+      // Store userId in socket data for later use
+      client.data.userId = userId;
+
+      this.logger.log(`Client connected: ${client.id} (User: ${userId})`);
+
+      // Join user's personal room
+      client.join(`user:${userId}`);
+
+      // Send connection confirmation
+      client.emit('connected', { userId, socketId: client.id });
+    } catch (error) {
+      this.logger.error(`Connection error for client ${client.id}: ${error.message}`);
+      client.disconnect();
+    }
+  }
+
+  handleDisconnect(client: Socket) {
+    const userId = client.data.userId;
+
+    if (userId && this.userSockets.has(userId)) {
+      this.userSockets.get(userId).delete(client.id);
+
+      if (this.userSockets.get(userId).size === 0) {
+        this.userSockets.delete(userId);
+      }
+    }
+
+    this.logger.log(`Client disconnected: ${client.id} (User: ${userId || 'unknown'})`);
+  }
+
+  @SubscribeMessage('join:project')
+  async handleJoinProject(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    const userId = client.data.userId;
+
+    if (!userId) {
+      client.emit('error', { message: 'Unauthorized' });
+      return;
+    }
+
+    // Verify user owns the project
+    const project = await this.prisma.project.findUnique({
+      where: { id: data.projectId },
+      select: { ownerId: true },
+    });
+
+    if (!project || project.ownerId !== userId) {
+      client.emit('error', { message: 'Project not found or access denied' });
+      return;
+    }
+
+    // Join project room
+    client.join(`project:${data.projectId}`);
+    this.logger.log(`Client ${client.id} joined project room: ${data.projectId}`);
+
+    client.emit('project:joined', { projectId: data.projectId });
+  }
+
+  @SubscribeMessage('leave:project')
+  handleLeaveProject(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    client.leave(`project:${data.projectId}`);
+    this.logger.log(`Client ${client.id} left project room: ${data.projectId}`);
+  }
+
+  // Emit agent execution events
+  emitAgentStarted(projectId: string, agentId: string, agentType: string, taskDescription: string) {
+    this.server.to(`project:${projectId}`).emit('agent:started', {
+      agentId,
+      agentType,
+      taskDescription,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(`Agent started: ${agentType} for project ${projectId}`);
+  }
+
+  emitAgentChunk(projectId: string, agentId: string, chunk: string) {
+    this.server.to(`project:${projectId}`).emit('agent:chunk', {
+      agentId,
+      chunk,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  emitAgentCompleted(projectId: string, agentId: string, result: any) {
+    this.server.to(`project:${projectId}`).emit('agent:completed', {
+      agentId,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(`Agent completed: ${agentId} for project ${projectId}`);
+  }
+
+  emitAgentFailed(projectId: string, agentId: string, error: string) {
+    this.server.to(`project:${projectId}`).emit('agent:failed', {
+      agentId,
+      error,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.error(`Agent failed: ${agentId} for project ${projectId} - ${error}`);
+  }
+
+  emitGateReady(projectId: string, gateId: string, gateType: string, artifacts: any[]) {
+    this.server.to(`project:${projectId}`).emit('gate:ready', {
+      gateId,
+      gateType,
+      artifacts,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(`Gate ready: ${gateType} for project ${projectId}`);
+  }
+
+  emitGateApproved(projectId: string, gateId: string, gateType: string, approvedBy: string) {
+    this.server.to(`project:${projectId}`).emit('gate:approved', {
+      gateId,
+      gateType,
+      approvedBy,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(`Gate approved: ${gateType} for project ${projectId}`);
+  }
+
+  emitTaskCreated(projectId: string, task: any) {
+    this.server.to(`project:${projectId}`).emit('task:created', {
+      task,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(`Task created: ${task.id} for project ${projectId}`);
+  }
+
+  emitDocumentCreated(projectId: string, document: any) {
+    this.server.to(`project:${projectId}`).emit('document:created', {
+      document,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(`Document created: ${document.id} for project ${projectId}`);
+  }
+
+  emitNotification(userId: string, notification: { type: string; message: string; data?: any }) {
+    this.server.to(`user:${userId}`).emit('notification', {
+      ...notification,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Get active connections for a user
+  getUserConnections(userId: string): number {
+    return this.userSockets.get(userId)?.size || 0;
+  }
+
+  // Check if user is online
+  isUserOnline(userId: string): boolean {
+    return this.userSockets.has(userId) && this.userSockets.get(userId).size > 0;
+  }
+}

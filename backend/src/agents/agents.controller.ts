@@ -18,6 +18,7 @@ import { AgentTemplateLoaderService } from './services/agent-template-loader.ser
 import { ExecuteAgentDto } from './dto/execute-agent.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { WebSocketGateway as WSGateway } from '../websocket/websocket.gateway';
 
 @ApiTags('agents')
 @Controller('agents')
@@ -27,6 +28,7 @@ export class AgentsController {
   constructor(
     private readonly executionService: AgentExecutionService,
     private readonly templateLoader: AgentTemplateLoaderService,
+    private readonly wsGateway: WSGateway,
   ) {}
 
   @Get('templates')
@@ -58,6 +60,54 @@ export class AgentsController {
     @CurrentUser() user: any,
   ) {
     return this.executionService.executeAgent(executeDto, user.id);
+  }
+
+  @Post('execute-stream')
+  @ApiOperation({ summary: 'Execute an agent with real-time streaming via WebSocket' })
+  @ApiResponse({ status: 200, description: 'Agent execution started, results streaming via WebSocket' })
+  @ApiResponse({ status: 400, description: 'Execution limit reached or invalid request' })
+  @ApiResponse({ status: 403, description: 'Cannot execute agent for project you do not own' })
+  async executeStream(
+    @Body() executeDto: ExecuteAgentDto,
+    @CurrentUser() user: any,
+  ) {
+    // Start agent execution with streaming
+    const agentExecutionId = await this.executionService.executeAgentStream(
+      executeDto,
+      user.id,
+      {
+        onChunk: (chunk: string) => {
+          // Stream chunks to WebSocket
+          this.wsGateway.emitAgentChunk(executeDto.projectId, agentExecutionId, chunk);
+        },
+        onComplete: (response) => {
+          // Notify completion via WebSocket
+          this.wsGateway.emitAgentCompleted(executeDto.projectId, agentExecutionId, {
+            content: response.content,
+            usage: response.usage,
+            finishReason: response.finishReason,
+          });
+        },
+        onError: (error) => {
+          // Notify error via WebSocket
+          this.wsGateway.emitAgentFailed(executeDto.projectId, agentExecutionId, error.message);
+        },
+      },
+    );
+
+    // Emit agent started event
+    this.wsGateway.emitAgentStarted(
+      executeDto.projectId,
+      agentExecutionId,
+      executeDto.agentType,
+      executeDto.userPrompt,
+    );
+
+    return {
+      success: true,
+      agentExecutionId,
+      message: 'Agent execution started. Results will be streamed via WebSocket.',
+    };
   }
 
   @Get('history')

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi } from '../api/projects';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { useWebSocket } from '../hooks/useWebSocket';
+import apiClient from '../lib/api-client';
 type AgentType =
   | 'PRODUCT_MANAGER'
   | 'ARCHITECT'
@@ -36,6 +38,36 @@ export const AgentExecution: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
   const [taskDescription, setTaskDescription] = useState('');
   const [showOutput, setShowOutput] = useState<string | null>(null);
+  const [currentOutput, setCurrentOutput] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const outputRef = useRef<HTMLDivElement>(null);
+
+  // WebSocket connection for real-time agent output
+  const { isConnected } = useWebSocket(id, {
+    onAgentStarted: (event) => {
+      console.log('Agent started:', event);
+      setCurrentOutput('');
+      setIsStreaming(true);
+    },
+    onAgentChunk: (event) => {
+      console.log('Agent chunk received');
+      setCurrentOutput((prev) => prev + event.chunk);
+      // Auto-scroll to bottom
+      if (outputRef.current) {
+        outputRef.current.scrollTop = outputRef.current.scrollHeight;
+      }
+    },
+    onAgentCompleted: (event) => {
+      console.log('Agent completed:', event);
+      setIsStreaming(false);
+      queryClient.invalidateQueries({ queryKey: ['agent-history', id] });
+    },
+    onAgentFailed: (event) => {
+      console.error('Agent failed:', event);
+      setIsStreaming(false);
+      setCurrentOutput((prev) => prev + `\n\nERROR: ${event.error}`);
+    },
+  });
 
   const { data: project } = useQuery({
     queryKey: ['project', id],
@@ -65,14 +97,20 @@ export const AgentExecution: React.FC = () => {
 
   const runAgentMutation = useMutation({
     mutationFn: async (data: { agentType: AgentType; taskDescription: string }) => {
-      // TODO: Implement actual API call
-      console.log('Running agent:', data);
-      return { success: true };
+      const response = await apiClient.post('/agents/execute-stream', {
+        projectId: id,
+        agentType: data.agentType,
+        userPrompt: data.taskDescription || `Please execute your core responsibilities for this project.`,
+      });
+      return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-executions', id] });
       setSelectedAgent(null);
       setTaskDescription('');
+    },
+    onError: (error: any) => {
+      console.error('Failed to run agent:', error);
+      setCurrentOutput(`ERROR: ${error.response?.data?.message || 'Failed to start agent'}`);
     },
   });
 
