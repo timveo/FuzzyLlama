@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option 3: Hybrid Workspace - LayerCake</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #111827;
+            color: #f9fafb;
+            line-height: 1.6;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        body.light-mode {
+            background: #f9fafb;
+            color: #111827;
+        }
+
+        /* Header */
+        .header {
+            background: #1f2937;
+            border-bottom: 1px solid #374151;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        body.light-mode .header {
+            background: white;
+            border-bottom-color: #e5e7eb;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .menu-toggle {
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #9ca3af;
+            padding: 0.25rem;
+        }
+
+        body.light-mode .menu-toggle {
+            color: #6b7280;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #0ea5e9, #a855f7);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+
+        .header-center {
+            flex: 1;
+            max-width: 600px;
+            margin: 0 2rem;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.625rem 1rem 0.625rem 2.75rem;
+            background: #374151;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            color: #f9fafb;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        body.light-mode .search-input {
+            background: #f3f4f6;
+            border-color: #e5e7eb;
+            color: #111827;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9ca3af;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .icon-btn:hover {
+            background: #374151;
+            color: #f9fafb;
+        }
+
+        body.light-mode .icon-btn:hover {
+            background: #f3f4f6;
+            color: #111827;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+        }
+
+        .theme-toggle {
+            background: #374151;
+            padding: 0.25rem;
+            border-radius: 8px;
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        body.light-mode .theme-toggle {
+            background: #e5e7eb;
+        }
+
+        .theme-btn {
+            padding: 0.375rem 0.75rem;
+            border: none;
+            background: transparent;
+            color: #9ca3af;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .theme-btn.active {
+            background: #0ea5e9;
+            color: white;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0ea5e9, #a855f7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+
+        /* Breadcrumb Bar */
+        .breadcrumb-bar {
+            background: #1f2937;
+            border-bottom: 1px solid #374151;
+            padding: 0.625rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #9ca3af;
+        }
+
+        body.light-mode .breadcrumb-bar {
+            background: #f9fafb;
+            border-bottom-color: #e5e7eb;
+        }
+
+        .breadcrumb-item {
+            color: #9ca3af;
+        }
+
+        .breadcrumb-item.active {
+            color: #f9fafb;
+        }
+
+        body.light-mode .breadcrumb-item.active {
+            color: #111827;
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: flex;
+            height: calc(100vh - 120px);
+        }
+
+        /* Left Sidebar */
+        .left-sidebar {
+            width: 240px;
+            background: #1f2937;
+            border-right: 1px solid #374151;
+            padding: 1.5rem 1rem;
+            overflow-y: auto;
+        }
+
+        body.light-mode .left-sidebar {
+            background: white;
+            border-right-color: #e5e7eb;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-item {
+            padding: 0.625rem 0.75rem;
+            border-radius: 6px;
+            color: #d1d5db;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.2s;
+            margin-bottom: 0.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        body.light-mode .sidebar-item {
+            color: #4b5563;
+        }
+
+        .sidebar-item:hover {
+            background: #374151;
+            color: #f9fafb;
+        }
+
+        body.light-mode .sidebar-item:hover {
+            background: #f3f4f6;
+            color: #111827;
+        }
+
+        .sidebar-item.active {
+            background: rgba(14, 165, 233, 0.1);
+            color: #0ea5e9;
+        }
+
+        .btn-create {
+            width: 100%;
+            padding: 0.625rem;
+            background: linear-gradient(135deg, #0ea5e9, #a855f7);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+
+        .btn-create:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .content-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+        }
+
+        .view-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .view-btn {
+            padding: 0.5rem 1rem;
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+        }
+
+        body.light-mode .view-btn {
+            background: white;
+            border-color: #e5e7eb;
+            color: #4b5563;
+        }
+
+        .view-btn.active {
+            background: #0ea5e9;
+            border-color: #0ea5e9;
+            color: white;
+        }
+
+        /* Project Grid */
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .project-card {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        body.light-mode .project-card {
+            background: white;
+            border-color: #e5e7eb;
+        }
+
+        .project-card:hover {
+            border-color: #0ea5e9;
+            box-shadow: 0 8px 24px rgba(14, 165, 233, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .project-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .project-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .project-badges {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            padding: 0.25rem 0.625rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-primary {
+            background: rgba(14, 165, 233, 0.15);
+            color: #0ea5e9;
+        }
+
+        .badge-success {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .project-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #374151;
+        }
+
+        body.light-mode .project-stats {
+            border-top-color: #e5e7eb;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0ea5e9;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        /* Right Sidebar */
+        .right-sidebar {
+            width: 320px;
+            background: #1f2937;
+            border-left: 1px solid #374151;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        body.light-mode .right-sidebar {
+            background: white;
+            border-left-color: #e5e7eb;
+        }
+
+        .sidebar-panel {
+            margin-bottom: 2rem;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .agent-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: #374151;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        body.light-mode .agent-status {
+            background: #f3f4f6;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-running {
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+        }
+
+        .agent-info {
+            flex: 1;
+        }
+
+        .agent-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .agent-progress {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn-action {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #0ea5e9, #a855f7);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+
+        .btn-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+        }
+
+        .history-item {
+            padding: 0.75rem;
+            background: #374151;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        body.light-mode .history-item {
+            background: #f3f4f6;
+        }
+
+        .history-time {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: #1f2937;
+            border-top: 1px solid #374151;
+            padding: 0.5rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            color: #9ca3af;
+        }
+
+        body.light-mode .status-bar {
+            background: #f9fafb;
+            border-top-color: #e5e7eb;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <button class="menu-toggle">☰</button>
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <span>LayerCake</span>
+            </div>
+        </div>
+        <div class="header-center">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" placeholder="Search everything... (⌘K)">
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="icon-btn">
+                🔔
+                <span class="notification-badge"></span>
+            </button>
+            <button class="icon-btn">⚙️</button>
+            <div class="theme-toggle">
+                <button class="theme-btn active">🌙</button>
+                <button class="theme-btn">☀️</button>
+            </div>
+            <div class="avatar">TU</div>
+        </div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb-bar">
+        <span class="breadcrumb-item">Workspace</span>
+        <span>/</span>
+        <span class="breadcrumb-item">Projects</span>
+        <span>/</span>
+        <span class="breadcrumb-item active">All Projects</span>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+        <!-- Left Sidebar -->
+        <div class="left-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Projects</div>
+                <div class="sidebar-item">
+                    <span>🏠</span>
+                    <span>All Projects</span>
+                </div>
+                <div class="sidebar-item">
+                    <span>⭐</span>
+                    <span>Favorites</span>
+                </div>
+                <div class="sidebar-item">
+                    <span>📋</span>
+                    <span>Recent</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Agents</div>
+                <div class="sidebar-item active">
+                    <span>🎯</span>
+                    <span>Orchestrator</span>
+                </div>
+                <div class="sidebar-item">
+                    <span>🏗️</span>
+                    <span>Architect</span>
+                </div>
+                <div class="sidebar-item">
+                    <span>💻</span>
+                    <span>Developers</span>
+                </div>
+                <div class="sidebar-item">
+                    <span>✅</span>
+                    <span>QA Engineer</span>
+                </div>
+            </div>
+
+            <button class="btn-create">+ Create Project</button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h1 class="content-title">Projects</h1>
+                <div class="view-controls">
+                    <button class="view-btn active">⊞ Grid</button>
+                    <button class="view-btn">≡ List</button>
+                    <button class="view-btn">📊 Board</button>
+                </div>
+            </div>
+
+            <div class="project-grid">
+                <!-- Project Card 1 -->
+                <div class="project-card">
+                    <div class="project-header">
+                        <div>
+                            <h3 class="project-name">E-Commerce Platform</h3>
+                            <div class="project-badges">
+                                <span class="badge badge-primary">TRADITIONAL</span>
+                                <span class="badge badge-success">G2 COMPLETE</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 0.875rem; margin: 1rem 0;">
+                        Full-stack platform with React frontend, Node.js backend, and PostgreSQL database
+                    </p>
+                    <div class="project-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">45%</div>
+                            <div class="stat-label">Complete</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">12</div>
+                            <div class="stat-label">Tasks</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">3</div>
+                            <div class="stat-label">Active</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty Card -->
+                <div class="project-card" style="border-style: dashed; opacity: 0.6;">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 180px; text-align: center; color: #6b7280;">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">+</div>
+                        <div style="font-size: 0.875rem;">New Project</div>
+                        <div style="font-size: 0.75rem; margin-top: 0.25rem;">FREE: 0 of 1 remaining</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="right-sidebar">
+            <div class="sidebar-panel">
+                <h3 class="panel-title">Active Agents</h3>
+                <div class="agent-status">
+                    <div class="status-dot status-running"></div>
+                    <div class="agent-info">
+                        <div class="agent-name">Orchestrator</div>
+                        <div class="agent-progress">Coordinating tasks...</div>
+                    </div>
+                </div>
+                <div class="agent-status">
+                    <div class="status-dot status-running"></div>
+                    <div class="agent-info">
+                        <div class="agent-name">Backend Dev</div>
+                        <div class="agent-progress">Creating API endpoints</div>
+                    </div>
+                </div>
+                <div class="agent-status">
+                    <div class="status-dot status-running"></div>
+                    <div class="agent-info">
+                        <div class="agent-name">Frontend Dev</div>
+                        <div class="agent-progress">Building components</div>
+                    </div>
+                </div>
+                <button class="btn-action">Execute New Agent</button>
+            </div>
+
+            <div class="sidebar-panel">
+                <h3 class="panel-title">Recent Activity</h3>
+                <div class="history-item">
+                    <div>✓ Task completed: Setup database</div>
+                    <div class="history-time">2 minutes ago</div>
+                </div>
+                <div class="history-item">
+                    <div>🤖 Agent executed: Backend Dev</div>
+                    <div class="history-time">15 minutes ago</div>
+                </div>
+                <div class="history-item">
+                    <div>📄 Document created: API Spec</div>
+                    <div class="history-time">1 hour ago</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="status-item">
+                <span class="status-indicator"></span>
+                <span>Agent: orchestrator running</span>
+            </div>
+            <div class="status-item">
+                <span>📊</span>
+                <span>12,450 tokens used</span>
+            </div>
+        </div>
+        <div>
+            <span>View: Grid</span>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle functionality
+        const themeBtns = document.querySelectorAll('.theme-btn');
+        const body = document.body;
+
+        themeBtns.forEach((btn, index) => {
+            btn.addEventListener('click', () => {
+                themeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                if (index === 1) {
+                    body.classList.add('light-mode');
+                } else {
+                    body.classList.remove('light-mode');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

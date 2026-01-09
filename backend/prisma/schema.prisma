@@ -1,0 +1,1205 @@
+// LayerCake Database Schema
+// Migrated from MCP Server SQLite to PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTHENTICATION & USER MANAGEMENT
+// ============================================================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String?
+  name          String
+  avatarUrl     String?
+  emailVerified Boolean  @default(false)
+
+  // OAuth
+  githubId      String?  @unique
+  googleId      String?  @unique
+
+  // Subscription
+  planTier      PlanTier @default(FREE)
+  stripeCustomerId String? @unique
+
+  // Usage tracking
+  monthlyAgentExecutions Int @default(0)
+  lastExecutionReset DateTime?
+
+  // Relations
+  projects      Project[]
+  organizations OrganizationMember[]
+  decisions     Decision[]
+  documents     Document[]
+  specifications Specification[] @relation("SpecificationCreator")
+  gatesApproved Gate[]
+  tasksAssigned Task[] @relation("TaskAssignedTo")
+  tasksCreated  Task[] @relation("TaskCreatedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  TEAM
+  ENTERPRISE
+}
+
+model Organization {
+  id       String   @id @default(cuid())
+  name     String
+  planTier PlanTier @default(FREE)
+
+  stripeSubscriptionId String? @unique
+
+  members  OrganizationMember[]
+  projects Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrganizationMember {
+  id             String @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole @default(MEMBER)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// ============================================================================
+// PROJECTS
+// ============================================================================
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  type        ProjectType
+  repository  String?
+
+  // Ownership
+  ownerId        String
+  owner          User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // GitHub
+  githubRepoUrl    String?
+  githubRepoId     String?
+  railwayProjectId String?
+
+  // Relations
+  state              ProjectState?
+  phaseHistory       PhaseHistory[]
+  tasks              Task[]
+  blockers           Blocker[]
+  risks              Risk[]
+  deliverables       Deliverable[]
+  handoffs           Handoff[]
+  queries            Query[]
+  escalations        Escalation[]
+  decisions          Decision[]
+  metrics            Metrics?
+  featureLoops       FeatureLoops?
+  activeLoop         ActiveLoop?
+  loopQueue          LoopQueue[]
+  completedLoops     CompletedLoop[]
+  modelUsage         ModelUsage[]
+  teaching           Teaching?
+  teachingByAgent    TeachingByAgent[]
+  teachingTopics     TeachingTopic[]
+  nextActions        NextAction[]
+  memory             Memory[]
+  notes              Note[]
+  enhancedMemory     EnhancedMemory[]
+  toolResults        ToolResult[]
+  errorHistory       ErrorHistory[]
+  sessionContext     SessionContext[]
+  proofArtifacts     ProofArtifact[]
+  learningExtractions LearningExtraction[]
+  parallelAssessments ParallelAssessment[]
+
+  // New web app relations
+  agents           Agent[] @relation("AgentExecutions")
+  documents        Document[] @relation("ProjectDocuments")
+  specifications   Specification[] @relation("ProjectSpecifications")
+  gates            Gate[] @relation("ProjectGates")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([type])
+}
+
+enum ProjectType {
+  traditional
+  ai_ml
+  hybrid
+  enhancement
+}
+
+model ProjectState {
+  projectId       String  @id
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  currentPhase    Phase
+  currentGate     String
+  currentAgent    String?
+  percentComplete Int     @default(0)
+
+  updatedAt DateTime @updatedAt
+}
+
+enum Phase {
+  pre_startup
+  intake
+  assessment
+  planning
+  planning_complete
+  architecture
+  architecture_complete
+  design
+  design_complete
+  development
+  development_foundation
+  development_data
+  development_components
+  development_integration
+  development_polish
+  development_complete
+  testing
+  testing_complete
+  security_review
+  security_complete
+  pre_deployment
+  deployment_approved
+  production
+  completion
+  completed
+  blocked
+}
+
+model PhaseHistory {
+  id          Int      @id @default(autoincrement())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  phase       String
+  agent       String
+  startedAt   DateTime
+  completedAt DateTime?
+  status      PhaseStatus @default(in_progress)
+  notes       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+enum PhaseStatus {
+  in_progress
+  completed
+  skipped
+  failed
+}
+
+// ============================================================================
+// TASKS & BLOCKERS
+// ============================================================================
+
+model Task {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  phase       String
+  name        String
+  description String?
+  status      TaskStatus @default(not_started)
+  owner       String?
+
+  // Additional fields for web app
+  title       String?
+  priority    String?  // LOW, MEDIUM, HIGH, CRITICAL
+  estimatedEffort Int?
+  actualEffort    Int?
+
+  agentId     String?
+  assignedToId String?
+  assignedTo   User?    @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  parentTaskId String?
+  parentTask   Task?    @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks     Task[]   @relation("SubTasks")
+
+  blockingReason String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdById    String?
+  createdBy      User?  @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  toolResults      ToolResult[]
+  errorHistory     ErrorHistory[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId, phase])
+  @@index([status])
+  @@index([agentId])
+  @@index([assignedToId])
+}
+
+enum TaskStatus {
+  not_started
+  in_progress
+  complete
+  blocked
+  skipped
+}
+
+model Blocker {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  description     String
+  severity        Severity
+  owner           String?
+  resolvedAt      DateTime?
+  resolution      String?
+  escalated       Boolean  @default(false)
+  escalationLevel EscalationLevel?
+
+  blockerAgents   BlockerAgent[]
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@index([resolvedAt])
+}
+
+enum Severity {
+  critical
+  high
+  medium
+  low
+}
+
+enum EscalationLevel {
+  L1
+  L2
+  L3
+}
+
+model BlockerAgent {
+  blockerId String
+  blocker   Blocker @relation(fields: [blockerId], references: [id], onDelete: Cascade)
+  agent     String
+
+  @@id([blockerId, agent])
+}
+
+model Risk {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  description String
+  probability Probability
+  impact      Impact
+  mitigation  String?
+  owner       String?
+  status      RiskStatus @default(identified)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Probability {
+  high
+  medium
+  low
+}
+
+enum Impact {
+  high
+  medium
+  low
+}
+
+enum RiskStatus {
+  identified
+  mitigating
+  mitigated
+  accepted
+  realized
+}
+
+model Deliverable {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name      String
+  path      String?
+  status    DeliverableStatus @default(not_started)
+  owner     String?
+  version   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum DeliverableStatus {
+  not_started
+  in_progress
+  in_review
+  complete
+  blocked
+}
+
+// ============================================================================
+// AGENT COORDINATION
+// ============================================================================
+
+model Handoff {
+  id        Int      @id @default(autoincrement())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  fromAgent     String
+  toAgent       String
+  phase         String
+  status        HandoffStatus
+  retryAttempt  Int     @default(0)
+  notes         String?
+
+  handoffDeliverables HandoffDeliverable[]
+  learningExtractions LearningExtraction[] @relation("HandoffExtractions")
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+enum HandoffStatus {
+  complete
+  partial
+  blocked
+}
+
+model HandoffDeliverable {
+  handoffId   Int
+  handoff     Handoff @relation(fields: [handoffId], references: [id], onDelete: Cascade)
+  deliverable String
+
+  @@id([handoffId, deliverable])
+}
+
+model Query {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  fromAgent  String
+  toAgent    String
+  type       QueryType
+  question   String
+  answer     String?
+  status     QueryStatus @default(pending)
+  answeredAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+}
+
+enum QueryType {
+  clarification
+  validation
+  consultation
+  estimation
+}
+
+enum QueryStatus {
+  pending
+  answered
+  expired
+}
+
+model Escalation {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  level      EscalationLevel
+  fromAgent  String
+  severity   Severity
+  type       EscalationType
+  summary    String
+  status     EscalationStatus @default(pending)
+  resolution String?
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+}
+
+enum EscalationType {
+  blocker
+  decision
+  technical
+  scope
+}
+
+enum EscalationStatus {
+  pending
+  resolved
+  auto_resolved
+}
+
+model Decision {
+  id                     Int      @id @default(autoincrement())
+  projectId              String
+  project                Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  gate                   String
+  agent                  String
+  decisionType           String
+  description            String
+  rationale              String?
+  alternativesConsidered String?
+  outcome                String?
+
+  userId                 String?
+  user                   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  learningExtractions    LearningExtraction[] @relation("DecisionExtractions")
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId, gate])
+}
+
+// ============================================================================
+// METRICS & TRACKING
+// ============================================================================
+
+model Metrics {
+  projectId         String  @id
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  storiesTotal      Int     @default(0)
+  storiesCompleted  Int     @default(0)
+  bugsOpen          Int     @default(0)
+  bugsResolved      Int     @default(0)
+  testCoverage      String  @default("0%")
+  qualityGateStatus QualityGateStatus @default(pending)
+  retryCount        Int     @default(0)
+
+  updatedAt DateTime @updatedAt
+}
+
+enum QualityGateStatus {
+  passing
+  failing
+  pending
+}
+
+model FeatureLoops {
+  projectId               String  @id
+  project                 Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  enabled                 Boolean @default(false)
+  strategy                LoopStrategy @default(sequential)
+  maxIterations           Int     @default(3)
+  totalLoops              Int     @default(0)
+  completedLoops          Int     @default(0)
+  avgIterations           Float   @default(0)
+  avgDurationMinutes      Float   @default(0)
+  firstPassAcceptanceRate Float   @default(0)
+}
+
+enum LoopStrategy {
+  sequential
+  parallel
+}
+
+model ActiveLoop {
+  projectId String  @id
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  storyId   String?
+  storyTitle String?
+  phase     LoopPhase?
+  agent     String?
+  iteration Int     @default(0)
+  startedAt DateTime?
+}
+
+enum LoopPhase {
+  QUEUED
+  REFINING
+  BUILDING
+  TESTING
+  ACCEPTING
+  COMPLETE
+  BLOCKED
+}
+
+model LoopQueue {
+  id           Int      @id @default(autoincrement())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  storyId      String
+  title        String
+  priority     Int
+  dependencies String?
+}
+
+model CompletedLoop {
+  id              Int      @id @default(autoincrement())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  storyId         String
+  title           String
+  iterations      Int
+  durationMinutes Int
+  issuesFound     Int      @default(0)
+
+  completedAt DateTime @default(now())
+}
+
+model ModelUsage {
+  id               Int      @id @default(autoincrement())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  agent            String
+  tier             Int
+  task             String
+  tokensEstimated  Int      @default(0)
+
+  createdAt DateTime @default(now())
+}
+
+model Teaching {
+  projectId        String  @id
+  project          Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  level            TeachingLevel @default(INTERMEDIATE)
+  targetPerPhase   String  @default("5-8")
+  momentsDelivered Int     @default(0)
+}
+
+enum TeachingLevel {
+  NOVICE
+  INTERMEDIATE
+  EXPERT
+}
+
+model TeachingByAgent {
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agent     String
+  count     Int     @default(0)
+
+  @@id([projectId, agent])
+}
+
+model TeachingTopic {
+  id        Int      @id @default(autoincrement())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  topic     String
+  agent     String
+  gate      String
+
+  createdAt DateTime @default(now())
+}
+
+model NextAction {
+  id        Int      @id @default(autoincrement())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  action    String
+  owner     String
+  priority  Severity @default(medium)
+  status    ActionStatus @default(pending)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ActionStatus {
+  pending
+  in_progress
+  complete
+}
+
+model Memory {
+  id        Int      @id @default(autoincrement())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type      MemoryType
+  content   String
+
+  createdAt DateTime @default(now())
+}
+
+enum MemoryType {
+  decision_worked
+  decision_failed
+  pattern_discovered
+  gotcha
+}
+
+model Note {
+  id        Int      @id @default(autoincrement())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  content   String
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================================
+// ENHANCED CONTEXT ENGINEERING (Phase 1-5)
+// ============================================================================
+
+model EnhancedMemory {
+  id           Int      @id @default(autoincrement())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  memoryType   EnhancedMemoryType
+  scope        MemoryScope @default(project_specific)
+  title        String
+  content      String
+  context      String?
+  exampleCode  String?
+  tags         String?  // JSON array
+  agents       String?  // JSON array
+  gate         String?
+  outcome      String?
+  confidence   Float    @default(0.5)
+  embedding    Bytes?   // 384 floats for semantic search
+  syncedToSystem Boolean @default(false)
+
+  learningExtractions LearningExtraction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([memoryType])
+  @@index([scope])
+}
+
+enum EnhancedMemoryType {
+  pattern
+  decision
+  failure
+  gotcha
+  success
+  integration
+  performance
+  security
+}
+
+enum MemoryScope {
+  universal
+  stack_specific
+  domain_specific
+  project_specific
+}
+
+model MemoryLink {
+  id         Int      @id @default(autoincrement())
+  sourceType LinkSourceType
+  sourceId   String   // Polymorphic - can reference any model
+  targetType LinkTargetType
+  targetId   String   // Polymorphic - can reference any model or file path
+  linkType   LinkType
+
+  // Note: Relations are polymorphic, no foreign keys enforced at DB level
+  // Application code must handle referential integrity
+
+  createdAt DateTime @default(now())
+
+  @@index([sourceType, sourceId])
+  @@index([targetType, targetId])
+}
+
+enum LinkSourceType {
+  memory
+  decision
+  error
+  task
+  handoff
+}
+
+enum LinkTargetType {
+  memory
+  decision
+  error
+  task
+  file
+}
+
+enum LinkType {
+  caused_by
+  related_to
+  supersedes
+  depends_on
+  fixes
+  references
+}
+
+model ToolResult {
+  id              Int      @id @default(autoincrement())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  toolName        String
+  inputHash       String   // SHA256
+  inputJson       String
+  outputJson      String
+  success         Boolean
+  errorMessage    String?
+  executionTimeMs Int?
+  taskId          String?
+  task            Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  workerId        String?
+  expiresAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId, toolName, inputHash])
+  @@index([taskId])
+}
+
+model ErrorHistory {
+  id              Int      @id @default(autoincrement())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  taskId          String?
+  task            Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  errorType       ErrorType
+  errorMessage    String
+  stackTrace      String?
+  filePath        String?
+  lineNumber      Int?
+  contextJson     String?
+  resolution      String?
+  resolutionAgent String?
+  resolvedAt      DateTime?
+  retryCount      Int      @default(0)
+  embedding       Bytes?
+
+  learningExtractions LearningExtraction[] @relation("ErrorExtractions")
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([errorType])
+}
+
+enum ErrorType {
+  build
+  test
+  lint
+  runtime
+  validation
+  network
+  auth
+  unknown
+}
+
+model SessionContext {
+  id          Int      @id @default(autoincrement())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sessionId   String
+  contextType ContextType
+  key         String
+  valueJson   String
+  ttlSeconds  Int?
+  expiresAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, sessionId, contextType, key])
+  @@index([projectId, sessionId, contextType])
+  @@index([expiresAt])
+}
+
+enum ContextType {
+  conversation
+  working_set
+  agent_state
+  user_preference
+  temporary
+}
+
+model ProofArtifact {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  gate           String
+  proofType      ProofType
+  filePath       String
+  fileHash       String   // SHA256
+  contentSummary String
+  passFail       PassFail
+  createdBy      String
+  verified       Boolean  @default(false)
+  verifiedAt     DateTime?
+  verifiedBy     String?
+
+  // New relation to Gate model
+  gateId         String?
+  gateRelation   Gate?    @relation("GateProofArtifacts", fields: [gateId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@index([gate])
+  @@index([proofType])
+}
+
+enum ProofType {
+  test_output
+  coverage_report
+  lint_output
+  security_scan
+  build_output
+  lighthouse_report
+  accessibility_scan
+  spec_validation
+  deployment_log
+  smoke_test
+  screenshot
+  manual_verification
+}
+
+enum PassFail {
+  pass
+  fail
+  warning
+  info
+}
+
+model LearningExtraction {
+  id                 Int      @id @default(autoincrement())
+  projectId          String
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sourceType         ExtractionSource
+  sourceId           Int
+  extractedMemoryId  Int?
+  extractedMemory    EnhancedMemory? @relation(fields: [extractedMemoryId], references: [id], onDelete: SetNull)
+  confidence         Float
+  autoSynced         Boolean  @default(false)
+  reviewed           Boolean  @default(false)
+
+  // Relations for different source types
+  decisionSource     Decision?      @relation("DecisionExtractions", fields: [sourceId], references: [id], onDelete: Cascade, map: "decision_extraction_fk")
+  errorSource        ErrorHistory?  @relation("ErrorExtractions", fields: [sourceId], references: [id], onDelete: Cascade, map: "error_extraction_fk")
+  handoffSource      Handoff?       @relation("HandoffExtractions", fields: [sourceId], references: [id], onDelete: Cascade, map: "handoff_extraction_fk")
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+enum ExtractionSource {
+  decision
+  error
+  blocker
+  handoff
+}
+
+model ParallelAssessment {
+  id              Int      @id @default(autoincrement())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status          AssessmentStatus @default(in_progress)
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  aggregatedScore Float?
+  recommendation  Recommendation?
+  totalAgents     Int      @default(0)
+  completedAgents Int      @default(0)
+  timedOutAgents  Int      @default(0)
+  failedAgents    Int      @default(0)
+
+  results         AssessmentResult[]
+
+  @@index([projectId])
+}
+
+enum AssessmentStatus {
+  in_progress
+  complete
+  failed
+  partial
+}
+
+enum Recommendation {
+  MAINTAIN
+  ENHANCE
+  REFACTOR
+  REWRITE
+}
+
+model AssessmentResult {
+  id                    Int      @id @default(autoincrement())
+  parallelAssessmentId  Int
+  parallelAssessment    ParallelAssessment @relation(fields: [parallelAssessmentId], references: [id], onDelete: Cascade)
+
+  agent                 String
+  section               AssessmentSection
+  score                 Int?
+  weight                Float    @default(1.0)
+  status                AssessmentResultStatus @default(pending)
+  findingsJson          String?
+  metricsJson           String?
+  detailsJson           String?
+  startedAt             DateTime?
+  submittedAt           DateTime?
+  errorMessage          String?
+
+  @@unique([parallelAssessmentId, agent])
+  @@index([parallelAssessmentId])
+}
+
+enum AssessmentSection {
+  architecture
+  security
+  quality
+  devops
+  frontend_code
+  backend_code
+  ai_ml
+  data
+}
+
+enum AssessmentResultStatus {
+  pending
+  in_progress
+  complete
+  timed_out
+  failed
+}
+
+// ============================================================================
+// USAGE TRACKING & BILLING
+// ============================================================================
+
+model UsageMetric {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+
+  agentExecutions Int      @default(0)
+  apiTokensUsed   Int      @default(0)
+  cost            Decimal  @db.Decimal(10, 2)
+
+  periodStart DateTime
+  periodEnd   DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, periodStart])
+  @@index([projectId])
+}
+
+// ============================================================================
+// WEB APPLICATION MODELS (NEW)
+// ============================================================================
+
+model Agent {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation("AgentExecutions", fields: [projectId], references: [id], onDelete: Cascade)
+
+  agentType   String   // Role of agent (orchestrator, product_manager, etc.)
+  status      AgentStatus @default(PENDING)
+
+  inputPrompt String   @db.Text
+  outputResult String? @db.Text
+
+  model       String   // AI model used (claude-opus-4, gpt-4o, etc.)
+  inputTokens Int      @default(0)
+  outputTokens Int     @default(0)
+
+  contextData Json?    // Execution context
+
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([agentType])
+}
+
+enum AgentStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation("ProjectDocuments", fields: [projectId], references: [id], onDelete: Cascade)
+
+  title        String
+  content      String   @db.Text
+  documentType DocumentType
+
+  filePath     String?
+  language     String?
+  version      Int      @default(1)
+
+  agentId      String?
+  gateId       String?
+
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([documentType])
+  @@index([agentId])
+  @@index([gateId])
+}
+
+enum DocumentType {
+  REQUIREMENTS
+  ARCHITECTURE
+  API_SPEC
+  DATABASE_SCHEMA
+  USER_STORY
+  TEST_PLAN
+  DEPLOYMENT_GUIDE
+  CODE
+  OTHER
+}
+
+model Specification {
+  id               String   @id @default(cuid())
+  projectId        String
+  project          Project  @relation("ProjectSpecifications", fields: [projectId], references: [id], onDelete: Cascade)
+
+  name             String
+  specificationType SpecificationType
+  content          Json     // Flexible JSON storage for any spec format
+
+  description      String?
+  version          Int      @default(1)
+
+  agentId          String?
+  gateId           String?
+
+  createdById      String
+  createdBy        User     @relation("SpecificationCreator", fields: [createdById], references: [id])
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([specificationType])
+  @@index([agentId])
+  @@index([gateId])
+}
+
+enum SpecificationType {
+  OPENAPI
+  PRISMA
+  ZOD
+  GRAPHQL
+  PROTOBUF
+  OTHER
+}
+
+model Gate {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation("ProjectGates", fields: [projectId], references: [id], onDelete: Cascade)
+
+  gateType     String   // G0_PENDING, G0_COMPLETE, G1_PENDING, etc.
+  status       GateStatus @default(PENDING)
+
+  description  String?
+  passingCriteria String? @db.Text
+  reviewNotes  String?  @db.Text
+  blockingReason String? @db.Text
+
+  requiresProof Boolean @default(false)
+
+  approvedById  String?
+  approvedBy    User?    @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt    DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  proofArtifacts ProofArtifact[] @relation("GateProofArtifacts")
+
+  @@index([projectId])
+  @@index([gateType])
+  @@index([status])
+}
+
+enum GateStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  BLOCKED
+}

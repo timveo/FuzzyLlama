@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LayerCake UI Design Options</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 3rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: 1.125rem;
+            opacity: 0.9;
+        }
+
+        .design-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .design-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .design-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .design-number {
+            display: inline-block;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .design-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #1a202c;
+        }
+
+        .design-subtitle {
+            font-size: 1rem;
+            color: #718096;
+            margin-bottom: 1.25rem;
+        }
+
+        .design-features {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .design-features li {
+            padding: 0.5rem 0;
+            color: #4a5568;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .design-features li::before {
+            content: '✓';
+            color: #48bb78;
+            font-weight: 700;
+        }
+
+        .design-meta {
+            display: flex;
+            gap: 1rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.875rem;
+            color: #718096;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-recommended {
+            background: #48bb78;
+            color: white;
+        }
+
+        .badge-fastest {
+            background: #4299e1;
+            color: white;
+        }
+
+        .badge-advanced {
+            background: #ed8936;
+            color: white;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 3rem;
+        }
+
+        .footer p {
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .footer-link {
+            color: white;
+            text-decoration: none;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .footer-link:hover {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .design-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎂</div>
+            <h1>LayerCake UI Design Options</h1>
+            <p class="subtitle">Choose your preferred interface design for the MVP</p>
+        </div>
+
+        <div class="design-grid">
+            <!-- Option 1 -->
+            <a href="option1-dev-command-center.html" class="design-card">
+                <div class="design-number">1</div>
+                <h2 class="design-title">Developer Command Center</h2>
+                <p class="design-subtitle">Dark, Technical, CLI-Inspired</p>
+                <ul class="design-features">
+                    <li>Dark theme with terminal aesthetics</li>
+                    <li>Keyboard-first navigation</li>
+                    <li>Real-time agent output terminal</li>
+                    <li>Command palette (⌘K)</li>
+                    <li>Monospace code elements</li>
+                </ul>
+                <div class="design-meta">
+                    <div class="meta-item">
+                        <span>⏱️</span>
+                        <span>2-3 weeks</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>👥</span>
+                        <span>Developers</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Option 2 -->
+            <a href="option2-modern-saas.html" class="design-card" style="border: 3px solid #48bb78;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+                    <div class="design-number">2</div>
+                    <span class="badge badge-recommended">Recommended</span>
+                </div>
+                <h2 class="design-title">Modern SaaS Dashboard</h2>
+                <p class="design-subtitle">Light, Clean, Professional</p>
+                <ul class="design-features">
+                    <li>Clean, modern interface</li>
+                    <li>shadcn/ui components (fast)</li>
+                    <li>Excellent accessibility</li>
+                    <li>Mobile responsive</li>
+                    <li>Best for demos/investors</li>
+                </ul>
+                <div class="design-meta">
+                    <div class="meta-item">
+                        <span>⏱️</span>
+                        <span>1-2 weeks</span>
+                        <span class="badge badge-fastest">Fastest</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>👥</span>
+                        <span>Everyone</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Option 3 -->
+            <a href="option3-hybrid-workspace.html" class="design-card">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+                    <div class="design-number">3</div>
+                    <span class="badge badge-advanced">Advanced</span>
+                </div>
+                <h2 class="design-title">Hybrid Workspace</h2>
+                <p class="design-subtitle">Adaptive, Customizable, Feature-Rich</p>
+                <ul class="design-features">
+                    <li>Dark/Light theme toggle</li>
+                    <li>Three-panel customizable layout</li>
+                    <li>Drag & drop panels</li>
+                    <li>Advanced power-user features</li>
+                    <li>Most flexible option</li>
+                </ul>
+                <div class="design-meta">
+                    <div class="meta-item">
+                        <span>⏱️</span>
+                        <span>3-4 weeks</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>👥</span>
+                        <span>Power Users</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p><strong>Need help deciding?</strong></p>
+            <p>Option 2 (Modern SaaS) is recommended for fastest MVP delivery with broad appeal.</p>
+            <p>You can always add dark mode and advanced features later!</p>
+
+            <div class="footer-links">
+                <a href="../UI_DESIGN_OPTIONS.md" class="footer-link">📄 Full Design Specs</a>
+                <a href="../DEVELOPMENT_STATUS.md" class="footer-link">📊 Development Status</a>
+                <a href="../BACKEND_TEST_RESULTS.md" class="footer-link">✅ Test Results</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

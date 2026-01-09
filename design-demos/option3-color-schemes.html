@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option 3: Color Scheme Variations - LayerCake</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            padding: 2rem;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .page-subtitle {
+            color: #a1a1aa;
+            font-size: 1.125rem;
+        }
+
+        .schemes-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .scheme-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .scheme-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .scheme-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .scheme-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .scheme-description {
+            color: #a1a1aa;
+            font-size: 0.875rem;
+        }
+
+        .scheme-preview {
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preview-header {
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid;
+        }
+
+        .preview-logo {
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .preview-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .preview-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+
+        .preview-content {
+            display: flex;
+            height: calc(100% - 50px);
+        }
+
+        .preview-sidebar {
+            width: 200px;
+            padding: 1rem;
+            border-right: 1px solid;
+            font-size: 0.75rem;
+        }
+
+        .preview-main {
+            flex: 1;
+            padding: 1rem;
+        }
+
+        .preview-card {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            border: 1px solid;
+        }
+
+        .card-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .card-meta {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .preview-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.625rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .color-palette {
+            padding: 1.5rem;
+            border-top: 1px solid #2a2a2a;
+        }
+
+        .palette-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #a1a1aa;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .color-swatches {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+
+        .color-swatch {
+            text-align: center;
+        }
+
+        .swatch-color {
+            width: 100%;
+            height: 60px;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .swatch-label {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            margin-bottom: 0.25rem;
+        }
+
+        .swatch-value {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.625rem;
+            color: #71717a;
+        }
+
+        .select-btn {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .select-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Scheme-specific styles */
+
+        /* Scheme 1: Ocean Blue */
+        .scheme1-dark .preview-header { background: #0c1e2e; border-bottom-color: #1a3548; }
+        .scheme1-dark .preview-main { background: #0f1419; }
+        .scheme1-dark .preview-sidebar { background: #0c1e2e; border-right-color: #1a3548; }
+        .scheme1-dark .preview-card { background: #162838; border-color: #1e4057; }
+        .scheme1-dark .preview-badge { background: rgba(14, 165, 233, 0.2); color: #38bdf8; }
+        .scheme1-dark .preview-icon { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+        .scheme1-dark .preview-btn { background: #1a3548; color: #94a3b8; }
+        .scheme1-dark .select-btn { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+
+        .scheme1-light .preview-header { background: #f0f9ff; border-bottom-color: #e0f2fe; }
+        .scheme1-light .preview-main { background: #ffffff; }
+        .scheme1-light .preview-sidebar { background: #f0f9ff; border-right-color: #e0f2fe; }
+        .scheme1-light .preview-card { background: #f0f9ff; border-color: #bae6fd; }
+        .scheme1-light .preview-badge { background: #e0f2fe; color: #0369a1; }
+        .scheme1-light .preview-icon { background: linear-gradient(135deg, #0ea5e9, #06b6d4); color: white; }
+        .scheme1-light .preview-btn { background: #e0f2fe; color: #0c4a6e; }
+
+        /* Scheme 2: Purple Haze */
+        .scheme2-dark .preview-header { background: #1e1b2e; border-bottom-color: #2d2640; }
+        .scheme2-dark .preview-main { background: #0f0e16; }
+        .scheme2-dark .preview-sidebar { background: #1e1b2e; border-right-color: #2d2640; }
+        .scheme2-dark .preview-card { background: #251f3a; border-color: #372f52; }
+        .scheme2-dark .preview-badge { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+        .scheme2-dark .preview-icon { background: linear-gradient(135deg, #a855f7, #ec4899); }
+        .scheme2-dark .preview-btn { background: #2d2640; color: #c4b5fd; }
+        .scheme2-dark .select-btn { background: linear-gradient(135deg, #a855f7, #ec4899); }
+
+        .scheme2-light .preview-header { background: #faf5ff; border-bottom-color: #f3e8ff; }
+        .scheme2-light .preview-main { background: #ffffff; }
+        .scheme2-light .preview-sidebar { background: #faf5ff; border-right-color: #f3e8ff; }
+        .scheme2-light .preview-card { background: #faf5ff; border-color: #e9d5ff; }
+        .scheme2-light .preview-badge { background: #f3e8ff; color: #7e22ce; }
+        .scheme2-light .preview-icon { background: linear-gradient(135deg, #a855f7, #ec4899); color: white; }
+        .scheme2-light .preview-btn { background: #f3e8ff; color: #581c87; }
+
+        /* Scheme 3: Emerald Forest */
+        .scheme3-dark .preview-header { background: #0d1f1a; border-bottom-color: #1a332b; }
+        .scheme3-dark .preview-main { background: #0a120f; }
+        .scheme3-dark .preview-sidebar { background: #0d1f1a; border-right-color: #1a332b; }
+        .scheme3-dark .preview-card { background: #132b22; border-color: #1e4136; }
+        .scheme3-dark .preview-badge { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+        .scheme3-dark .preview-icon { background: linear-gradient(135deg, #10b981, #059669); }
+        .scheme3-dark .preview-btn { background: #1a332b; color: #86efac; }
+        .scheme3-dark .select-btn { background: linear-gradient(135deg, #10b981, #059669); }
+
+        .scheme3-light .preview-header { background: #f0fdf4; border-bottom-color: #dcfce7; }
+        .scheme3-light .preview-main { background: #ffffff; }
+        .scheme3-light .preview-sidebar { background: #f0fdf4; border-right-color: #dcfce7; }
+        .scheme3-light .preview-card { background: #f0fdf4; border-color: #bbf7d0; }
+        .scheme3-light .preview-badge { background: #dcfce7; color: #047857; }
+        .scheme3-light .preview-icon { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+        .scheme3-light .preview-btn { background: #dcfce7; color: #064e3b; }
+
+        /* Scheme 4: Amber Sunset */
+        .scheme4-dark .preview-header { background: #1f1a0d; border-bottom-color: #332b1a; }
+        .scheme4-dark .preview-main { background: #12100a; }
+        .scheme4-dark .preview-sidebar { background: #1f1a0d; border-right-color: #332b1a; }
+        .scheme4-dark .preview-card { background: #2b2213; border-color: #413420; }
+        .scheme4-dark .preview-badge { background: rgba(251, 191, 36, 0.2); color: #fcd34d; }
+        .scheme4-dark .preview-icon { background: linear-gradient(135deg, #f59e0b, #f97316); }
+        .scheme4-dark .preview-btn { background: #332b1a; color: #fde68a; }
+        .scheme4-dark .select-btn { background: linear-gradient(135deg, #f59e0b, #f97316); }
+
+        .scheme4-light .preview-header { background: #fffbeb; border-bottom-color: #fef3c7; }
+        .scheme4-light .preview-main { background: #ffffff; }
+        .scheme4-light .preview-sidebar { background: #fffbeb; border-right-color: #fef3c7; }
+        .scheme4-light .preview-card { background: #fffbeb; border-color: #fde68a; }
+        .scheme4-light .preview-badge { background: #fef3c7; color: #92400e; }
+        .scheme4-light .preview-icon { background: linear-gradient(135deg, #f59e0b, #f97316); color: white; }
+        .scheme4-light .preview-btn { background: #fef3c7; color: #78350f; }
+
+        /* Scheme 5: Rose Gold */
+        .scheme5-dark .preview-header { background: #1f0d1a; border-bottom-color: #331a2b; }
+        .scheme5-dark .preview-main { background: #120a0f; }
+        .scheme5-dark .preview-sidebar { background: #1f0d1a; border-right-color: #331a2b; }
+        .scheme5-dark .preview-card { background: #2b1322; border-color: #412036; }
+        .scheme5-dark .preview-badge { background: rgba(244, 114, 182, 0.2); color: #f9a8d4; }
+        .scheme5-dark .preview-icon { background: linear-gradient(135deg, #ec4899, #be185d); }
+        .scheme5-dark .preview-btn { background: #331a2b; color: #fbcfe8; }
+        .scheme5-dark .select-btn { background: linear-gradient(135deg, #ec4899, #be185d); }
+
+        .scheme5-light .preview-header { background: #fdf2f8; border-bottom-color: #fce7f3; }
+        .scheme5-light .preview-main { background: #ffffff; }
+        .scheme5-light .preview-sidebar { background: #fdf2f8; border-right-color: #fce7f3; }
+        .scheme5-light .preview-card { background: #fdf2f8; border-color: #fbcfe8; }
+        .scheme5-light .preview-badge { background: #fce7f3; color: #9f1239; }
+        .scheme5-light .preview-icon { background: linear-gradient(135deg, #ec4899, #be185d); color: white; }
+        .scheme5-light .preview-btn { background: #fce7f3; color: #831843; }
+
+        .theme-toggle {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+
+        .theme-switch {
+            display: flex;
+            background: #1a1a1a;
+            border-radius: 6px;
+            padding: 0.25rem;
+        }
+
+        .theme-switch-btn {
+            padding: 0.375rem 0.75rem;
+            border: none;
+            background: transparent;
+            color: #71717a;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .theme-switch-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        @media (max-width: 1200px) {
+            .schemes-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <h1 class="page-title">Color Scheme Variations</h1>
+        <p class="page-subtitle">Option 3: Hybrid Workspace - Explore Different Palettes</p>
+    </div>
+
+    <div class="schemes-container">
+        <!-- Scheme 1: Ocean Blue -->
+        <div class="scheme-card">
+            <div class="scheme-header">
+                <h2 class="scheme-name">🌊 Ocean Blue</h2>
+                <p class="scheme-description">Cool, professional blues with cyan accents. Evokes trust and stability.</p>
+            </div>
+
+            <div class="theme-toggle">
+                <span style="font-size: 0.75rem; color: #71717a;">Theme:</span>
+                <div class="theme-switch">
+                    <button class="theme-switch-btn active" onclick="switchTheme(this, 'scheme1', 'dark')">🌙 Dark</button>
+                    <button class="theme-switch-btn" onclick="switchTheme(this, 'scheme1', 'light')">☀️ Light</button>
+                </div>
+            </div>
+
+            <div class="scheme-preview scheme1-dark" id="scheme1-preview">
+                <div class="preview-header">
+                    <div class="preview-logo">
+                        <div class="preview-icon">⚡</div>
+                        <span>LayerCake</span>
+                    </div>
+                    <div class="preview-actions">
+                        <div class="preview-btn">🔍</div>
+                        <div class="preview-btn">⚙️</div>
+                    </div>
+                </div>
+                <div class="preview-content">
+                    <div class="preview-sidebar">
+                        <div style="margin-bottom: 1rem; opacity: 0.7;">Navigation</div>
+                        <div style="margin-bottom: 0.5rem;">📦 Projects</div>
+                        <div style="margin-bottom: 0.5rem;">✓ Tasks</div>
+                        <div style="margin-bottom: 0.5rem;">🎯 Gates</div>
+                    </div>
+                    <div class="preview-main">
+                        <div class="preview-card">
+                            <div class="card-title">E-Commerce Platform</div>
+                            <div class="card-meta">Traditional • 45% Complete</div>
+                            <div class="preview-badge">G2 COMPLETE</div>
+                        </div>
+                        <div class="preview-card">
+                            <div class="card-title">ML Pipeline</div>
+                            <div class="card-meta">AI/ML • 23% Complete</div>
+                            <div class="preview-badge">G1 PENDING</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="color-palette">
+                <div class="palette-title">Color Palette</div>
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #0ea5e9;"></div>
+                        <div class="swatch-label">Primary</div>
+                        <div class="swatch-value">#0ea5e9</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #06b6d4;"></div>
+                        <div class="swatch-label">Accent</div>
+                        <div class="swatch-value">#06b6d4</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #0c1e2e;"></div>
+                        <div class="swatch-label">Surface</div>
+                        <div class="swatch-value">#0c1e2e</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="select-btn" onclick="selectScheme('Ocean Blue')">Select This Scheme</button>
+        </div>
+
+        <!-- Scheme 2: Purple Haze -->
+        <div class="scheme-card">
+            <div class="scheme-header">
+                <h2 class="scheme-name">💜 Purple Haze</h2>
+                <p class="scheme-description">Rich purples with pink highlights. Creative and modern feel.</p>
+            </div>
+
+            <div class="theme-toggle">
+                <span style="font-size: 0.75rem; color: #71717a;">Theme:</span>
+                <div class="theme-switch">
+                    <button class="theme-switch-btn active" onclick="switchTheme(this, 'scheme2', 'dark')">🌙 Dark</button>
+                    <button class="theme-switch-btn" onclick="switchTheme(this, 'scheme2', 'light')">☀️ Light</button>
+                </div>
+            </div>
+
+            <div class="scheme-preview scheme2-dark" id="scheme2-preview">
+                <div class="preview-header">
+                    <div class="preview-logo">
+                        <div class="preview-icon">⚡</div>
+                        <span>LayerCake</span>
+                    </div>
+                    <div class="preview-actions">
+                        <div class="preview-btn">🔍</div>
+                        <div class="preview-btn">⚙️</div>
+                    </div>
+                </div>
+                <div class="preview-content">
+                    <div class="preview-sidebar">
+                        <div style="margin-bottom: 1rem; opacity: 0.7;">Navigation</div>
+                        <div style="margin-bottom: 0.5rem;">📦 Projects</div>
+                        <div style="margin-bottom: 0.5rem;">✓ Tasks</div>
+                        <div style="margin-bottom: 0.5rem;">🎯 Gates</div>
+                    </div>
+                    <div class="preview-main">
+                        <div class="preview-card">
+                            <div class="card-title">E-Commerce Platform</div>
+                            <div class="card-meta">Traditional • 45% Complete</div>
+                            <div class="preview-badge">G2 COMPLETE</div>
+                        </div>
+                        <div class="preview-card">
+                            <div class="card-title">ML Pipeline</div>
+                            <div class="card-meta">AI/ML • 23% Complete</div>
+                            <div class="preview-badge">G1 PENDING</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="color-palette">
+                <div class="palette-title">Color Palette</div>
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #a855f7;"></div>
+                        <div class="swatch-label">Primary</div>
+                        <div class="swatch-value">#a855f7</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #ec4899;"></div>
+                        <div class="swatch-label">Accent</div>
+                        <div class="swatch-value">#ec4899</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #1e1b2e;"></div>
+                        <div class="swatch-label">Surface</div>
+                        <div class="swatch-value">#1e1b2e</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="select-btn" onclick="selectScheme('Purple Haze')">Select This Scheme</button>
+        </div>
+
+        <!-- Scheme 3: Emerald Forest -->
+        <div class="scheme-card">
+            <div class="scheme-header">
+                <h2 class="scheme-name">🌲 Emerald Forest</h2>
+                <p class="scheme-description">Natural greens with earthy tones. Growth and productivity focused.</p>
+            </div>
+
+            <div class="theme-toggle">
+                <span style="font-size: 0.75rem; color: #71717a;">Theme:</span>
+                <div class="theme-switch">
+                    <button class="theme-switch-btn active" onclick="switchTheme(this, 'scheme3', 'dark')">🌙 Dark</button>
+                    <button class="theme-switch-btn" onclick="switchTheme(this, 'scheme3', 'light')">☀️ Light</button>
+                </div>
+            </div>
+
+            <div class="scheme-preview scheme3-dark" id="scheme3-preview">
+                <div class="preview-header">
+                    <div class="preview-logo">
+                        <div class="preview-icon">⚡</div>
+                        <span>LayerCake</span>
+                    </div>
+                    <div class="preview-actions">
+                        <div class="preview-btn">🔍</div>
+                        <div class="preview-btn">⚙️</div>
+                    </div>
+                </div>
+                <div class="preview-content">
+                    <div class="preview-sidebar">
+                        <div style="margin-bottom: 1rem; opacity: 0.7;">Navigation</div>
+                        <div style="margin-bottom: 0.5rem;">📦 Projects</div>
+                        <div style="margin-bottom: 0.5rem;">✓ Tasks</div>
+                        <div style="margin-bottom: 0.5rem;">🎯 Gates</div>
+                    </div>
+                    <div class="preview-main">
+                        <div class="preview-card">
+                            <div class="card-title">E-Commerce Platform</div>
+                            <div class="card-meta">Traditional • 45% Complete</div>
+                            <div class="preview-badge">G2 COMPLETE</div>
+                        </div>
+                        <div class="preview-card">
+                            <div class="card-title">ML Pipeline</div>
+                            <div class="card-meta">AI/ML • 23% Complete</div>
+                            <div class="preview-badge">G1 PENDING</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="color-palette">
+                <div class="palette-title">Color Palette</div>
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #10b981;"></div>
+                        <div class="swatch-label">Primary</div>
+                        <div class="swatch-value">#10b981</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #059669;"></div>
+                        <div class="swatch-label">Accent</div>
+                        <div class="swatch-value">#059669</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #0d1f1a;"></div>
+                        <div class="swatch-label">Surface</div>
+                        <div class="swatch-value">#0d1f1a</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="select-btn" onclick="selectScheme('Emerald Forest')">Select This Scheme</button>
+        </div>
+
+        <!-- Scheme 4: Amber Sunset -->
+        <div class="scheme-card">
+            <div class="scheme-header">
+                <h2 class="scheme-name">🌅 Amber Sunset</h2>
+                <p class="scheme-description">Warm oranges and golds. Energetic and optimistic atmosphere.</p>
+            </div>
+
+            <div class="theme-toggle">
+                <span style="font-size: 0.75rem; color: #71717a;">Theme:</span>
+                <div class="theme-switch">
+                    <button class="theme-switch-btn active" onclick="switchTheme(this, 'scheme4', 'dark')">🌙 Dark</button>
+                    <button class="theme-switch-btn" onclick="switchTheme(this, 'scheme4', 'light')">☀️ Light</button>
+                </div>
+            </div>
+
+            <div class="scheme-preview scheme4-dark" id="scheme4-preview">
+                <div class="preview-header">
+                    <div class="preview-logo">
+                        <div class="preview-icon">⚡</div>
+                        <span>LayerCake</span>
+                    </div>
+                    <div class="preview-actions">
+                        <div class="preview-btn">🔍</div>
+                        <div class="preview-btn">⚙️</div>
+                    </div>
+                </div>
+                <div class="preview-content">
+                    <div class="preview-sidebar">
+                        <div style="margin-bottom: 1rem; opacity: 0.7;">Navigation</div>
+                        <div style="margin-bottom: 0.5rem;">📦 Projects</div>
+                        <div style="margin-bottom: 0.5rem;">✓ Tasks</div>
+                        <div style="margin-bottom: 0.5rem;">🎯 Gates</div>
+                    </div>
+                    <div class="preview-main">
+                        <div class="preview-card">
+                            <div class="card-title">E-Commerce Platform</div>
+                            <div class="card-meta">Traditional • 45% Complete</div>
+                            <div class="preview-badge">G2 COMPLETE</div>
+                        </div>
+                        <div class="preview-card">
+                            <div class="card-title">ML Pipeline</div>
+                            <div class="card-meta">AI/ML • 23% Complete</div>
+                            <div class="preview-badge">G1 PENDING</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="color-palette">
+                <div class="palette-title">Color Palette</div>
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #f59e0b;"></div>
+                        <div class="swatch-label">Primary</div>
+                        <div class="swatch-value">#f59e0b</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #f97316;"></div>
+                        <div class="swatch-label">Accent</div>
+                        <div class="swatch-value">#f97316</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #1f1a0d;"></div>
+                        <div class="swatch-label">Surface</div>
+                        <div class="swatch-value">#1f1a0d</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="select-btn" onclick="selectScheme('Amber Sunset')">Select This Scheme</button>
+        </div>
+
+        <!-- Scheme 5: Rose Gold -->
+        <div class="scheme-card">
+            <div class="scheme-header">
+                <h2 class="scheme-name">🌹 Rose Gold</h2>
+                <p class="scheme-description">Elegant pinks with warm undertones. Sophisticated and premium feel.</p>
+            </div>
+
+            <div class="theme-toggle">
+                <span style="font-size: 0.75rem; color: #71717a;">Theme:</span>
+                <div class="theme-switch">
+                    <button class="theme-switch-btn active" onclick="switchTheme(this, 'scheme5', 'dark')">🌙 Dark</button>
+                    <button class="theme-switch-btn" onclick="switchTheme(this, 'scheme5', 'light')">☀️ Light</button>
+                </div>
+            </div>
+
+            <div class="scheme-preview scheme5-dark" id="scheme5-preview">
+                <div class="preview-header">
+                    <div class="preview-logo">
+                        <div class="preview-icon">⚡</div>
+                        <span>LayerCake</span>
+                    </div>
+                    <div class="preview-actions">
+                        <div class="preview-btn">🔍</div>
+                        <div class="preview-btn">⚙️</div>
+                    </div>
+                </div>
+                <div class="preview-content">
+                    <div class="preview-sidebar">
+                        <div style="margin-bottom: 1rem; opacity: 0.7;">Navigation</div>
+                        <div style="margin-bottom: 0.5rem;">📦 Projects</div>
+                        <div style="margin-bottom: 0.5rem;">✓ Tasks</div>
+                        <div style="margin-bottom: 0.5rem;">🎯 Gates</div>
+                    </div>
+                    <div class="preview-main">
+                        <div class="preview-card">
+                            <div class="card-title">E-Commerce Platform</div>
+                            <div class="card-meta">Traditional • 45% Complete</div>
+                            <div class="preview-badge">G2 COMPLETE</div>
+                        </div>
+                        <div class="preview-card">
+                            <div class="card-title">ML Pipeline</div>
+                            <div class="card-meta">AI/ML • 23% Complete</div>
+                            <div class="preview-badge">G1 PENDING</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="color-palette">
+                <div class="palette-title">Color Palette</div>
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #ec4899;"></div>
+                        <div class="swatch-label">Primary</div>
+                        <div class="swatch-value">#ec4899</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #be185d;"></div>
+                        <div class="swatch-label">Accent</div>
+                        <div class="swatch-value">#be185d</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #1f0d1a;"></div>
+                        <div class="swatch-label">Surface</div>
+                        <div class="swatch-value">#1f0d1a</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="select-btn" onclick="selectScheme('Rose Gold')">Select This Scheme</button>
+        </div>
+
+        <!-- Original Scheme -->
+        <div class="scheme-card" style="border: 2px solid #3b82f6;">
+            <div class="scheme-header">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <h2 class="scheme-name">⚡ Original (Sky Blue)</h2>
+                        <p class="scheme-description">The default hybrid workspace palette. Balanced and modern.</p>
+                    </div>
+                    <span style="padding: 0.25rem 0.75rem; background: #3b82f6; color: white; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">DEFAULT</span>
+                </div>
+            </div>
+
+            <div class="theme-toggle">
+                <span style="font-size: 0.75rem; color: #71717a;">Theme:</span>
+                <div class="theme-switch">
+                    <button class="theme-switch-btn active" onclick="switchTheme(this, 'scheme0', 'dark')">🌙 Dark</button>
+                    <button class="theme-switch-btn" onclick="switchTheme(this, 'scheme0', 'light')">☀️ Light</button>
+                </div>
+            </div>
+
+            <div class="scheme-preview" id="scheme0-preview" style="background: #111827;">
+                <div class="preview-header" style="background: #1f2937; border-bottom-color: #374151;">
+                    <div class="preview-logo">
+                        <div class="preview-icon" style="background: linear-gradient(135deg, #0ea5e9, #a855f7);">⚡</div>
+                        <span>LayerCake</span>
+                    </div>
+                    <div class="preview-actions">
+                        <div class="preview-btn" style="background: #374151; color: #9ca3af;">🔍</div>
+                        <div class="preview-btn" style="background: #374151; color: #9ca3af;">⚙️</div>
+                    </div>
+                </div>
+                <div class="preview-content">
+                    <div class="preview-sidebar" style="background: #1f2937; border-right-color: #374151;">
+                        <div style="margin-bottom: 1rem; opacity: 0.7;">Navigation</div>
+                        <div style="margin-bottom: 0.5rem;">📦 Projects</div>
+                        <div style="margin-bottom: 0.5rem;">✓ Tasks</div>
+                        <div style="margin-bottom: 0.5rem;">🎯 Gates</div>
+                    </div>
+                    <div class="preview-main" style="background: #111827;">
+                        <div class="preview-card" style="background: #1f2937; border-color: #374151;">
+                            <div class="card-title">E-Commerce Platform</div>
+                            <div class="card-meta">Traditional • 45% Complete</div>
+                            <div class="preview-badge" style="background: rgba(14, 165, 233, 0.2); color: #0ea5e9;">G2 COMPLETE</div>
+                        </div>
+                        <div class="preview-card" style="background: #1f2937; border-color: #374151;">
+                            <div class="card-title">ML Pipeline</div>
+                            <div class="card-meta">AI/ML • 23% Complete</div>
+                            <div class="preview-badge" style="background: rgba(168, 85, 247, 0.2); color: #a855f7;">G1 PENDING</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="color-palette">
+                <div class="palette-title">Color Palette</div>
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #0ea5e9;"></div>
+                        <div class="swatch-label">Primary</div>
+                        <div class="swatch-value">#0ea5e9</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #a855f7;"></div>
+                        <div class="swatch-label">Accent</div>
+                        <div class="swatch-value">#a855f7</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="swatch-color" style="background: #1f2937;"></div>
+                        <div class="swatch-label">Surface</div>
+                        <div class="swatch-value">#1f2937</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="select-btn" onclick="selectScheme('Original (Sky Blue)')">Select This Scheme</button>
+        </div>
+    </div>
+
+    <script>
+        function switchTheme(btn, schemeId, theme) {
+            // Update button states
+            const parent = btn.parentElement;
+            parent.querySelectorAll('.theme-switch-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update preview
+            const preview = document.getElementById(schemeId + '-preview');
+            preview.className = 'scheme-preview ' + schemeId + '-' + theme;
+        }
+
+        function selectScheme(name) {
+            alert('You selected: ' + name + '\n\nThis color scheme will be applied to your LayerCake workspace!');
+        }
+    </script>
+</body>
+</html>
