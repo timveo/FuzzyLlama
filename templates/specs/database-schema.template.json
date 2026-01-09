@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DatabaseSchema",
+  "description": "Universal database schema contract. Source of truth for both Prisma (Node.js) and SQLAlchemy (Python) implementations.",
+  "version": "1.0.0",
+  "metadata": {
+    "project": "[PROJECT_NAME]",
+    "created": "[DATE]",
+    "author": "Architect Agent"
+  },
+  "definitions": {
+    "User": {
+      "type": "object",
+      "tableName": "users",
+      "description": "Application user",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "primaryKey": true,
+          "default": "uuid()",
+          "description": "Unique identifier"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "unique": true,
+          "maxLength": 255,
+          "description": "User email address"
+        },
+        "passwordHash": {
+          "type": "string",
+          "columnName": "password_hash",
+          "description": "Hashed password (bcrypt)"
+        },
+        "name": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "description": "Display name"
+        },
+        "role": {
+          "$ref": "#/definitions/UserRole",
+          "default": "USER",
+          "description": "User role for authorization"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "columnName": "created_at",
+          "default": "now()",
+          "description": "Account creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "columnName": "updated_at",
+          "default": "now()",
+          "onUpdate": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "email", "passwordHash", "role", "createdAt", "updatedAt"],
+      "indexes": [
+        { "columns": ["email"], "unique": true },
+        { "columns": ["createdAt"] }
+      ],
+      "relations": {
+        "posts": {
+          "type": "hasMany",
+          "model": "Post",
+          "foreignKey": "authorId"
+        },
+        "sessions": {
+          "type": "hasMany",
+          "model": "Session",
+          "foreignKey": "userId"
+        }
+      }
+    },
+    "UserRole": {
+      "type": "string",
+      "enum": ["USER", "ADMIN"],
+      "description": "Available user roles"
+    },
+    "Session": {
+      "type": "object",
+      "tableName": "sessions",
+      "description": "User authentication session",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "primaryKey": true,
+          "default": "uuid()"
+        },
+        "userId": {
+          "type": "string",
+          "format": "uuid",
+          "columnName": "user_id",
+          "references": {
+            "model": "User",
+            "field": "id",
+            "onDelete": "CASCADE"
+          }
+        },
+        "token": {
+          "type": "string",
+          "unique": true,
+          "description": "Refresh token"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "columnName": "expires_at"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "columnName": "created_at",
+          "default": "now()"
+        }
+      },
+      "required": ["id", "userId", "token", "expiresAt", "createdAt"],
+      "indexes": [
+        { "columns": ["token"], "unique": true },
+        { "columns": ["userId"] },
+        { "columns": ["expiresAt"] }
+      ],
+      "relations": {
+        "user": {
+          "type": "belongsTo",
+          "model": "User",
+          "foreignKey": "userId"
+        }
+      }
+    },
+    "Post": {
+      "type": "object",
+      "tableName": "posts",
+      "description": "Example content model",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "primaryKey": true,
+          "default": "uuid()"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "content": {
+          "type": ["string", "null"],
+          "description": "Post body content"
+        },
+        "published": {
+          "type": "boolean",
+          "default": false
+        },
+        "authorId": {
+          "type": "string",
+          "format": "uuid",
+          "columnName": "author_id",
+          "references": {
+            "model": "User",
+            "field": "id",
+            "onDelete": "CASCADE"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "columnName": "created_at",
+          "default": "now()"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "columnName": "updated_at",
+          "default": "now()",
+          "onUpdate": "now()"
+        }
+      },
+      "required": ["id", "title", "published", "authorId", "createdAt", "updatedAt"],
+      "indexes": [
+        { "columns": ["authorId"] },
+        { "columns": ["published", "createdAt"] }
+      ],
+      "relations": {
+        "author": {
+          "type": "belongsTo",
+          "model": "User",
+          "foreignKey": "authorId"
+        }
+      }
+    }
+  },
+  "typeMapping": {
+    "comment": "Reference for converting JSON Schema types to ORM-specific types",
+    "string": {
+      "prisma": "String",
+      "sqlalchemy": "Column(String)"
+    },
+    "string:uuid": {
+      "prisma": "String @default(uuid())",
+      "sqlalchemy": "Column(String, default=lambda: str(uuid4()))"
+    },
+    "string:email": {
+      "prisma": "String",
+      "sqlalchemy": "Column(String)"
+    },
+    "string:date-time": {
+      "prisma": "DateTime",
+      "sqlalchemy": "Column(DateTime)"
+    },
+    "integer": {
+      "prisma": "Int",
+      "sqlalchemy": "Column(Integer)"
+    },
+    "number": {
+      "prisma": "Float",
+      "sqlalchemy": "Column(Float)"
+    },
+    "boolean": {
+      "prisma": "Boolean",
+      "sqlalchemy": "Column(Boolean)"
+    },
+    "nullable": {
+      "prisma": "Type?",
+      "sqlalchemy": "nullable=True"
+    }
+  }
+}

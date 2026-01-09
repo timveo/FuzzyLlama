@@ -1,0 +1,257 @@
+{
+  "$schema": "../task-pattern.schema.json",
+  "pattern_id": "crud-entity",
+  "name": "CRUD Entity",
+  "description": "Complete CRUD operations for a database entity with API and UI",
+  "version": "1.0.0",
+  "category": "data",
+  "triggers": [
+    "CRUD",
+    "create read update delete",
+    "entity",
+    "resource",
+    "model"
+  ],
+  "variables": {
+    "entity_name": {
+      "type": "string",
+      "required": true,
+      "description": "Name of the entity (PascalCase, e.g., 'Product')"
+    },
+    "entity_plural": {
+      "type": "string",
+      "description": "Plural form of entity name (e.g., 'products')"
+    },
+    "include_soft_delete": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include soft delete functionality"
+    },
+    "include_pagination": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include pagination for list endpoint"
+    },
+    "include_search": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include search functionality"
+    }
+  },
+  "tasks": [
+    {
+      "template_id": "PLAN-ENTITY-STORIES",
+      "type": "planning",
+      "priority": "high",
+      "worker_category": "planning",
+      "description": "Write user stories for {{entity_name}} management",
+      "gate_dependency": "G1",
+      "story_refs": []
+    },
+    {
+      "template_id": "PLAN-ENTITY-PRISMA",
+      "type": "planning",
+      "priority": "high",
+      "worker_category": "planning",
+      "description": "Design Prisma schema for {{entity_name}} model",
+      "dependencies": ["PLAN-ENTITY-STORIES"],
+      "gate_dependency": "G2",
+      "spec_refs": ["prisma.models.{{entity_name}}"]
+    },
+    {
+      "template_id": "PLAN-ENTITY-OPENAPI",
+      "type": "planning",
+      "priority": "high",
+      "worker_category": "planning",
+      "description": "Design OpenAPI spec for {{entity_plural}} endpoints",
+      "dependencies": ["PLAN-ENTITY-PRISMA"],
+      "gate_dependency": "G2",
+      "spec_refs": ["openapi.paths./api/{{entity_plural}}.*"]
+    },
+    {
+      "template_id": "PLAN-ENTITY-ZOD",
+      "type": "planning",
+      "priority": "medium",
+      "worker_category": "planning",
+      "description": "Define Zod validation schemas for {{entity_name}}",
+      "dependencies": ["PLAN-ENTITY-OPENAPI"],
+      "gate_dependency": "G2",
+      "spec_refs": ["zod.schemas.{{entity_name}}.*"]
+    },
+    {
+      "template_id": "GEN-ENTITY-API-CREATE",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement POST /api/{{entity_plural}} - Create {{entity_name}}",
+      "dependencies": ["PLAN-ENTITY-OPENAPI", "PLAN-ENTITY-PRISMA", "PLAN-ENTITY-ZOD"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{entity_plural}}.post"]
+    },
+    {
+      "template_id": "GEN-ENTITY-API-LIST",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement GET /api/{{entity_plural}} - List {{entity_plural}}",
+      "dependencies": ["PLAN-ENTITY-OPENAPI", "PLAN-ENTITY-PRISMA"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{entity_plural}}.get"]
+    },
+    {
+      "template_id": "GEN-ENTITY-API-GET",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement GET /api/{{entity_plural}}/:id - Get {{entity_name}}",
+      "dependencies": ["PLAN-ENTITY-OPENAPI", "PLAN-ENTITY-PRISMA"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{entity_plural}}/{id}.get"]
+    },
+    {
+      "template_id": "GEN-ENTITY-API-UPDATE",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement PUT /api/{{entity_plural}}/:id - Update {{entity_name}}",
+      "dependencies": ["GEN-ENTITY-API-GET", "PLAN-ENTITY-ZOD"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{entity_plural}}/{id}.put"]
+    },
+    {
+      "template_id": "GEN-ENTITY-API-DELETE",
+      "type": "generation",
+      "priority": "medium",
+      "worker_category": "generation",
+      "description": "Implement DELETE /api/{{entity_plural}}/:id - Delete {{entity_name}}",
+      "dependencies": ["GEN-ENTITY-API-GET"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{entity_plural}}/{id}.delete"]
+    },
+    {
+      "template_id": "GEN-ENTITY-SERVICE",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement {{entity_name}}Service with business logic",
+      "dependencies": ["PLAN-ENTITY-PRISMA"],
+      "gate_dependency": "G3",
+      "spec_refs": ["prisma.models.{{entity_name}}"]
+    },
+    {
+      "template_id": "GEN-ENTITY-UI-LIST",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Build {{entity_name}} list page with table/grid",
+      "dependencies": ["GEN-ENTITY-API-LIST"],
+      "gate_dependency": "G4",
+      "spec_refs": ["zod.schemas.{{entity_name}}"]
+    },
+    {
+      "template_id": "GEN-ENTITY-UI-DETAIL",
+      "type": "generation",
+      "priority": "medium",
+      "worker_category": "generation",
+      "description": "Build {{entity_name}} detail page",
+      "dependencies": ["GEN-ENTITY-API-GET"],
+      "gate_dependency": "G4",
+      "spec_refs": ["zod.schemas.{{entity_name}}"]
+    },
+    {
+      "template_id": "GEN-ENTITY-UI-FORM",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Build {{entity_name}} create/edit form",
+      "dependencies": ["GEN-ENTITY-API-CREATE", "GEN-ENTITY-API-UPDATE", "PLAN-ENTITY-ZOD"],
+      "gate_dependency": "G4",
+      "spec_refs": ["zod.schemas.{{entity_name}}Input"]
+    },
+    {
+      "template_id": "VAL-ENTITY-UNIT",
+      "type": "validation",
+      "priority": "high",
+      "worker_category": "validation",
+      "description": "Write and run unit tests for {{entity_name}}Service",
+      "dependencies": ["GEN-ENTITY-SERVICE"],
+      "spec_refs": []
+    },
+    {
+      "template_id": "VAL-ENTITY-API",
+      "type": "validation",
+      "priority": "high",
+      "worker_category": "validation",
+      "description": "Write and run API integration tests for {{entity_plural}} endpoints",
+      "dependencies": [
+        "GEN-ENTITY-API-CREATE",
+        "GEN-ENTITY-API-LIST",
+        "GEN-ENTITY-API-GET",
+        "GEN-ENTITY-API-UPDATE",
+        "GEN-ENTITY-API-DELETE"
+      ],
+      "spec_refs": []
+    },
+    {
+      "template_id": "VAL-ENTITY-E2E",
+      "type": "validation",
+      "priority": "medium",
+      "worker_category": "validation",
+      "description": "Write and run E2E tests for {{entity_name}} CRUD flow",
+      "dependencies": [
+        "GEN-ENTITY-UI-LIST",
+        "GEN-ENTITY-UI-FORM",
+        "VAL-ENTITY-API"
+      ],
+      "spec_refs": []
+    }
+  ],
+  "conditional_tasks": [
+    {
+      "condition": "{{include_search}}",
+      "tasks": [
+        {
+          "template_id": "GEN-ENTITY-API-SEARCH",
+          "type": "generation",
+          "priority": "medium",
+          "worker_category": "generation",
+          "description": "Implement search endpoint for {{entity_plural}}",
+          "dependencies": ["GEN-ENTITY-API-LIST"],
+          "gate_dependency": "G3",
+          "spec_refs": ["openapi.paths./api/{{entity_plural}}/search.get"]
+        },
+        {
+          "template_id": "GEN-ENTITY-UI-SEARCH",
+          "type": "generation",
+          "priority": "medium",
+          "worker_category": "generation",
+          "description": "Build search component for {{entity_name}} list",
+          "dependencies": ["GEN-ENTITY-API-SEARCH", "GEN-ENTITY-UI-LIST"],
+          "gate_dependency": "G4",
+          "spec_refs": []
+        }
+      ]
+    },
+    {
+      "condition": "{{include_soft_delete}}",
+      "tasks": [
+        {
+          "template_id": "GEN-ENTITY-API-RESTORE",
+          "type": "generation",
+          "priority": "low",
+          "worker_category": "generation",
+          "description": "Implement restore endpoint for soft-deleted {{entity_plural}}",
+          "dependencies": ["GEN-ENTITY-API-DELETE"],
+          "gate_dependency": "G3",
+          "spec_refs": ["openapi.paths./api/{{entity_plural}}/{id}/restore.post"]
+        }
+      ]
+    }
+  ],
+  "estimated_tasks": 16,
+  "parallelism_potential": {
+    "max_parallel_planning": 2,
+    "max_parallel_generation": 5,
+    "max_parallel_validation": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {},
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 2,
+      "high": 0,
+      "critical": 0,
+      "total": 2
+    },
+    "dependencies": {
+      "prod": 45,
+      "dev": 23,
+      "optional": 0,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 68
+    }
+  },
+  "summary": "2 moderate severity vulnerabilities found",
+  "pass_fail": "PASS",
+  "notes": "No critical or high vulnerabilities. Moderate issues reviewed and accepted.",
+  "generated": "2025-01-03T15:00:00.000Z",
+  "tool": "npm audit"
+}

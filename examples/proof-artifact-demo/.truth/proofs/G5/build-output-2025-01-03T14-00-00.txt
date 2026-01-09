@@ -1,0 +1,19 @@
+$ npm run build
+
+> demo-app@1.0.0 build
+> vite build
+
+vite v5.0.12 building for production...
+transforming...
+✓ 142 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.46 kB │ gzip:  0.30 kB
+dist/assets/index-abc123.css       12.34 kB │ gzip:  3.21 kB
+dist/assets/index-def456.js       156.78 kB │ gzip: 48.92 kB
+✓ built in 2.34s
+
+Exit code: 0
+Pass/Fail: PASS
+Summary: Build succeeded - 0 errors, 0 warnings
+Generated: 2025-01-03T14:00:00.000Z

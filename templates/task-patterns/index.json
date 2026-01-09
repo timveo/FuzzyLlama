@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "name": "Task Pattern Registry",
+  "description": "Index of all available task decomposition patterns",
+  "version": "1.0.0",
+  "patterns": [
+    {
+      "pattern_id": "auth-flow",
+      "name": "Authentication Flow",
+      "file": "auth-flow.json",
+      "category": "security",
+      "estimated_tasks": 16,
+      "description": "Complete user authentication with login, register, logout, password reset",
+      "keywords": ["auth", "login", "signup", "register", "authentication", "user account"]
+    },
+    {
+      "pattern_id": "crud-entity",
+      "name": "CRUD Entity",
+      "file": "crud-entity.json",
+      "category": "data",
+      "estimated_tasks": 16,
+      "description": "Full CRUD operations for a database entity with API and UI",
+      "keywords": ["CRUD", "entity", "resource", "model", "create", "read", "update", "delete"]
+    },
+    {
+      "pattern_id": "file-upload",
+      "name": "File Upload",
+      "file": "file-upload.json",
+      "category": "media",
+      "estimated_tasks": 12,
+      "description": "File upload, storage, and retrieval system",
+      "keywords": ["upload", "file", "image", "attachment", "storage", "media"]
+    },
+    {
+      "pattern_id": "search-filter",
+      "name": "Search & Filter",
+      "file": "search-filter.json",
+      "category": "data",
+      "estimated_tasks": 10,
+      "description": "Advanced search and filtering functionality",
+      "keywords": ["search", "filter", "query", "facet", "sort"]
+    },
+    {
+      "pattern_id": "dashboard",
+      "name": "Dashboard",
+      "file": "dashboard.json",
+      "category": "ui",
+      "estimated_tasks": 14,
+      "description": "Analytics dashboard with charts and metrics",
+      "keywords": ["dashboard", "analytics", "charts", "metrics", "statistics", "overview"]
+    },
+    {
+      "pattern_id": "notification",
+      "name": "Notification System",
+      "file": "notification.json",
+      "category": "communication",
+      "estimated_tasks": 12,
+      "description": "In-app and email notification system",
+      "keywords": ["notification", "alert", "email", "push", "inbox"]
+    },
+    {
+      "pattern_id": "settings",
+      "name": "User Settings",
+      "file": "settings.json",
+      "category": "user",
+      "estimated_tasks": 10,
+      "description": "User preferences and settings management",
+      "keywords": ["settings", "preferences", "profile", "account", "configuration"]
+    }
+  ],
+  "category_descriptions": {
+    "security": "Authentication, authorization, and security features",
+    "data": "Data management, CRUD operations, and storage",
+    "media": "File handling, uploads, and media management",
+    "ui": "User interface components and pages",
+    "communication": "Messaging, notifications, and alerts",
+    "user": "User-related features and profiles"
+  },
+  "pattern_combinations": [
+    {
+      "name": "Todo App with Auth",
+      "description": "Basic todo application with user authentication",
+      "patterns": ["auth-flow", "crud-entity"],
+      "variables": {
+        "crud-entity": {
+          "entity_name": "Todo",
+          "entity_plural": "todos"
+        }
+      },
+      "estimated_tasks": 32
+    },
+    {
+      "name": "Blog Platform",
+      "description": "Blog with posts, comments, and user accounts",
+      "patterns": ["auth-flow", "crud-entity", "crud-entity"],
+      "variables": {
+        "crud-entity.1": {
+          "entity_name": "Post",
+          "entity_plural": "posts",
+          "include_search": true
+        },
+        "crud-entity.2": {
+          "entity_name": "Comment",
+          "entity_plural": "comments"
+        }
+      },
+      "estimated_tasks": 48
+    },
+    {
+      "name": "E-commerce Basics",
+      "description": "Basic e-commerce with products, cart, and checkout",
+      "patterns": ["auth-flow", "crud-entity", "crud-entity"],
+      "variables": {
+        "crud-entity.1": {
+          "entity_name": "Product",
+          "entity_plural": "products",
+          "include_search": true,
+          "include_pagination": true
+        },
+        "crud-entity.2": {
+          "entity_name": "Order",
+          "entity_plural": "orders"
+        }
+      },
+      "estimated_tasks": 48
+    }
+  ]
+}

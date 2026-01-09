@@ -1,0 +1,261 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://multi-agent-product-creator/schemas/task-completion.schema.json",
+  "title": "Task Completion Schema",
+  "description": "Lightweight format for workers to report task completion. Replaces the complex handoff.schema.json in the Hub-and-Spoke architecture.",
+  "type": "object",
+  "required": ["task_completion"],
+  "properties": {
+    "task_completion": {
+      "type": "object",
+      "required": ["task_id", "worker_id", "status", "timestamp"],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^TASK-[0-9]{3,}$",
+          "description": "ID of the completed task"
+        },
+        "worker_id": {
+          "type": "string",
+          "description": "Worker that completed the task"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["complete", "failed", "blocked", "needs_review"],
+          "description": "Task completion status"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "description": "Time taken to complete the task"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "What the task produced",
+      "properties": {
+        "files_created": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "checksum": {
+                "type": "string",
+                "description": "SHA-256 for verification"
+              }
+            }
+          }
+        },
+        "files_modified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files_deleted": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spec_sections_implemented": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Spec references that were implemented (e.g., 'openapi.paths./api/users.get')"
+        },
+        "stories_completed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^US-[0-9]{3}$"
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "description": "Self-verification results (worker validates own output)",
+      "properties": {
+        "all_passed": {
+          "type": "boolean"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "passed"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Check name (e.g., 'build', 'lint', 'test')"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "command": {
+                "type": "string"
+              },
+              "output": {
+                "type": "string"
+              },
+              "exit_code": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "self_healing_applied": {
+          "type": "boolean",
+          "description": "Whether the worker fixed issues during execution"
+        },
+        "healing_iterations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "description": "Error details if status is 'failed' or 'blocked'",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "SPEC_MISMATCH",
+            "BUILD_FAILED",
+            "TEST_FAILED",
+            "DEPENDENCY_MISSING",
+            "BLOCKED_BY_GATE",
+            "BLOCKED_BY_TASK",
+            "TIMEOUT",
+            "UNKNOWN"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string"
+        },
+        "recoverable": {
+          "type": "boolean"
+        },
+        "blocked_by": {
+          "type": "string",
+          "description": "Task ID or Gate ID that's blocking"
+        }
+      }
+    },
+    "spawned_tasks": {
+      "type": "array",
+      "description": "New tasks discovered during execution (e.g., bug found needs fixing)",
+      "items": {
+        "type": "object",
+        "required": ["type", "description", "priority"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["planning", "generation", "validation"]
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"]
+          },
+          "spec_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this task was spawned"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes for the orchestrator or next worker"
+    }
+  },
+  "examples": [
+    {
+      "task_completion": {
+        "task_id": "TASK-001",
+        "worker_id": "full-stack-generator",
+        "status": "complete",
+        "timestamp": "2024-12-19T10:30:00Z",
+        "duration_ms": 45000
+      },
+      "output": {
+        "files_created": [
+          {"path": "src/components/UserList.tsx", "purpose": "User listing component"},
+          {"path": "src/components/UserList.test.tsx", "purpose": "Component tests"}
+        ],
+        "files_modified": ["src/App.tsx"],
+        "spec_sections_implemented": ["openapi.paths./api/users.get"],
+        "stories_completed": ["US-001"]
+      },
+      "verification": {
+        "all_passed": true,
+        "checks": [
+          {"name": "build", "passed": true, "command": "npm run build", "exit_code": 0},
+          {"name": "lint", "passed": true, "command": "npm run lint", "exit_code": 0},
+          {"name": "test", "passed": true, "command": "npm test", "exit_code": 0}
+        ],
+        "self_healing_applied": false
+      }
+    },
+    {
+      "task_completion": {
+        "task_id": "TASK-002",
+        "worker_id": "api-generator",
+        "status": "failed",
+        "timestamp": "2024-12-19T11:00:00Z",
+        "duration_ms": 30000
+      },
+      "verification": {
+        "all_passed": false,
+        "checks": [
+          {"name": "build", "passed": true, "command": "npm run build", "exit_code": 0},
+          {"name": "test", "passed": false, "command": "npm test", "exit_code": 1, "output": "FAIL: UserService.test.ts"}
+        ],
+        "self_healing_applied": true,
+        "healing_iterations": 3
+      },
+      "error": {
+        "code": "TEST_FAILED",
+        "message": "Tests failing after 3 self-healing attempts",
+        "details": "UserService.test.ts: Expected user.email to be defined",
+        "recoverable": true
+      },
+      "spawned_tasks": [
+        {
+          "type": "generation",
+          "description": "Fix UserService email handling",
+          "priority": "high",
+          "spec_refs": ["openapi.paths./api/users.post"],
+          "reason": "Test failure in user creation"
+        }
+      ]
+    }
+  ]
+}

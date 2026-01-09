@@ -1,0 +1,17 @@
+$ npm run lint
+
+> demo-app@1.0.0 lint
+> eslint . --ext .ts,.tsx
+
+  2 warnings found.
+
+  /src/components/Button.tsx
+    12:5  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+  /src/utils/helpers.ts
+    45:1  warning  Prefer using optional chaining  @typescript-eslint/prefer-optional-chain
+
+Exit code: 0
+Pass/Fail: PASS
+Summary: 0 errors, 2 warnings
+Generated: 2025-01-03T14:05:00.000Z

@@ -1,0 +1,557 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://product-creator.dev/schemas/status.json",
+  "title": "Project Status Schema (Hub-and-Spoke)",
+  "description": "Schema for validating STATUS.md project status files in the Hub-and-Spoke architecture. Reference: constants/CONSTANTS.md",
+  "type": "object",
+  "required": ["project", "current_phase", "last_updated", "task_queue", "worker_states"],
+  "properties": {
+    "project": {
+      "type": "object",
+      "description": "Project identification",
+      "required": ["name", "id", "path"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable project name"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Project identifier (lowercase, hyphens only)"
+        },
+        "path": {
+          "type": "string",
+          "description": "Absolute path to project directory"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["traditional", "ai_ml", "hybrid", "enhancement"],
+          "description": "Project classification: traditional (new web/mobile), ai_ml (new AI project), hybrid (new with AI), enhancement (existing codebase)"
+        },
+        "repository": {
+          "type": "string",
+          "format": "uri",
+          "description": "Git repository URL"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "current_phase": {
+      "type": "string",
+      "enum": [
+        "intake",
+        "assessment",
+        "planning",
+        "architecture",
+        "design",
+        "development",
+        "ml_development",
+        "testing",
+        "security_review",
+        "deployment",
+        "maintenance",
+        "blocked",
+        "completed",
+        "cancelled"
+      ],
+      "description": "Current project phase"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    },
+    "task_queue": {
+      "type": "array",
+      "description": "Priority-ordered work items for parallel execution",
+      "items": {
+        "$ref": "#/definitions/task"
+      }
+    },
+    "worker_states": {
+      "type": "object",
+      "description": "Current state of all workers in the swarm",
+      "additionalProperties": {
+        "$ref": "#/definitions/worker_state"
+      }
+    },
+    "parallel_execution": {
+      "type": "object",
+      "description": "Parallel execution tracking",
+      "properties": {
+        "active_workers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Workers currently executing tasks"
+        },
+        "blocked_workers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Workers blocked by dependencies or gates"
+        },
+        "dependency_graph": {
+          "type": "object",
+          "description": "Task dependency relationships",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "concurrent_tasks": {
+          "type": "integer",
+          "description": "Number of tasks currently executing in parallel"
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "description": "Human approval gate status",
+      "properties": {
+        "G1": { "$ref": "#/definitions/gate_status" },
+        "G2": { "$ref": "#/definitions/gate_status" },
+        "G3": { "$ref": "#/definitions/gate_status" },
+        "G4": { "$ref": "#/definitions/gate_status" },
+        "G5": { "$ref": "#/definitions/gate_status" },
+        "G6": { "$ref": "#/definitions/gate_status" },
+        "G7": { "$ref": "#/definitions/gate_status" },
+        "G8": { "$ref": "#/definitions/gate_status" },
+        "G9": { "$ref": "#/definitions/gate_status" },
+        "E2": { "$ref": "#/definitions/gate_status" }
+      }
+    },
+    "specs": {
+      "type": "object",
+      "description": "Specification state (source of truth for code generation)",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Spec version (semver)"
+        },
+        "locked": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, specs cannot be modified (set after G3 approval)"
+        },
+        "locked_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "openapi_path": {
+          "type": "string"
+        },
+        "prisma_path": {
+          "type": "string"
+        },
+        "zod_path": {
+          "type": "string"
+        }
+      }
+    },
+    "validation_results": {
+      "type": "object",
+      "description": "Continuous validation pipeline results",
+      "properties": {
+        "last_run": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "overall_status": {
+          "type": "string",
+          "enum": ["passing", "failing", "partial", "not_run"]
+        },
+        "lint": { "$ref": "#/definitions/validation_check" },
+        "typecheck": { "$ref": "#/definitions/validation_check" },
+        "tests": { "$ref": "#/definitions/validation_check" },
+        "security": { "$ref": "#/definitions/validation_check" },
+        "build": { "$ref": "#/definitions/validation_check" }
+      }
+    },
+    "phase_progress": {
+      "type": "object",
+      "description": "Progress within current phase",
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "percent_complete": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "tasks_total": {
+          "type": "integer"
+        },
+        "tasks_completed": {
+          "type": "integer"
+        },
+        "tasks_in_progress": {
+          "type": "integer"
+        },
+        "tasks_blocked": {
+          "type": "integer"
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "description": "Current blockers preventing progress",
+      "items": {
+        "$ref": "#/definitions/blocker"
+      }
+    },
+    "risks": {
+      "type": "array",
+      "description": "Identified risks",
+      "items": {
+        "$ref": "#/definitions/risk"
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "description": "Status of key deliverables",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["not_started", "in_progress", "in_review", "complete", "blocked"]
+          },
+          "path": {
+            "type": "string",
+            "description": "File path relative to project root"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "escalations": {
+      "type": "array",
+      "description": "Escalated issues requiring human decision",
+      "items": {
+        "$ref": "#/definitions/escalation"
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Project metrics and KPIs",
+      "properties": {
+        "stories_total": { "type": "integer" },
+        "stories_completed": { "type": "integer" },
+        "tasks_total": { "type": "integer" },
+        "tasks_completed": { "type": "integer" },
+        "bugs_open": { "type": "integer" },
+        "bugs_resolved": { "type": "integer" },
+        "test_coverage": { "type": "string" },
+        "validation_status": {
+          "type": "string",
+          "enum": ["passing", "failing", "pending"]
+        },
+        "average_task_duration_ms": { "type": "integer" },
+        "parallel_efficiency": {
+          "type": "number",
+          "description": "Ratio of parallel vs sequential execution time"
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "description": "Project learnings and institutional knowledge",
+      "properties": {
+        "decisions_that_worked": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "decisions_that_failed": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "patterns_discovered": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "gotchas": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-form notes and context"
+    }
+  },
+  "definitions": {
+    "task": {
+      "type": "object",
+      "required": ["id", "type", "priority", "status", "worker_category", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^TASK-[0-9]{3,}$",
+          "description": "Unique task identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["planning", "generation", "validation", "coordination"],
+          "description": "Task category for routing"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "Execution priority (critical processed first)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "in_progress", "blocked", "complete", "failed", "cancelled"],
+          "description": "Current task status"
+        },
+        "worker_category": {
+          "type": "string",
+          "enum": ["planning", "generation", "validation"],
+          "description": "Which worker swarm can handle this task"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable task description"
+        },
+        "assigned_worker": {
+          "type": "string",
+          "description": "Worker currently assigned to this task"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Task IDs that must complete before this task can start"
+        },
+        "gate_dependency": {
+          "type": "string",
+          "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "E2"],
+          "description": "Gate that must be approved before this task can start"
+        },
+        "spec_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "References to spec sections this task implements"
+        },
+        "story_refs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^US-[0-9]{3}$" },
+          "description": "User story IDs this task implements"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 0
+        }
+      }
+    },
+    "worker_state": {
+      "type": "object",
+      "required": ["worker_id", "category", "status"],
+      "properties": {
+        "worker_id": {
+          "type": "string",
+          "description": "Unique worker identifier"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["planning", "generation", "validation"],
+          "description": "Worker swarm category"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["idle", "active", "blocked", "cooling_down", "offline"],
+          "description": "Current worker status"
+        },
+        "current_task": {
+          "type": "string",
+          "description": "Task ID currently being processed"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Worker capabilities"
+        },
+        "last_active": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "tasks_completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "gate_status": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected", "skipped", "not_applicable"]
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approved_by": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Conditions attached to approval"
+        },
+        "blocked_tasks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Task IDs waiting for this gate"
+        }
+      }
+    },
+    "validation_check": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "skipped", "not_run"]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ms": {
+          "type": "integer"
+        },
+        "error_count": {
+          "type": "integer"
+        },
+        "warning_count": {
+          "type": "integer"
+        }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "required": ["id", "description", "severity", "created_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^BLOCK-[0-9]{3}$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        },
+        "owner": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "blocked_tasks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Task IDs blocked by this blocker"
+        },
+        "escalated": {
+          "type": "boolean",
+          "default": false
+        },
+        "escalation_level": {
+          "type": "string",
+          "enum": ["L1", "L2", "L3"]
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "required": ["id", "description", "probability", "impact"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^RISK-[0-9]{3}$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "probability": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        },
+        "impact": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        },
+        "mitigation": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["identified", "mitigating", "mitigated", "accepted", "realized"]
+        }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^ESC-[0-9]{3}$"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["L1", "L2", "L3"]
+        },
+        "from_worker": { "type": "string" },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium"]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["blocker", "decision", "technical", "scope"]
+        },
+        "summary": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "resolved", "auto_resolved"]
+        },
+        "resolution": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "resolved_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

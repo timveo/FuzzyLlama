@@ -1,0 +1,12 @@
+{
+  "total": {
+    "lines": { "total": 1250, "covered": 1087, "skipped": 0, "pct": 87.0 },
+    "statements": { "total": 1450, "covered": 1261, "skipped": 0, "pct": 87.0 },
+    "functions": { "total": 185, "covered": 168, "skipped": 0, "pct": 90.8 },
+    "branches": { "total": 320, "covered": 262, "skipped": 0, "pct": 81.9 }
+  },
+  "summary": "Coverage: 87% lines, 81.9% branches",
+  "pass_fail": "PASS",
+  "threshold_met": true,
+  "generated": "2025-01-03T14:15:00.000Z"
+}

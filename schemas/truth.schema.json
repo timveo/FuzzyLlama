@@ -1,0 +1,923 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://multi-agent-product-creator/schemas/truth.schema.json",
+  "title": "Central Truth Schema",
+  "description": "Single source of truth for project state, task queue, worker coordination, and specifications in the Hub-and-Spoke architecture",
+  "type": "object",
+  "required": ["project", "state", "task_queue", "worker_states"],
+  "properties": {
+    "project": {
+      "$ref": "#/definitions/project"
+    },
+    "state": {
+      "$ref": "#/definitions/state"
+    },
+    "task_queue": {
+      "type": "array",
+      "description": "Priority-ordered work items for parallel execution",
+      "items": {
+        "$ref": "#/definitions/task"
+      }
+    },
+    "worker_states": {
+      "type": "object",
+      "description": "Current state of all workers in the swarm",
+      "additionalProperties": {
+        "$ref": "#/definitions/worker_state"
+      }
+    },
+    "specs": {
+      "$ref": "#/definitions/specs"
+    },
+    "validation_results": {
+      "$ref": "#/definitions/validation_results"
+    },
+    "gates": {
+      "$ref": "#/definitions/gates"
+    },
+    "event_log": {
+      "type": "array",
+      "description": "Complete audit trail of all actions and decisions",
+      "items": {
+        "$ref": "#/definitions/event_log_entry"
+      }
+    },
+    "cost_tracking": {
+      "$ref": "#/definitions/cost_tracking"
+    }
+  },
+  "definitions": {
+    "project": {
+      "type": "object",
+      "required": ["id", "name", "path", "type", "created_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Unique project identifier (kebab-case)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable project name"
+        },
+        "path": {
+          "type": "string",
+          "description": "Absolute path to project directory"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["traditional", "ai_ml", "hybrid", "enhancement"],
+          "description": "Project classification"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["current_phase", "phase_progress"],
+      "properties": {
+        "current_phase": {
+          "type": "string",
+          "enum": [
+            "intake",
+            "assessment",
+            "planning",
+            "architecture",
+            "design",
+            "ml_development",
+            "development",
+            "testing",
+            "security_review",
+            "deployment",
+            "maintenance",
+            "completed",
+            "cancelled"
+          ]
+        },
+        "phase_progress": {
+          "type": "object",
+          "properties": {
+            "percent_complete": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "tasks_total": {
+              "type": "integer"
+            },
+            "tasks_completed": {
+              "type": "integer"
+            },
+            "tasks_in_progress": {
+              "type": "integer"
+            },
+            "tasks_blocked": {
+              "type": "integer"
+            }
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/blocker"
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/risk"
+          }
+        },
+        "onboarding": {
+          "$ref": "#/definitions/onboarding_state"
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "type", "priority", "status", "worker_category", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^TASK-[0-9]{3,}$",
+          "description": "Unique task identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["planning", "generation", "validation", "coordination"],
+          "description": "Task category for routing"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "Execution priority (critical processed first)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "in_progress", "blocked", "complete", "failed", "cancelled"],
+          "description": "Current task status"
+        },
+        "worker_category": {
+          "type": "string",
+          "enum": ["planning", "generation", "validation"],
+          "description": "Which worker swarm can handle this task"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable task description"
+        },
+        "assigned_worker": {
+          "type": "string",
+          "description": "Worker currently assigned to this task"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Task IDs that must complete before this task can start"
+        },
+        "gate_dependency": {
+          "type": "string",
+          "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "E2"],
+          "description": "Gate that must be approved before this task can start"
+        },
+        "spec_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "References to spec sections this task implements (e.g., 'openapi.paths./api/users.get')"
+        },
+        "story_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^US-[0-9]{3}$"
+          },
+          "description": "User story IDs this task implements"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "output": {
+          "type": "object",
+          "description": "Task completion output",
+          "properties": {
+            "files_modified": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "files_created": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "verification": {
+              "type": "object",
+              "properties": {
+                "build_passed": {
+                  "type": "boolean"
+                },
+                "tests_passed": {
+                  "type": "boolean"
+                },
+                "lint_passed": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 0
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "recoverable": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "worker_state": {
+      "type": "object",
+      "required": ["worker_id", "category", "status"],
+      "properties": {
+        "worker_id": {
+          "type": "string",
+          "description": "Unique worker identifier"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["planning", "generation", "validation"],
+          "description": "Worker swarm category"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["idle", "active", "blocked", "cooling_down", "offline"],
+          "description": "Current worker status"
+        },
+        "current_task": {
+          "type": "string",
+          "description": "Task ID currently being processed"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Worker capabilities (e.g., ['react', 'typescript', 'api-design'])"
+        },
+        "spec_consumption": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Spec paths this worker reads from"
+        },
+        "last_active": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "tasks_completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "average_task_duration_ms": {
+          "type": "integer",
+          "description": "Rolling average task completion time"
+        }
+      }
+    },
+    "specs": {
+      "type": "object",
+      "description": "Machine-readable specifications that drive code generation",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Spec version (semver)"
+        },
+        "locked": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, specs cannot be modified (set after G3 approval)"
+        },
+        "locked_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "locked_by": {
+          "type": "string",
+          "description": "Gate that locked the specs (typically G3)"
+        },
+        "openapi": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to OpenAPI spec file"
+            },
+            "checksum": {
+              "type": "string",
+              "description": "SHA-256 checksum for integrity"
+            },
+            "endpoints_count": {
+              "type": "integer"
+            }
+          }
+        },
+        "prisma": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to Prisma schema file"
+            },
+            "checksum": {
+              "type": "string"
+            },
+            "models_count": {
+              "type": "integer"
+            }
+          }
+        },
+        "zod": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to Zod schemas directory"
+            },
+            "schemas_count": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "validation_results": {
+      "type": "object",
+      "description": "Results from continuous validation pipeline",
+      "properties": {
+        "validation_id": {
+          "type": "string",
+          "pattern": "^VAL-[0-9]{3,}$",
+          "description": "Unique identifier for this validation run"
+        },
+        "trigger_source": {
+          "type": "string",
+          "enum": ["task_completion", "file_change", "manual", "gate_check", "scheduled"],
+          "description": "What triggered this validation run"
+        },
+        "last_run": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "overall_status": {
+          "type": "string",
+          "enum": ["passing", "failing", "partial", "not_run"]
+        },
+        "lint": {
+          "$ref": "#/definitions/validation_check"
+        },
+        "typecheck": {
+          "$ref": "#/definitions/validation_check"
+        },
+        "tests": {
+          "$ref": "#/definitions/validation_check"
+        },
+        "security": {
+          "$ref": "#/definitions/validation_check"
+        },
+        "build": {
+          "$ref": "#/definitions/validation_check"
+        }
+      }
+    },
+    "validation_check": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "skipped", "not_run"]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ms": {
+          "type": "integer"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer"
+              },
+              "message": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["error", "warning"]
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Check-specific metrics (e.g., coverage percentage)"
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "description": "Human approval gate status",
+      "properties": {
+        "G1": { "$ref": "#/definitions/gate_status" },
+        "G2": { "$ref": "#/definitions/gate_status" },
+        "G3": { "$ref": "#/definitions/gate_status" },
+        "G4": { "$ref": "#/definitions/gate_status" },
+        "G5": { "$ref": "#/definitions/gate_status" },
+        "G6": { "$ref": "#/definitions/gate_status" },
+        "G7": { "$ref": "#/definitions/gate_status" },
+        "G8": { "$ref": "#/definitions/gate_status" },
+        "G9": { "$ref": "#/definitions/gate_status" },
+        "E2": { "$ref": "#/definitions/gate_status" }
+      }
+    },
+    "gate_status": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected", "skipped", "not_applicable"]
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approved_by": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Conditions attached to approval"
+        },
+        "blocked_tasks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Task IDs waiting for this gate"
+        }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "required": ["id", "description", "severity"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^BLOCK-[0-9]{3}$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium"]
+        },
+        "blocked_tasks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolution_path": {
+          "type": "string"
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "required": ["id", "description", "probability", "impact"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^RISK-[0-9]{3}$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "probability": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "impact": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "mitigation": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "mitigated", "occurred", "closed"]
+        }
+      }
+    },
+    "event_log_entry": {
+      "type": "object",
+      "description": "A single event in the audit trail",
+      "required": ["id", "timestamp", "event_type", "actor", "summary", "details"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^EVT-[0-9]{5}$",
+          "description": "Unique event identifier"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the event occurred"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "project_created",
+            "phase_changed",
+            "task_created",
+            "task_started",
+            "task_completed",
+            "task_failed",
+            "task_blocked",
+            "task_cancelled",
+            "worker_registered",
+            "worker_assigned",
+            "worker_completed",
+            "worker_status_changed",
+            "gate_approved",
+            "gate_rejected",
+            "spec_registered",
+            "spec_locked",
+            "validation_triggered",
+            "validation_completed",
+            "blocker_added",
+            "blocker_resolved",
+            "risk_added",
+            "risk_updated",
+            "decision_made",
+            "human_input",
+            "error",
+            "self_healing",
+            "session_started",
+            "session_ended",
+            "token_usage",
+            "onboarding_started",
+            "onboarding_question_answered",
+            "onboarding_completed",
+            "startup_message_displayed",
+            "protocol_violation",
+            "enforcement_blocked",
+            "summary_report_generated"
+          ],
+          "description": "Type of event"
+        },
+        "actor": {
+          "type": "string",
+          "description": "Who/what triggered the event (worker_id, 'user', 'system', or agent name)"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Human-readable description of what happened"
+        },
+        "details": {
+          "type": "object",
+          "description": "Structured data about the event"
+        },
+        "related_task_id": {
+          "type": "string",
+          "description": "Associated task ID if applicable"
+        },
+        "related_gate": {
+          "type": "string",
+          "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "E2"],
+          "description": "Associated gate if applicable"
+        },
+        "related_spec": {
+          "type": "string",
+          "enum": ["openapi", "prisma", "zod"],
+          "description": "Associated spec type if applicable"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional metadata about the event",
+          "properties": {
+            "duration_ms": {
+              "type": "integer",
+              "description": "Duration in milliseconds if applicable"
+            },
+            "retry_count": {
+              "type": "integer",
+              "description": "Retry count for self-healing events"
+            },
+            "error_code": {
+              "type": "string",
+              "description": "Error code if this is an error event"
+            },
+            "files_affected": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Files that were modified"
+            }
+          }
+        },
+        "token_usage": {
+          "$ref": "#/definitions/token_usage",
+          "description": "Token usage for this event (if applicable)"
+        }
+      }
+    },
+    "token_usage": {
+      "type": "object",
+      "description": "Token usage from an API call",
+      "required": ["input_tokens", "output_tokens", "model"],
+      "properties": {
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of input tokens used"
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of output tokens generated"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model name used for the API call"
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Calculated cost in USD based on model pricing"
+        }
+      }
+    },
+    "session_cost": {
+      "type": "object",
+      "description": "Cost tracking for a single session",
+      "required": ["session_id", "started_at", "phase", "total_input_tokens", "total_output_tokens", "total_cost_usd", "model_breakdown"],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "Unique session identifier"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the session started"
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the session ended"
+        },
+        "phase": {
+          "type": "string",
+          "description": "Project phase when session started"
+        },
+        "total_input_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total input tokens used in session"
+        },
+        "total_output_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total output tokens generated in session"
+        },
+        "total_cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total cost of session in USD"
+        },
+        "model_breakdown": {
+          "type": "object",
+          "description": "Token usage breakdown by model",
+          "additionalProperties": {
+            "$ref": "#/definitions/token_usage"
+          }
+        }
+      }
+    },
+    "cost_tracking": {
+      "type": "object",
+      "description": "Project-wide cost tracking data",
+      "required": ["total_input_tokens", "total_output_tokens", "total_cost_usd", "cost_by_phase", "cost_by_model", "sessions"],
+      "properties": {
+        "total_input_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total input tokens across all sessions"
+        },
+        "total_output_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total output tokens across all sessions"
+        },
+        "total_cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total cost in USD"
+        },
+        "cost_by_phase": {
+          "type": "object",
+          "description": "Cost breakdown by project phase",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "input_tokens": { "type": "integer" },
+              "output_tokens": { "type": "integer" },
+              "cost_usd": { "type": "number" }
+            }
+          }
+        },
+        "cost_by_model": {
+          "type": "object",
+          "description": "Cost breakdown by model",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "input_tokens": { "type": "integer" },
+              "output_tokens": { "type": "integer" },
+              "cost_usd": { "type": "number" }
+            }
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "description": "All cost tracking sessions",
+          "items": {
+            "$ref": "#/definitions/session_cost"
+          }
+        },
+        "current_session_id": {
+          "type": "string",
+          "description": "ID of the currently active session"
+        },
+        "budget_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Budget limit in USD"
+        },
+        "budget_alert_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Alert threshold as decimal (0.0-1.0)"
+        }
+      }
+    },
+    "onboarding_question": {
+      "type": "object",
+      "description": "Single onboarding question state",
+      "required": ["question_id", "question", "answered"],
+      "properties": {
+        "question_id": {
+          "type": "string",
+          "enum": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+          "description": "Question identifier"
+        },
+        "question": {
+          "type": "string",
+          "description": "The question text"
+        },
+        "answered": {
+          "type": "boolean",
+          "description": "Whether the question has been answered"
+        },
+        "answer": {
+          "type": "string",
+          "description": "The user's answer"
+        },
+        "answered_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the question was answered"
+        }
+      }
+    },
+    "onboarding_state": {
+      "type": "object",
+      "description": "Tracks mandatory startup protocol completion",
+      "required": ["started", "completed", "startup_message_displayed", "questions"],
+      "properties": {
+        "started": {
+          "type": "boolean",
+          "description": "Whether onboarding has started"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When onboarding started"
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether all 5 questions have been answered"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When onboarding completed"
+        },
+        "user_experience_level": {
+          "type": "string",
+          "enum": ["novice", "intermediate", "expert"],
+          "description": "User's technical experience level (from Q3)"
+        },
+        "questions": {
+          "type": "object",
+          "description": "Status of each onboarding question",
+          "properties": {
+            "Q1_what_building": {
+              "$ref": "#/definitions/onboarding_question"
+            },
+            "Q2_existing_code": {
+              "$ref": "#/definitions/onboarding_question"
+            },
+            "Q3_technical_background": {
+              "$ref": "#/definitions/onboarding_question"
+            },
+            "Q4_done_criteria": {
+              "$ref": "#/definitions/onboarding_question"
+            },
+            "Q5_constraints": {
+              "$ref": "#/definitions/onboarding_question"
+            }
+          }
+        },
+        "startup_message_displayed": {
+          "type": "boolean",
+          "description": "Whether the startup message was displayed to the user"
+        },
+        "startup_message_displayed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the startup message was displayed"
+        }
+      }
+    }
+  }
+}

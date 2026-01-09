@@ -1,0 +1,515 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://product-creator.dev/schemas/archive/handoff.json",
+  "title": "Agent Handoff Schema (DEPRECATED)",
+  "description": "DEPRECATED: This schema is archived. Use task-completion.schema.json instead. This schema was used for sequential agent-to-agent handoffs, replaced by Hub-and-Spoke task queue architecture in v2.0.",
+  "_deprecation": {
+    "deprecated_since": "2026-01-02",
+    "replaced_by": "schemas/task-completion.schema.json",
+    "reason": "Hub-and-Spoke architecture replaces sequential handoffs with task queue",
+    "migration_guide": "See constants/STATE_MANAGEMENT.md for new task completion format"
+  },
+  "type": "object",
+  "required": ["handoff", "next_agent", "next_action"],
+  "properties": {
+    "handoff": {
+      "type": "object",
+      "description": "Handoff metadata",
+      "required": ["agent", "timestamp", "status", "phase", "project"],
+      "properties": {
+        "agent": {
+          "type": "string",
+          "enum": [
+            "Orchestrator",
+            "Product Manager",
+            "Architect",
+            "UX/UI Designer",
+            "Frontend Developer",
+            "Backend Developer",
+            "Data Engineer",
+            "ML Engineer",
+            "Prompt Engineer",
+            "Model Evaluator",
+            "AIOps Engineer",
+            "QA Engineer",
+            "Security & Privacy Engineer",
+            "DevOps Engineer"
+          ]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["complete", "partial", "blocked", "failed"]
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "intake",
+            "assessment",
+            "planning",
+            "architecture",
+            "design",
+            "development",
+            "ml_development",
+            "testing",
+            "security_review",
+            "deployment",
+            "maintenance"
+          ]
+        },
+        "project": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Unique key to prevent duplicate processing. Format: {gate}_{agent}_{timestamp}",
+          "pattern": "^[A-Z0-9_.]+_[A-Za-z_]+_[0-9T:-]+Z?$"
+        },
+        "checksum": {
+          "type": "string",
+          "description": "SHA-256 hash of deliverables for verification",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "previous_handoff_id": {
+          "type": "string",
+          "description": "Reference to previous handoff in chain (for traceability)"
+        },
+        "execution_id": {
+          "type": "string",
+          "description": "Unique identifier for this execution session"
+        },
+        "model_tier": {
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "description": "Model tier used for this work (1=Fast, 2=Balanced, 3=Powerful)"
+        },
+        "model_id": {
+          "type": "string",
+          "description": "Specific model identifier used (e.g., claude-3-5-sonnet-20241022)"
+        }
+      }
+    },
+    "task_complexity": {
+      "type": "object",
+      "description": "Task complexity assessment for model tier routing",
+      "properties": {
+        "score": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Complexity score (1-3: Tier 1, 4-7: Tier 2, 8-10: Tier 3)"
+        },
+        "factors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Factors contributing to complexity score"
+        }
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "description": "What was produced (agent-specific)"
+    },
+    "quality_checks": {
+      "type": "object",
+      "description": "Quality gates passed",
+      "properties": {
+        "all_passed": { "type": "boolean" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "status": {
+                "type": "string",
+                "enum": ["passed", "failed", "skipped", "warning"]
+              },
+              "actual_value": { "type": "string" },
+              "expected_value": { "type": "string" },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "retry_context": {
+      "type": "object",
+      "description": "Context for retry attempts after quality gate failures",
+      "properties": {
+        "attempt_number": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "max_attempts": {
+          "type": "integer",
+          "default": 3
+        },
+        "original_handoff_id": {
+          "type": "string",
+          "description": "Reference to first attempt"
+        },
+        "failure_history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "attempt": { "type": "integer" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "status": { "type": "string" },
+              "gate": { "type": "string" },
+              "failures": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "criterion": { "type": "string" },
+                    "expected": { "type": "string" },
+                    "actual": { "type": "string" },
+                    "gap": { "type": "string" }
+                  }
+                }
+              },
+              "actions_taken": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "remaining_issues": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        },
+        "escalation_threshold": {
+          "type": "integer",
+          "default": 3
+        },
+        "auto_escalate": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "description": "Issues preventing full completion",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "severity"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^BLOCK-[0-9]{3}$"
+          },
+          "description": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"]
+          },
+          "owner": { "type": "string" },
+          "resolution_path": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "blocked_agents": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Dependencies for next agent",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["resolved", "pending", "blocked"]
+          },
+          "owner": { "type": "string" }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "description": "Unresolved questions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^QUERY-[0-9]{3}$",
+            "description": "Query ID following CONSTANTS.md format"
+          },
+          "question": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["open", "answered", "deferred"]
+          },
+          "answer": { "type": "string" }
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "description": "Identified risks for next phase",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^RISK-[0-9]{3}$"
+          },
+          "description": { "type": "string" },
+          "probability": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "impact": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "mitigation": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["identified", "mitigating", "mitigated", "accepted", "realized"]
+          }
+        }
+      }
+    },
+    "next_agent": {
+      "type": "string",
+      "description": "Agent(s) to hand off to"
+    },
+    "next_action": {
+      "type": "string",
+      "description": "Primary action for next agent"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional context for next agent"
+    },
+    "artifacts": {
+      "type": "object",
+      "description": "File paths to key artifacts",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "files_created": {
+      "type": "array",
+      "description": "List of files created by this agent (MANDATORY for verification)",
+      "items": {
+        "type": "object",
+        "required": ["path", "purpose"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path from project root"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Brief description of file purpose"
+          },
+          "lines": {
+            "type": "integer",
+            "description": "Number of lines in file"
+          },
+          "checksum": {
+            "type": "string",
+            "description": "SHA-256 hash for verification"
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "description": "Verification results proving work was executed (includes self-healing history)",
+      "properties": {
+        "self_healing_applied": {
+          "type": "boolean",
+          "description": "Whether the self-healing loop was triggered during this work",
+          "default": false
+        },
+        "total_internal_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Number of internal verification/fix cycles before success or escalation"
+        },
+        "final_verification": {
+          "type": "object",
+          "description": "Final verification results (after any self-healing)",
+          "properties": {
+            "commands_executed": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "command": { "type": "string" },
+                  "exit_code": { "type": "integer" },
+                  "timestamp": { "type": "string", "format": "date-time" },
+                  "duration_ms": { "type": "integer" }
+                }
+              }
+            },
+            "all_passed": { "type": "boolean" }
+          }
+        },
+        "healing_summary": {
+          "type": "object",
+          "description": "Summary of self-healing actions (only if self_healing_applied=true)",
+          "properties": {
+            "errors_fixed": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of errors automatically fixed"
+            },
+            "error_types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["type_error", "import_error", "syntax_error", "lint_error", "test_failure", "build_error", "runtime_error", "coverage_gap"]
+              },
+              "description": "Types of errors encountered and fixed"
+            },
+            "confidence": {
+              "type": "string",
+              "enum": ["high", "medium", "low"],
+              "description": "Agent's confidence in the fixes applied"
+            }
+          }
+        },
+        "self_healing_log": {
+          "type": "object",
+          "description": "Detailed internal healing log (included for transparency, not shown during execution)",
+          "properties": {
+            "started_at": { "type": "string", "format": "date-time" },
+            "completed_at": { "type": "string", "format": "date-time" },
+            "attempts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "attempt": { "type": "integer" },
+                  "command": { "type": "string" },
+                  "exit_code": { "type": "integer" },
+                  "error_type": { "type": "string" },
+                  "error_summary": { "type": "string" },
+                  "error_location": { "type": "string" },
+                  "reflection": { "type": "string" },
+                  "fix_applied": { "type": "string" },
+                  "fix_file": { "type": "string" },
+                  "fix_line": { "type": "integer" },
+                  "duration_ms": { "type": "integer" }
+                }
+              }
+            },
+            "final_status": {
+              "type": "string",
+              "enum": ["success", "escalated"]
+            },
+            "total_attempts": { "type": "integer" },
+            "total_duration_ms": { "type": "integer" }
+          }
+        },
+        "escalation": {
+          "type": "object",
+          "description": "Escalation details (only if healing failed after 3 attempts)",
+          "properties": {
+            "triggered": { "type": "boolean" },
+            "reason": { "type": "string" },
+            "attempt_summary": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "attempt": { "type": "integer" },
+                  "error_type": { "type": "string" },
+                  "fix_tried": { "type": "string" },
+                  "result": { "type": "string" }
+                }
+              }
+            },
+            "root_cause_analysis": { "type": "string" },
+            "recommended_options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "option": { "type": "string" },
+                  "description": { "type": "string" },
+                  "trade_offs": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "build_output": {
+          "type": "string",
+          "description": "Actual output from npm run build (final successful run)"
+        },
+        "test_output": {
+          "type": "string",
+          "description": "Actual output from npm run test (final successful run)"
+        },
+        "lint_output": {
+          "type": "string",
+          "description": "Actual output from npm run lint"
+        },
+        "typecheck_output": {
+          "type": "string",
+          "description": "Actual output from npm run typecheck"
+        },
+        "scan_output": {
+          "type": "string",
+          "description": "Actual output from security scans"
+        },
+        "deployment_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Live deployment URL (for DevOps)"
+        },
+        "health_check": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "status_code": { "type": "integer" },
+            "response_time_ms": { "type": "integer" }
+          }
+        },
+        "commands_executed": {
+          "type": "array",
+          "description": "All commands run with their exit codes (legacy field, prefer final_verification)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "command": { "type": "string" },
+              "exit_code": { "type": "integer" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "description": "Test coverage metrics",
+          "properties": {
+            "lines": { "type": "number" },
+            "branches": { "type": "number" },
+            "functions": { "type": "number" },
+            "statements": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+$ npm test
+
+> demo-app@1.0.0 test
+> vitest run --coverage
+
+ RUN  v1.2.0 /path/to/demo-app
+
+ ✓ src/components/Button.test.tsx (4 tests) 23ms
+   ✓ Button renders correctly
+   ✓ Button handles click events
+   ✓ Button displays loading state
+   ✓ Button is disabled when disabled prop is true
+
+ ✓ src/components/Form.test.tsx (6 tests) 45ms
+   ✓ Form renders all fields
+   ✓ Form validates required fields
+   ✓ Form validates email format
+   ✓ Form submits valid data
+   ✓ Form shows error messages
+   ✓ Form resets on cancel
+
+ ✓ src/hooks/useAuth.test.ts (5 tests) 34ms
+   ✓ useAuth returns user when logged in
+   ✓ useAuth returns null when logged out
+   ✓ login updates user state
+   ✓ logout clears user state
+   ✓ refresh token works correctly
+
+ ✓ src/api/users.test.ts (8 tests) 89ms
+   ✓ GET /users returns user list
+   ✓ GET /users/:id returns single user
+   ✓ POST /users creates new user
+   ✓ PUT /users/:id updates user
+   ✓ DELETE /users/:id removes user
+   ✓ handles 404 for non-existent user
+   ✓ handles validation errors
+   ✓ handles server errors
+
+ Test Files  4 passed (4)
+      Tests  23 passed (23)
+   Start at  14:10:00
+   Duration  1.23s (transform 234ms, setup 45ms, collect 567ms, tests 191ms)
+
+ % Coverage report from v8
+---------------------|---------|----------|---------|---------|-------------------
+File                 | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+---------------------|---------|----------|---------|---------|-------------------
+All files            |   87.23 |    82.14 |   91.67 |   87.23 |
+ src/components      |   92.45 |    88.89 |   95.00 |   92.45 |
+  Button.tsx         |   95.00 |   100.00 |  100.00 |   95.00 | 45-47
+  Form.tsx           |   90.00 |    80.00 |   90.00 |   90.00 | 78-82,95
+ src/hooks           |   85.71 |    75.00 |   88.89 |   85.71 |
+  useAuth.ts         |   85.71 |    75.00 |   88.89 |   85.71 | 34-38
+ src/api             |   82.35 |    80.00 |   90.00 |   82.35 |
+  users.ts           |   82.35 |    80.00 |   90.00 |   82.35 | 67-72,89-91
+---------------------|---------|----------|---------|---------|-------------------
+
+Exit code: 0
+Pass/Fail: PASS
+Summary: 23 passed, 0 failed, 87.23% coverage
+Generated: 2025-01-03T14:10:00.000Z

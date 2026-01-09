@@ -1,0 +1,153 @@
+// Prisma Schema Template
+//
+// PURPOSE: This is the DATABASE CONTRACT.
+// Backend MUST use this schema exactly. No modifications allowed.
+//
+// ARCHITECT: Fill in all [PLACEHOLDERS] based on PRD requirements
+// VALIDATION: Run `prisma validate` before handoff
+//
+// NAMING CONVENTIONS:
+// - Model names: PascalCase (User, WorkspaceUser)
+// - Field names: camelCase (createdAt, userId)
+// - Table names: snake_case via @@map (users, workspace_users)
+// - Enum names: PascalCase (UserRole, ProjectStatus)
+// - Enum values: SCREAMING_SNAKE_CASE (USER, ADMIN, IN_PROGRESS)
+//
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// Must match OpenAPI enums exactly
+// =============================================================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// [ADD MORE ENUMS]
+// enum [EnumName] {
+//   VALUE_ONE
+//   VALUE_TWO
+// }
+
+// =============================================================================
+// USER & AUTH
+// =============================================================================
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String?
+  role         UserRole  @default(USER)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  refreshTokens RefreshToken[]
+  // [ADD RELATIONS TO OTHER MODELS]
+  // posts         Post[]
+  // workspaces    WorkspaceUser[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// =============================================================================
+// [DOMAIN NAME] - Copy this section for each domain
+// =============================================================================
+
+// Example: Workspace domain for multi-tenant apps
+//
+// model Workspace {
+//   id        String   @id @default(uuid())
+//   name      String
+//   slug      String   @unique
+//   ownerId   String   @map("owner_id")
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
+//
+//   // Relations
+//   owner    User            @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+//   members  WorkspaceUser[]
+//   projects Project[]
+//
+//   @@index([ownerId])
+//   @@map("workspaces")
+// }
+//
+// model WorkspaceUser {
+//   id          String        @id @default(uuid())
+//   workspaceId String        @map("workspace_id")
+//   userId      String        @map("user_id")
+//   role        WorkspaceRole @default(MEMBER)
+//   joinedAt    DateTime      @default(now()) @map("joined_at")
+//
+//   // Relations
+//   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+//   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+//
+//   @@unique([workspaceId, userId])
+//   @@index([userId])
+//   @@map("workspace_users")
+// }
+
+// =============================================================================
+// AUDIT LOG (Optional - add if compliance required)
+// =============================================================================
+
+// model AuditLog {
+//   id        String   @id @default(uuid())
+//   userId    String?  @map("user_id")
+//   action    String   // CREATE, UPDATE, DELETE, LOGIN, etc.
+//   resource  String   // User, Workspace, etc.
+//   resourceId String? @map("resource_id")
+//   details   Json?    // Additional context
+//   ipAddress String?  @map("ip_address")
+//   userAgent String?  @map("user_agent")
+//   createdAt DateTime @default(now()) @map("created_at")
+//
+//   @@index([userId])
+//   @@index([resource, resourceId])
+//   @@index([createdAt])
+//   @@map("audit_logs")
+// }
+
+// =============================================================================
+// SCHEMA CHECKLIST (Architect must verify before handoff)
+// =============================================================================
+//
+// [ ] All models have @id with @default(uuid())
+// [ ] All models have createdAt and updatedAt timestamps
+// [ ] All field names are camelCase
+// [ ] All table names use @@map("snake_case")
+// [ ] All foreign keys have appropriate indexes
+// [ ] All relations have onDelete behavior specified
+// [ ] Enums match OpenAPI enums exactly
+// [ ] No unused models or fields
+// [ ] prisma validate passes
+// [ ] prisma format applied

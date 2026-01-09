@@ -1,0 +1,202 @@
+# AI Model Configuration Template
+#
+# PURPOSE: Define model selection, routing rules, and cost controls
+# USAGE: ML Engineer fills based on PRD requirements and budget
+
+# =============================================================================
+# MODEL REGISTRY
+# =============================================================================
+
+models:
+  # Primary production model
+  primary:
+    provider: anthropic
+    model_id: claude-sonnet-4-20250514
+    display_name: Claude Sonnet 4
+    capabilities:
+      - reasoning
+      - coding
+      - analysis
+    context_window: 200000
+    max_output: 8192
+    cost_per_million:
+      input: 3.00
+      output: 15.00
+    latency_p95_ms: 580
+
+  # Fast/cheap model for simple tasks
+  fast:
+    provider: anthropic
+    model_id: claude-haiku-3-20240307
+    display_name: Claude Haiku 3
+    capabilities:
+      - classification
+      - extraction
+      - summarization
+    context_window: 200000
+    max_output: 4096
+    cost_per_million:
+      input: 0.25
+      output: 1.25
+    latency_p95_ms: 320
+
+  # Reasoning model for complex tasks
+  reasoning:
+    provider: anthropic
+    model_id: claude-opus-4-20250514
+    display_name: Claude Opus 4
+    capabilities:
+      - complex_reasoning
+      - research
+      - long_form_writing
+    context_window: 200000
+    max_output: 32000
+    cost_per_million:
+      input: 15.00
+      output: 75.00
+    latency_p95_ms: 1200
+
+# =============================================================================
+# MODEL ROUTING RULES
+# =============================================================================
+
+routing:
+  # Default model when no rules match
+  default: primary
+
+  # Task-based routing
+  rules:
+    - name: simple_classification
+      conditions:
+        task_type: classification
+        complexity: low
+      model: fast
+
+    - name: code_generation
+      conditions:
+        task_type: code_generation
+      model: primary
+
+    - name: complex_analysis
+      conditions:
+        task_type: analysis
+        complexity: high
+      model: reasoning
+
+    - name: user_chat
+      conditions:
+        task_type: chat
+        priority: normal
+      model: primary
+
+    - name: budget_constrained
+      conditions:
+        budget_mode: strict
+      model: fast
+
+# =============================================================================
+# COST CONTROLS
+# =============================================================================
+
+cost_controls:
+  # Budget limits
+  daily_budget_usd: 50.00
+  monthly_budget_usd: 1000.00
+  alert_threshold_percent: 80
+
+  # Auto-downgrade when approaching limits
+  auto_downgrade:
+    enabled: true
+    threshold_percent: 90
+    target_model: fast
+
+  # Request limits
+  rate_limits:
+    requests_per_minute: 100
+    tokens_per_minute: 100000
+
+# =============================================================================
+# CACHING
+# =============================================================================
+
+caching:
+  enabled: true
+  strategy: semantic
+  ttl_seconds: 3600
+  max_cache_size_mb: 100
+
+  # What to cache
+  cacheable:
+    - classification
+    - extraction
+    - static_analysis
+
+  # Never cache
+  non_cacheable:
+    - user_chat
+    - real_time_data
+
+# =============================================================================
+# FALLBACK CONFIGURATION
+# =============================================================================
+
+fallback:
+  enabled: true
+  max_retries: 3
+  retry_delay_ms: 1000
+
+  # Fallback chain
+  chain:
+    - primary
+    - fast  # Fallback to cheaper model on rate limit
+
+  # Error handling
+  on_all_fail: queue_for_retry
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+
+monitoring:
+  enabled: true
+  metrics:
+    - latency_histogram
+    - token_usage
+    - error_rate
+    - cost_per_request
+    - cache_hit_rate
+
+  alerts:
+    - name: high_error_rate
+      condition: error_rate > 5%
+      window: 5m
+      severity: critical
+
+    - name: high_latency
+      condition: p95_latency > 2s
+      window: 5m
+      severity: warning
+
+    - name: budget_warning
+      condition: daily_spend > 80% of daily_budget
+      severity: warning
+
+# =============================================================================
+# ENVIRONMENT OVERRIDES
+# =============================================================================
+
+environments:
+  development:
+    routing:
+      default: fast  # Use cheaper model in dev
+    cost_controls:
+      daily_budget_usd: 10.00
+
+  staging:
+    routing:
+      default: primary
+    cost_controls:
+      daily_budget_usd: 25.00
+
+  production:
+    # Uses top-level config

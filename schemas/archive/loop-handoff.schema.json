@@ -1,0 +1,224 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://product-creator.dev/schemas/archive/loop-handoff.json",
+  "title": "Feature Loop Handoff Schema (DEPRECATED)",
+  "description": "DEPRECATED: This schema is archived. Use task-completion.schema.json instead. Feature loops now use the task queue with story_refs for tracking.",
+  "_deprecation": {
+    "deprecated_since": "2026-01-02",
+    "replaced_by": "schemas/task-completion.schema.json",
+    "reason": "Hub-and-Spoke architecture handles feature loops through task queue with story_refs",
+    "migration_guide": "See constants/TASK_QUEUE_PROTOCOL.md for new task structure with story_refs"
+  },
+  "type": "object",
+  "required": ["loop_handoff", "deliverables"],
+  "properties": {
+    "loop_handoff": {
+      "type": "object",
+      "description": "Loop transition metadata",
+      "required": ["story_id", "from_agent", "to_agent", "phase_transition", "timestamp", "iteration"],
+      "properties": {
+        "story_id": {
+          "type": "string",
+          "pattern": "^US-[0-9]{3}$",
+          "description": "User story identifier (e.g., US-001)"
+        },
+        "story_title": {
+          "type": "string",
+          "description": "Human-readable story title"
+        },
+        "from_agent": {
+          "type": "string",
+          "enum": [
+            "Orchestrator",
+            "Product Manager",
+            "Architect",
+            "UX/UI Designer",
+            "Frontend Developer",
+            "Backend Developer",
+            "Data Engineer",
+            "ML Engineer",
+            "Prompt Engineer",
+            "Model Evaluator",
+            "AIOps Engineer",
+            "QA Engineer",
+            "Security & Privacy Engineer",
+            "DevOps Engineer"
+          ]
+        },
+        "to_agent": {
+          "type": "string",
+          "enum": [
+            "Orchestrator",
+            "Product Manager",
+            "Architect",
+            "UX/UI Designer",
+            "Frontend Developer",
+            "Backend Developer",
+            "Data Engineer",
+            "ML Engineer",
+            "Prompt Engineer",
+            "Model Evaluator",
+            "AIOps Engineer",
+            "QA Engineer",
+            "Security & Privacy Engineer",
+            "DevOps Engineer",
+            "User"
+          ]
+        },
+        "phase_transition": {
+          "type": "string",
+          "enum": [
+            "QUEUED → REFINE",
+            "REFINE → BUILD",
+            "BUILD → TEST",
+            "TEST → ACCEPT",
+            "TEST → BUILD",
+            "ACCEPT → COMPLETE",
+            "ACCEPT → BUILD",
+            "ACCEPT → REFINE"
+          ],
+          "description": "Phase transition being made"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Current iteration number (max typically 3)"
+        },
+        "project": {
+          "type": "string",
+          "description": "Project identifier"
+        }
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "description": "What was produced in this phase",
+      "properties": {
+        "files_changed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Files modified in this phase"
+        },
+        "files_created": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "New files created in this phase"
+        },
+        "tests_added": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tests added"
+        },
+        "acceptance_criteria_met": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of acceptance criteria verified"
+        },
+        "documentation_updated": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Documentation files updated"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "description": "Build/test verification results",
+      "properties": {
+        "build": {
+          "type": "string",
+          "enum": ["passing", "failing", "skipped", "not_applicable"],
+          "description": "Build status"
+        },
+        "tests": {
+          "type": "string",
+          "description": "Test results (e.g., '15/15 passing')"
+        },
+        "coverage": {
+          "type": "string",
+          "description": "Test coverage percentage (e.g., '85%')"
+        },
+        "lint": {
+          "type": "string",
+          "description": "Lint results (e.g., '0 errors')"
+        }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "description": "Issues found during this phase",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "severity"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^LOOP-[0-9]{3}$",
+            "description": "Issue ID within the loop"
+          },
+          "description": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"]
+          },
+          "location": {
+            "type": "string",
+            "description": "File/line where issue found"
+          },
+          "suggested_fix": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional context for next agent"
+    },
+    "known_limitations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Known limitations or deferred items"
+    },
+    "questions": {
+      "type": "array",
+      "description": "Questions for next agent or user",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "options": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "blocking": { "type": "boolean" }
+        }
+      }
+    },
+    "time_spent": {
+      "type": "object",
+      "description": "Time tracking for this phase",
+      "properties": {
+        "duration_minutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

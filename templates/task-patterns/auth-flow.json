@@ -1,0 +1,261 @@
+{
+  "$schema": "../task-pattern.schema.json",
+  "pattern_id": "auth-flow",
+  "name": "Authentication Flow",
+  "description": "Complete user authentication system with login, registration, logout, and password reset",
+  "version": "1.0.0",
+  "category": "security",
+  "triggers": [
+    "auth",
+    "authentication",
+    "login",
+    "signup",
+    "register",
+    "user account"
+  ],
+  "variables": {
+    "feature_name": {
+      "type": "string",
+      "default": "auth",
+      "description": "Name of the authentication feature"
+    },
+    "include_2fa": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include two-factor authentication"
+    },
+    "include_oauth": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include OAuth providers (Google, GitHub, etc.)"
+    }
+  },
+  "tasks": [
+    {
+      "template_id": "PLAN-AUTH-STORIES",
+      "type": "planning",
+      "priority": "high",
+      "worker_category": "planning",
+      "description": "Write user stories for {{feature_name}} feature",
+      "gate_dependency": "G1",
+      "story_refs": []
+    },
+    {
+      "template_id": "PLAN-AUTH-OPENAPI",
+      "type": "planning",
+      "priority": "high",
+      "worker_category": "planning",
+      "description": "Design OpenAPI spec for {{feature_name}} endpoints",
+      "dependencies": ["PLAN-AUTH-STORIES"],
+      "gate_dependency": "G2",
+      "spec_refs": ["openapi.paths./api/{{feature_name}}.*"]
+    },
+    {
+      "template_id": "PLAN-AUTH-PRISMA",
+      "type": "planning",
+      "priority": "high",
+      "worker_category": "planning",
+      "description": "Design Prisma schema for User and Session models",
+      "dependencies": ["PLAN-AUTH-STORIES"],
+      "gate_dependency": "G2",
+      "spec_refs": ["prisma.models.User", "prisma.models.Session"]
+    },
+    {
+      "template_id": "PLAN-AUTH-ZOD",
+      "type": "planning",
+      "priority": "medium",
+      "worker_category": "planning",
+      "description": "Define Zod validation schemas for {{feature_name}}",
+      "dependencies": ["PLAN-AUTH-OPENAPI"],
+      "gate_dependency": "G2",
+      "spec_refs": ["zod.schemas.{{feature_name}}.*"]
+    },
+    {
+      "template_id": "GEN-AUTH-API-LOGIN",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement login endpoint POST /api/{{feature_name}}/login",
+      "dependencies": ["PLAN-AUTH-OPENAPI", "PLAN-AUTH-PRISMA", "PLAN-AUTH-ZOD"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{feature_name}}/login.post"]
+    },
+    {
+      "template_id": "GEN-AUTH-API-REGISTER",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement registration endpoint POST /api/{{feature_name}}/register",
+      "dependencies": ["PLAN-AUTH-OPENAPI", "PLAN-AUTH-PRISMA", "PLAN-AUTH-ZOD"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{feature_name}}/register.post"]
+    },
+    {
+      "template_id": "GEN-AUTH-API-LOGOUT",
+      "type": "generation",
+      "priority": "medium",
+      "worker_category": "generation",
+      "description": "Implement logout endpoint POST /api/{{feature_name}}/logout",
+      "dependencies": ["GEN-AUTH-API-LOGIN"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{feature_name}}/logout.post"]
+    },
+    {
+      "template_id": "GEN-AUTH-API-ME",
+      "type": "generation",
+      "priority": "medium",
+      "worker_category": "generation",
+      "description": "Implement current user endpoint GET /api/{{feature_name}}/me",
+      "dependencies": ["GEN-AUTH-API-LOGIN"],
+      "gate_dependency": "G3",
+      "spec_refs": ["openapi.paths./api/{{feature_name}}/me.get"]
+    },
+    {
+      "template_id": "GEN-AUTH-API-PASSWORD",
+      "type": "generation",
+      "priority": "medium",
+      "worker_category": "generation",
+      "description": "Implement password reset flow",
+      "dependencies": ["GEN-AUTH-API-LOGIN"],
+      "gate_dependency": "G3",
+      "spec_refs": [
+        "openapi.paths./api/{{feature_name}}/forgot-password.post",
+        "openapi.paths./api/{{feature_name}}/reset-password.post"
+      ]
+    },
+    {
+      "template_id": "GEN-AUTH-MIDDLEWARE",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Implement authentication middleware",
+      "dependencies": ["GEN-AUTH-API-LOGIN"],
+      "gate_dependency": "G3",
+      "spec_refs": []
+    },
+    {
+      "template_id": "GEN-AUTH-UI-LOGIN",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Build login page component",
+      "dependencies": ["GEN-AUTH-API-LOGIN"],
+      "gate_dependency": "G4",
+      "spec_refs": ["zod.schemas.{{feature_name}}.LoginInput"]
+    },
+    {
+      "template_id": "GEN-AUTH-UI-REGISTER",
+      "type": "generation",
+      "priority": "high",
+      "worker_category": "generation",
+      "description": "Build registration page component",
+      "dependencies": ["GEN-AUTH-API-REGISTER"],
+      "gate_dependency": "G4",
+      "spec_refs": ["zod.schemas.{{feature_name}}.RegisterInput"]
+    },
+    {
+      "template_id": "GEN-AUTH-UI-PASSWORD",
+      "type": "generation",
+      "priority": "medium",
+      "worker_category": "generation",
+      "description": "Build password reset pages",
+      "dependencies": ["GEN-AUTH-API-PASSWORD"],
+      "gate_dependency": "G4",
+      "spec_refs": []
+    },
+    {
+      "template_id": "VAL-AUTH-UNIT",
+      "type": "validation",
+      "priority": "high",
+      "worker_category": "validation",
+      "description": "Write and run unit tests for {{feature_name}} services",
+      "dependencies": [
+        "GEN-AUTH-API-LOGIN",
+        "GEN-AUTH-API-REGISTER",
+        "GEN-AUTH-MIDDLEWARE"
+      ],
+      "spec_refs": []
+    },
+    {
+      "template_id": "VAL-AUTH-E2E",
+      "type": "validation",
+      "priority": "high",
+      "worker_category": "validation",
+      "description": "Write and run E2E tests for {{feature_name}} flow",
+      "dependencies": [
+        "GEN-AUTH-UI-LOGIN",
+        "GEN-AUTH-UI-REGISTER",
+        "VAL-AUTH-UNIT"
+      ],
+      "spec_refs": []
+    },
+    {
+      "template_id": "VAL-AUTH-SECURITY",
+      "type": "validation",
+      "priority": "critical",
+      "worker_category": "validation",
+      "description": "Security review of {{feature_name}} implementation",
+      "dependencies": ["VAL-AUTH-E2E"],
+      "gate_dependency": "G6",
+      "spec_refs": []
+    }
+  ],
+  "conditional_tasks": [
+    {
+      "condition": "{{include_2fa}}",
+      "tasks": [
+        {
+          "template_id": "GEN-AUTH-2FA-API",
+          "type": "generation",
+          "priority": "medium",
+          "worker_category": "generation",
+          "description": "Implement 2FA setup and verification endpoints",
+          "dependencies": ["GEN-AUTH-API-LOGIN"],
+          "gate_dependency": "G3",
+          "spec_refs": ["openapi.paths./api/{{feature_name}}/2fa.*"]
+        },
+        {
+          "template_id": "GEN-AUTH-2FA-UI",
+          "type": "generation",
+          "priority": "medium",
+          "worker_category": "generation",
+          "description": "Build 2FA setup and verification UI",
+          "dependencies": ["GEN-AUTH-2FA-API"],
+          "gate_dependency": "G4",
+          "spec_refs": []
+        }
+      ]
+    },
+    {
+      "condition": "{{include_oauth}}",
+      "tasks": [
+        {
+          "template_id": "GEN-AUTH-OAUTH-API",
+          "type": "generation",
+          "priority": "medium",
+          "worker_category": "generation",
+          "description": "Implement OAuth provider callbacks",
+          "dependencies": ["GEN-AUTH-API-LOGIN"],
+          "gate_dependency": "G3",
+          "spec_refs": ["openapi.paths./api/{{feature_name}}/oauth.*"]
+        },
+        {
+          "template_id": "GEN-AUTH-OAUTH-UI",
+          "type": "generation",
+          "priority": "medium",
+          "worker_category": "generation",
+          "description": "Build OAuth login buttons",
+          "dependencies": ["GEN-AUTH-OAUTH-API", "GEN-AUTH-UI-LOGIN"],
+          "gate_dependency": "G4",
+          "spec_refs": []
+        }
+      ]
+    }
+  ],
+  "estimated_tasks": 16,
+  "parallelism_potential": {
+    "max_parallel_planning": 2,
+    "max_parallel_generation": 4,
+    "max_parallel_validation": 2
+  }
+}
