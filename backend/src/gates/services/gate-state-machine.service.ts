@@ -144,6 +144,28 @@ export class GateStateMachineService {
       }
     }
 
+    // Check if required deliverables are present and approved
+    const deliverables = await this.prisma.deliverable.findMany({
+      where: { gateId: gate.id },
+    });
+
+    if (deliverables.length > 0) {
+      // Check if all deliverables are approved
+      const unapprovedDeliverables = deliverables.filter(
+        (d) => d.status !== 'approved',
+      );
+
+      if (unapprovedDeliverables.length > 0) {
+        const deliverableNames = unapprovedDeliverables
+          .map((d) => d.name)
+          .join(', ');
+        return {
+          canTransition: false,
+          reason: `Gate has unapproved deliverables: ${deliverableNames}. All deliverables must be approved before gate approval.`,
+        };
+      }
+    }
+
     return { canTransition: true };
   }
 
