@@ -27,6 +27,7 @@ import { SessionContextModule } from './session-context/session-context.module';
 import { CostTrackingModule } from './cost-tracking/cost-tracking.module';
 import { CodeGenerationModule } from './code-generation/code-generation.module';
 import { GitHubModule } from './integrations/github/github.module';
+import { RailwayModule } from './integrations/railway/railway.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -59,6 +60,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     CostTrackingModule,
     CodeGenerationModule,
     GitHubModule,
+    RailwayModule,
   ],
   controllers: [AppController],
   providers: [
