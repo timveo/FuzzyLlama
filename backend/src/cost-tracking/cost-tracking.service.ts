@@ -1,0 +1,377 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { Decimal } from '@prisma/client/runtime/library';
+
+/**
+ * CostTrackingService - Track AI API costs per project, gate, and agent
+ *
+ * Purpose:
+ * - Calculate costs from token usage (input + output tokens)
+ * - Track costs per gate (G1-G9)
+ * - Aggregate costs per project
+ * - Provide cost breakdowns for billing
+ *
+ * Pricing (as of 2024):
+ * - Claude Opus 4: $15/$75 per 1M tokens (input/output)
+ * - Claude Sonnet 4: $3/$15 per 1M tokens
+ * - GPT-4 Turbo: $10/$30 per 1M tokens
+ * - GPT-3.5 Turbo: $0.50/$1.50 per 1M tokens
+ */
+@Injectable()
+export class CostTrackingService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  // Model pricing per 1M tokens (USD)
+  private readonly MODEL_PRICING = {
+    'claude-opus-4': { input: 15, output: 75 },
+    'claude-sonnet-4': { input: 3, output: 15 },
+    'claude-3-opus-20240229': { input: 15, output: 75 },
+    'claude-3-5-sonnet-20241022': { input: 3, output: 15 },
+    'gpt-4-turbo': { input: 10, output: 30 },
+    'gpt-4o': { input: 5, output: 15 },
+    'gpt-3.5-turbo': { input: 0.5, output: 1.5 },
+  };
+
+  /**
+   * Calculate cost for a single agent execution
+   */
+  calculateAgentCost(
+    model: string,
+    inputTokens: number,
+    outputTokens: number,
+  ): number {
+    const pricing = this.MODEL_PRICING[model] || {
+      input: 3,
+      output: 15,
+    }; // Default to Sonnet pricing
+
+    const inputCost = (inputTokens / 1_000_000) * pricing.input;
+    const outputCost = (outputTokens / 1_000_000) * pricing.output;
+
+    return inputCost + outputCost;
+  }
+
+  /**
+   * Get costs per gate for a project
+   */
+  async getCostsPerGate(projectId: string): Promise<
+    Array<{
+      gateType: string;
+      agentExecutions: number;
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCost: number;
+      agents: Array<{
+        agentType: string;
+        executions: number;
+        cost: number;
+      }>;
+    }>
+  > {
+    // Get all gates for project
+    const gates = await this.prisma.gate.findMany({
+      where: { projectId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        tasks: {
+          include: {
+            agents: true, // Get agent executions for each task
+          },
+        },
+      },
+    });
+
+    const costsByGate = [];
+
+    for (const gate of gates) {
+      // Collect all agent executions across tasks in this gate
+      const agents: any[] = [];
+      gate.tasks.forEach((task) => {
+        agents.push(...task.agents);
+      });
+
+      // Calculate totals
+      const totalInputTokens = agents.reduce(
+        (sum, a) => sum + a.inputTokens,
+        0,
+      );
+      const totalOutputTokens = agents.reduce(
+        (sum, a) => sum + a.outputTokens,
+        0,
+      );
+
+      // Calculate cost per agent type
+      const agentTypeCosts: Record<
+        string,
+        { executions: number; cost: number }
+      > = {};
+
+      agents.forEach((agent) => {
+        const cost = this.calculateAgentCost(
+          agent.model,
+          agent.inputTokens,
+          agent.outputTokens,
+        );
+
+        if (!agentTypeCosts[agent.agentType]) {
+          agentTypeCosts[agent.agentType] = { executions: 0, cost: 0 };
+        }
+
+        agentTypeCosts[agent.agentType].executions++;
+        agentTypeCosts[agent.agentType].cost += cost;
+      });
+
+      const totalCost = Object.values(agentTypeCosts).reduce(
+        (sum, a) => sum + a.cost,
+        0,
+      );
+
+      costsByGate.push({
+        gateType: gate.gateType,
+        agentExecutions: agents.length,
+        totalInputTokens,
+        totalOutputTokens,
+        totalCost,
+        agents: Object.entries(agentTypeCosts).map(([agentType, data]) => ({
+          agentType,
+          executions: data.executions,
+          cost: data.cost,
+        })),
+      });
+    }
+
+    return costsByGate;
+  }
+
+  /**
+   * Get total project costs
+   */
+  async getProjectCosts(projectId: string): Promise<{
+    totalCost: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalAgentExecutions: number;
+    costsByModel: Record<string, { cost: number; executions: number }>;
+    costsByAgent: Record<string, { cost: number; executions: number }>;
+  }> {
+    const agents = await this.prisma.agent.findMany({
+      where: { projectId },
+      select: {
+        model: true,
+        agentType: true,
+        inputTokens: true,
+        outputTokens: true,
+      },
+    });
+
+    let totalCost = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
+    const costsByModel: Record<string, { cost: number; executions: number }> =
+      {};
+    const costsByAgent: Record<string, { cost: number; executions: number }> =
+      {};
+
+    agents.forEach((agent) => {
+      const cost = this.calculateAgentCost(
+        agent.model,
+        agent.inputTokens,
+        agent.outputTokens,
+      );
+
+      totalCost += cost;
+      totalInputTokens += agent.inputTokens;
+      totalOutputTokens += agent.outputTokens;
+
+      // By model
+      if (!costsByModel[agent.model]) {
+        costsByModel[agent.model] = { cost: 0, executions: 0 };
+      }
+      costsByModel[agent.model].cost += cost;
+      costsByModel[agent.model].executions++;
+
+      // By agent type
+      if (!costsByAgent[agent.agentType]) {
+        costsByAgent[agent.agentType] = { cost: 0, executions: 0 };
+      }
+      costsByAgent[agent.agentType].cost += cost;
+      costsByAgent[agent.agentType].executions++;
+    });
+
+    return {
+      totalCost,
+      totalInputTokens,
+      totalOutputTokens,
+      totalAgentExecutions: agents.length,
+      costsByModel,
+      costsByAgent,
+    };
+  }
+
+  /**
+   * Record usage metric for billing
+   */
+  async recordUsageMetric(
+    userId: string,
+    projectId: string,
+    agentExecutions: number,
+    apiTokensUsed: number,
+    cost: number,
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<any> {
+    return this.prisma.usageMetric.create({
+      data: {
+        userId,
+        projectId,
+        agentExecutions,
+        apiTokensUsed,
+        cost: new Decimal(cost),
+        periodStart,
+        periodEnd,
+      },
+    });
+  }
+
+  /**
+   * Get usage metrics for a user
+   */
+  async getUserUsage(
+    userId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<{
+    totalAgentExecutions: number;
+    totalTokensUsed: number;
+    totalCost: number;
+    byProject: Array<{
+      projectId: string;
+      projectName: string;
+      agentExecutions: number;
+      cost: number;
+    }>;
+  }> {
+    const where: any = { userId };
+
+    if (startDate && endDate) {
+      where.periodStart = { gte: startDate };
+      where.periodEnd = { lte: endDate };
+    }
+
+    const metrics = await this.prisma.usageMetric.findMany({
+      where,
+    });
+
+    const totalAgentExecutions = metrics.reduce(
+      (sum, m) => sum + m.agentExecutions,
+      0,
+    );
+    const totalTokensUsed = metrics.reduce(
+      (sum, m) => sum + m.apiTokensUsed,
+      0,
+    );
+    const totalCost = metrics.reduce(
+      (sum, m) => sum + parseFloat(m.cost.toString()),
+      0,
+    );
+
+    // Group by project
+    const projectCosts: Record<
+      string,
+      { agentExecutions: number; cost: number }
+    > = {};
+
+    metrics.forEach((m) => {
+      if (m.projectId) {
+        if (!projectCosts[m.projectId]) {
+          projectCosts[m.projectId] = { agentExecutions: 0, cost: 0 };
+        }
+        projectCosts[m.projectId].agentExecutions += m.agentExecutions;
+        projectCosts[m.projectId].cost += parseFloat(m.cost.toString());
+      }
+    });
+
+    // Get project names
+    const projectIds = Object.keys(projectCosts);
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, name: true },
+    });
+
+    const projectMap = new Map(projects.map((p) => [p.id, p.name]));
+
+    const byProject = Object.entries(projectCosts).map(
+      ([projectId, data]) => ({
+        projectId,
+        projectName: projectMap.get(projectId) || 'Unknown',
+        agentExecutions: data.agentExecutions,
+        cost: data.cost,
+      }),
+    );
+
+    return {
+      totalAgentExecutions,
+      totalTokensUsed,
+      totalCost,
+      byProject,
+    };
+  }
+
+  /**
+   * Get cost estimate for a gate based on historical data
+   */
+  async estimateGateCost(gateType: string): Promise<{
+    averageCost: number;
+    minCost: number;
+    maxCost: number;
+    sampleSize: number;
+  }> {
+    // Get all gates of this type across all projects
+    const gates = await this.prisma.gate.findMany({
+      where: { gateType },
+      include: {
+        tasks: {
+          include: { agents: true },
+        },
+      },
+    });
+
+    const costs: number[] = [];
+
+    for (const gate of gates) {
+      const agents: any[] = [];
+      gate.tasks.forEach((task) => {
+        agents.push(...task.agents);
+      });
+
+      const gateCost = agents.reduce((sum, agent) => {
+        return (
+          sum +
+          this.calculateAgentCost(
+            agent.model,
+            agent.inputTokens,
+            agent.outputTokens,
+          )
+        );
+      }, 0);
+
+      costs.push(gateCost);
+    }
+
+    if (costs.length === 0) {
+      return { averageCost: 0, minCost: 0, maxCost: 0, sampleSize: 0 };
+    }
+
+    const averageCost = costs.reduce((sum, c) => sum + c, 0) / costs.length;
+    const minCost = Math.min(...costs);
+    const maxCost = Math.max(...costs);
+
+    return {
+      averageCost,
+      minCost,
+      maxCost,
+      sampleSize: costs.length,
+    };
+  }
+}
