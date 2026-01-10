@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './observability/sentry-exception.filter';
 import { SentryService } from './observability/sentry.service';
@@ -11,6 +12,42 @@ async function bootstrap() {
   // Get Sentry service and apply global exception filter
   const sentryService = app.get(SentryService);
   app.useGlobalFilters(new SentryExceptionFilter(sentryService));
+
+  // Security headers with Helmet
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'", // Required for Swagger UI
+            "'unsafe-eval'", // Required for Swagger UI
+          ],
+          styleSrc: ["'self'", "'unsafe-inline'"], // Required for Swagger UI
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: [
+            "'self'",
+            process.env.FRONTEND_URL,
+            'ws://localhost:*',
+            'wss://*',
+          ].filter(Boolean) as string[],
+          fontSrc: ["'self'", 'data:'],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
+        },
+      },
+      crossOriginEmbedderPolicy: false, // Disable for API server
+      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin requests
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    }),
+  );
 
   // Enable CORS
   app.enableCors({
@@ -46,8 +83,13 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 Backend API running on http://localhost:${port}`);
-  console.log(`📚 API Documentation available at http://localhost:${port}/api/docs`);
+
+  const logger = app.get('winston');
+  logger.info(`🚀 Backend API running on http://localhost:${port}`);
+  logger.info(`📚 API Documentation available at http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Failed to start application:', error);
+  process.exit(1);
+});

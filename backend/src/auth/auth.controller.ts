@@ -81,4 +81,29 @@ export class AuthController {
   async getMe(@CurrentUser() user: any) {
     return this.authService.getMe(user.id);
   }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout current session' })
+  @ApiResponse({ status: 200, description: 'Successfully logged out' })
+  async logout(
+    @CurrentUser() user: any,
+    @Body() body: { tokenId: string },
+  ): Promise<{ message: string }> {
+    await this.authService.logout(user.id, body.tokenId);
+    return { message: 'Successfully logged out' };
+  }
+
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout all sessions' })
+  @ApiResponse({ status: 200, description: 'Successfully logged out all sessions' })
+  async logoutAll(@CurrentUser() user: any): Promise<{ message: string }> {
+    await this.authService.logoutAll(user.id);
+    return { message: 'Successfully logged out all sessions' };
+  }
 }

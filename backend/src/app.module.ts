@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { LoggerModule } from './common/logger/logger.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -39,6 +40,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
+    LoggerModule,
     ObservabilityModule,
     StorageModule,
     AnalyticsModule,

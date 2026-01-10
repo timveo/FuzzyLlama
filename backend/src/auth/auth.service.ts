@@ -7,7 +7,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { TokenStorageService } from './token-storage.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -18,6 +20,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly tokenStorage: TokenStorageService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
@@ -123,6 +126,16 @@ export class AuthService {
         throw new UnauthorizedException('Invalid token type');
       }
 
+      // Validate token exists in Redis and is not blacklisted
+      const isValid = await this.tokenStorage.validateRefreshToken(
+        payload.sub,
+        payload.jti,
+      );
+
+      if (!isValid) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
         select: {
@@ -137,6 +150,10 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
+      // Invalidate old refresh token (token rotation)
+      await this.tokenStorage.invalidateRefreshToken(payload.sub, payload.jti);
+
+      // Generate new tokens
       const tokens = await this.generateTokens(user.id, user.email);
 
       return {
@@ -176,7 +193,18 @@ export class AuthService {
     return user;
   }
 
+  async logout(userId: string, tokenId: string): Promise<void> {
+    await this.tokenStorage.invalidateRefreshToken(userId, tokenId);
+  }
+
+  async logoutAll(userId: string): Promise<void> {
+    await this.tokenStorage.invalidateAllUserTokens(userId);
+  }
+
   private async generateTokens(userId: string, email: string) {
+    // Generate unique token ID for refresh token
+    const tokenId = randomBytes(16).toString('hex');
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         { sub: userId, email, type: 'access' },
@@ -186,13 +214,16 @@ export class AuthService {
         },
       ),
       this.jwtService.signAsync(
-        { sub: userId, email, type: 'refresh' },
+        { sub: userId, email, type: 'refresh', jti: tokenId },
         {
           secret: this.configService.get<string>('JWT_SECRET'),
           expiresIn: '30d',
         },
       ),
     ]);
+
+    // Store refresh token in Redis
+    await this.tokenStorage.storeRefreshToken(userId, tokenId, refreshToken);
 
     return { accessToken, refreshToken };
   }
