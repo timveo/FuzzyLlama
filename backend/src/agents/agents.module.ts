@@ -3,21 +3,25 @@ import { AgentsController } from './agents.controller';
 import { AgentExecutionService } from './services/agent-execution.service';
 import { AgentTemplateLoaderService } from './services/agent-template-loader.service';
 import { AIProviderService } from './services/ai-provider.service';
+import { OrchestratorService } from './services/orchestrator.service';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { WebSocketModule } from '../websocket/websocket.module';
+import { GatesModule } from '../gates/gates.module';
 
 @Module({
-  imports: [PrismaModule, WebSocketModule],
+  imports: [PrismaModule, WebSocketModule, GatesModule],
   controllers: [AgentsController],
   providers: [
     AgentExecutionService,
     AgentTemplateLoaderService,
     AIProviderService,
+    OrchestratorService,
   ],
   exports: [
     AgentExecutionService,
     AgentTemplateLoaderService,
     AIProviderService,
+    OrchestratorService,
   ],
 })
 export class AgentsModule {}

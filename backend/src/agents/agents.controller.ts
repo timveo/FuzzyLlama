@@ -15,6 +15,7 @@ import {
 } from '@nestjs/swagger';
 import { AgentExecutionService } from './services/agent-execution.service';
 import { AgentTemplateLoaderService } from './services/agent-template-loader.service';
+import { OrchestratorService } from './services/orchestrator.service';
 import { ExecuteAgentDto } from './dto/execute-agent.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -28,6 +29,7 @@ export class AgentsController {
   constructor(
     private readonly executionService: AgentExecutionService,
     private readonly templateLoader: AgentTemplateLoaderService,
+    private readonly orchestrator: OrchestratorService,
     private readonly wsGateway: AppWebSocketGateway,
   ) {}
 
@@ -126,5 +128,45 @@ export class AgentsController {
   @ApiResponse({ status: 404, description: 'Agent execution not found' })
   async getExecution(@Param('id') id: string, @CurrentUser() user: any) {
     return this.executionService.getAgentExecution(id, user.id);
+  }
+
+  @Post('orchestrator/decompose')
+  @ApiOperation({ summary: 'Decompose requirements into agent tasks' })
+  @ApiResponse({ status: 200, description: 'Requirements decomposed successfully' })
+  async decomposeRequirements(
+    @Body() body: { projectId: string; requirements: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.orchestrator.decomposeRequirements(body.projectId, body.requirements);
+  }
+
+  @Get('orchestrator/progress/:projectId')
+  @ApiOperation({ summary: 'Get project progress and next actions' })
+  @ApiResponse({ status: 200, description: 'Project progress retrieved successfully' })
+  async getProgress(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.orchestrator.getProjectProgress(projectId);
+  }
+
+  @Get('orchestrator/next-task/:projectId')
+  @ApiOperation({ summary: 'Get next executable task for project' })
+  @ApiResponse({ status: 200, description: 'Next task retrieved successfully' })
+  async getNextTask(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.orchestrator.getNextExecutableTask(projectId);
+  }
+
+  @Post('orchestrator/route/:projectId')
+  @ApiOperation({ summary: 'Route task to appropriate agent based on current gate' })
+  @ApiResponse({ status: 200, description: 'Task routed successfully' })
+  async routeTask(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.orchestrator.routeTaskToAgent(projectId, user.id);
   }
 }
