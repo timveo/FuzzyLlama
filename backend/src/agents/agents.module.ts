@@ -7,9 +7,10 @@ import { OrchestratorService } from './services/orchestrator.service';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { GatesModule } from '../gates/gates.module';
+import { DocumentsModule } from '../documents/documents.module';
 
 @Module({
-  imports: [PrismaModule, WebSocketModule, GatesModule],
+  imports: [PrismaModule, WebSocketModule, GatesModule, DocumentsModule],
   controllers: [AgentsController],
   providers: [
     AgentExecutionService,

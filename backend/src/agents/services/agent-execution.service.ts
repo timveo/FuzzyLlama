@@ -13,6 +13,7 @@ import {
 } from '../interfaces/agent-template.interface';
 import { ExecuteAgentDto } from '../dto/execute-agent.dto';
 import { getAgentTemplate } from '../templates';
+import { DocumentsService } from '../../documents/documents.service';
 
 @Injectable()
 export class AgentExecutionService {
@@ -20,6 +21,7 @@ export class AgentExecutionService {
     private prisma: PrismaService,
     private templateLoader: AgentTemplateLoaderService,
     private aiProvider: AIProviderService,
+    private documentsService: DocumentsService,
   ) {}
 
   async executeAgent(
@@ -257,6 +259,20 @@ export class AgentExecutionService {
             },
           });
 
+          // Post-processing: Generate documents and handle handoffs
+          try {
+            await this.postProcessAgentCompletion(
+              agentExecution.id,
+              executeDto.projectId,
+              executeDto.agentType,
+              response.content,
+              userId,
+            );
+          } catch (error) {
+            console.error('Post-processing error:', error);
+            // Don't fail the entire execution if post-processing fails
+          }
+
           streamCallback.onComplete(response);
         },
         onError: async (error) => {
@@ -436,5 +452,102 @@ ${template.prompt.context}
     }
 
     return agent;
+  }
+
+  /**
+   * Post-process agent completion: Generate documents and prepare handoffs
+   */
+  private async postProcessAgentCompletion(
+    agentExecutionId: string,
+    projectId: string,
+    agentType: string,
+    agentOutput: string,
+    userId: string,
+  ): Promise<void> {
+    // 1. Generate documents from agent output
+    try {
+      await this.documentsService.generateFromAgentOutput(
+        projectId,
+        agentExecutionId,
+        agentType,
+        agentOutput,
+        userId,
+      );
+    } catch (error) {
+      console.error('Document generation error:', error);
+    }
+
+    // 2. Extract handoff data
+    const handoffData = this.documentsService.extractHandoffData(agentOutput);
+
+    if (handoffData && handoffData.nextAgent?.length > 0) {
+      // Get current gate
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        include: { state: true },
+      });
+
+      if (!project || !project.state) {
+        return;
+      }
+
+      // Create handoff record for each next agent
+      for (const nextAgent of handoffData.nextAgent) {
+        try {
+          await this.prisma.handoff.create({
+            data: {
+              projectId,
+              fromAgent: agentType,
+              toAgent: nextAgent,
+              phase: project.state.currentPhase,
+              status: 'partial',
+              notes: handoffData.nextAction || 'Agent handoff',
+            },
+          });
+
+          // Create handoff deliverables
+          if (handoffData.deliverables?.length > 0) {
+            const handoff = await this.prisma.handoff.findFirst({
+              where: {
+                projectId,
+                fromAgent: agentType,
+                toAgent: nextAgent,
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+
+            if (handoff) {
+              for (const deliverable of handoffData.deliverables) {
+                await this.prisma.handoffDeliverable.create({
+                  data: {
+                    handoffId: handoff.id,
+                    deliverable,
+                  },
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Handoff creation error:', error);
+        }
+      }
+    }
+
+    // 3. Update task status if this agent was assigned a task
+    try {
+      await this.prisma.task.updateMany({
+        where: {
+          projectId,
+          owner: agentType,
+          status: 'in_progress',
+        },
+        data: {
+          status: 'complete',
+          completedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error('Task update error:', error);
+    }
   }
 }
