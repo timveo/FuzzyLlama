@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -27,31 +28,29 @@ export class NotesController {
   @Get()
   async getNotes(
     @Query('projectId') projectId: string,
-    @Query('noteType') noteType?: string,
     @Query('limit') limit?: string,
   ) {
-    const options: any = {};
-    if (noteType) options.noteType = noteType;
+    const options: { limit?: number } = {};
     if (limit) options.limit = parseInt(limit, 10);
 
     return this.notesService.getNotes(projectId, options);
   }
 
   @Get(':id')
-  async getNote(@Param('id') id: string) {
+  async getNote(@Param('id', ParseIntPipe) id: number) {
     return this.notesService.getNote(id);
   }
 
   @Patch(':id')
   async updateNote(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() updateNoteDto: UpdateNoteDto,
   ) {
     return this.notesService.updateNote(id, updateNoteDto.content);
   }
 
   @Delete(':id')
-  async deleteNote(@Param('id') id: string) {
+  async deleteNote(@Param('id', ParseIntPipe) id: number) {
     await this.notesService.deleteNote(id);
     return { success: true };
   }

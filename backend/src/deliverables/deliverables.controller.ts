@@ -13,7 +13,7 @@ import { DeliverablesService } from './deliverables.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateDeliverableDto } from './dto/create-deliverable.dto';
 import { UpdateDeliverableDto } from './dto/update-deliverable.dto';
-import { ApproveDeliverableDto } from './dto/approve-deliverable.dto';
+import { DeliverableStatus } from '@prisma/client';
 
 @Controller('api/deliverables')
 @UseGuards(JwtAuthGuard)
@@ -28,14 +28,12 @@ export class DeliverablesController {
   @Get()
   async getDeliverables(
     @Query('projectId') projectId: string,
-    @Query('gateId') gateId?: string,
-    @Query('status') status?: 'pending' | 'in_progress' | 'completed' | 'approved',
-    @Query('deliverableType') deliverableType?: string,
+    @Query('status') status?: DeliverableStatus,
+    @Query('owner') owner?: string,
   ) {
-    const options: any = {};
-    if (gateId) options.gateId = gateId;
+    const options: { status?: DeliverableStatus; owner?: string } = {};
     if (status) options.status = status;
-    if (deliverableType) options.deliverableType = deliverableType;
+    if (owner) options.owner = owner;
 
     return this.deliverablesService.getDeliverables(projectId, options);
   }
@@ -53,20 +51,29 @@ export class DeliverablesController {
     return this.deliverablesService.updateDeliverable(id, updateDeliverableDto);
   }
 
-  @Post(':id/approve')
-  async approveDeliverable(
-    @Param('id') id: string,
-    @Body() approveDeliverableDto: ApproveDeliverableDto,
-  ) {
-    return this.deliverablesService.approveDeliverable(
-      id,
-      approveDeliverableDto.approvedBy,
-    );
+  @Post(':id/complete')
+  async markComplete(@Param('id') id: string) {
+    return this.deliverablesService.markComplete(id);
+  }
+
+  @Post(':id/in-progress')
+  async markInProgress(@Param('id') id: string) {
+    return this.deliverablesService.markInProgress(id);
+  }
+
+  @Post(':id/in-review')
+  async markInReview(@Param('id') id: string) {
+    return this.deliverablesService.markInReview(id);
   }
 
   @Delete(':id')
   async deleteDeliverable(@Param('id') id: string) {
     await this.deliverablesService.deleteDeliverable(id);
     return { success: true };
+  }
+
+  @Get('statistics/:projectId')
+  async getStatistics(@Param('projectId') projectId: string) {
+    return this.deliverablesService.getDeliverableStatistics(projectId);
   }
 }

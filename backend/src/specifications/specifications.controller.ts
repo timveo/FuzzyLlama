@@ -21,6 +21,7 @@ import { CreateSpecificationDto } from './dto/create-specification.dto';
 import { UpdateSpecificationDto } from './dto/update-specification.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequestUser } from '../common/types/user.types';
 
 @ApiTags('specifications')
 @Controller('specifications')

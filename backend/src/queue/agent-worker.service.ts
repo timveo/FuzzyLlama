@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue, Process, Processor } from '@nestjs/bull';
+import { InjectQueue, Process, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
 import { Queue, Job } from 'bull';
 import { AgentExecutionService } from '../agents/services/agent-execution.service';
 import { AgentJob } from './queue-manager.service';
-import { MetricsService } from '../observability/metrics.service';
+import { PrometheusMetricsService } from '../observability/metrics.service';
 
 /**
  * AgentWorkerService - Worker Processes for Agent Execution
@@ -26,7 +26,7 @@ export class AgentWorkerService implements OnModuleInit {
     @InjectQueue('agents-medium') private mediumQueue: Queue,
     @InjectQueue('agents-low') private lowQueue: Queue,
     private readonly agentExecution: AgentExecutionService,
-    private readonly metrics: MetricsService,
+    private readonly metrics: PrometheusMetricsService,
   ) {}
 
   onModuleInit() {
@@ -38,35 +38,15 @@ export class AgentWorkerService implements OnModuleInit {
   }
 
   /**
-   * Process critical priority jobs (concurrency: 5)
+   * Process all agent jobs
+   * Note: In NestJS Bull, the @Processor decorator is class-level
+   * For multi-queue processing, use separate processor classes or
+   * handle via queue name in the job data
    */
-  @Process({ name: '*', concurrency: 5, queue: 'agents-critical' })
-  async processCritical(job: Job<AgentJob>): Promise<any> {
-    return this.processAgentJob(job, 'CRITICAL');
-  }
-
-  /**
-   * Process high priority jobs (concurrency: 3)
-   */
-  @Process({ name: '*', concurrency: 3, queue: 'agents-high' })
-  async processHigh(job: Job<AgentJob>): Promise<any> {
-    return this.processAgentJob(job, 'HIGH');
-  }
-
-  /**
-   * Process medium priority jobs (concurrency: 2)
-   */
-  @Process({ name: '*', concurrency: 2, queue: 'agents-medium' })
-  async processMedium(job: Job<AgentJob>): Promise<any> {
-    return this.processAgentJob(job, 'MEDIUM');
-  }
-
-  /**
-   * Process low priority jobs (concurrency: 1)
-   */
-  @Process({ name: '*', concurrency: 1, queue: 'agents-low' })
-  async processLow(job: Job<AgentJob>): Promise<any> {
-    return this.processAgentJob(job, 'LOW');
+  @Process()
+  async processAgentJobFromQueue(job: Job<AgentJob>): Promise<any> {
+    const priority = job.data.priority || 'MEDIUM';
+    return this.processAgentJob(job, priority);
   }
 
   /**
@@ -81,15 +61,15 @@ export class AgentWorkerService implements OnModuleInit {
 
     try {
       // Execute agent via AgentExecutionService
-      const result = await this.agentExecution.executeAgentWithRetry(
-        job.data.projectId,
-        job.data.agentType,
-        job.data.userPrompt,
-        job.data.userId,
+      const result = await this.agentExecution.executeAgent(
         {
-          model: job.data.model,
+          projectId: job.data.projectId,
+          agentType: job.data.agentType,
+          userPrompt: job.data.userPrompt,
+          model: job.data.model as any, // Cast from string to AIModel enum
           inputs: job.data.inputs,
         },
+        job.data.userId,
       );
 
       const duration = Date.now() - startTime;
@@ -106,10 +86,10 @@ export class AgentWorkerService implements OnModuleInit {
         job.data.agentType,
         job.data.model || 'unknown',
         duration / 1000, // Convert to seconds
-        true,
-        result.inputTokens || 0,
-        result.outputTokens || 0,
-        result.cost || 0,
+        result.success,
+        0, // Input tokens - not tracked in current interface
+        0, // Output tokens - not tracked in current interface
+        0, // Cost - not tracked in current interface
       );
 
       this.metrics.queueProcessingDuration
@@ -117,16 +97,17 @@ export class AgentWorkerService implements OnModuleInit {
         .observe(duration / 1000);
 
       return {
-        success: true,
-        agentId: result.id,
-        output: result.outputResult,
+        success: result.success,
+        output: result.output,
+        nextAgent: result.nextAgent,
+        gateReady: result.gateReady,
         duration,
       };
     } catch (error) {
       const duration = Date.now() - startTime;
 
       this.logger.error(
-        `[${priority}] Job ${job.id} failed after ${(duration / 1000).toFixed(2)}s: ${error.message}`,
+        `[${priority}] Job ${job.id} failed after ${(duration / 1000).toFixed(2)}s: ${(error as Error).message}`,
       );
 
       // Update job progress
@@ -152,23 +133,17 @@ export class AgentWorkerService implements OnModuleInit {
   /**
    * Job completed handler
    */
-  @Process({ name: 'completed', queue: 'agents-critical' })
-  @Process({ name: 'completed', queue: 'agents-high' })
-  @Process({ name: 'completed', queue: 'agents-medium' })
-  @Process({ name: 'completed', queue: 'agents-low' })
+  @OnQueueCompleted()
   async onCompleted(job: Job<AgentJob>, result: any): Promise<void> {
     this.logger.log(
-      `Job ${job.id} completed successfully - Agent: ${result.agentId}`,
+      `Job ${job.id} completed successfully - Output: ${result?.output?.substring(0, 100) || 'unknown'}...`,
     );
   }
 
   /**
    * Job failed handler
    */
-  @Process({ name: 'failed', queue: 'agents-critical' })
-  @Process({ name: 'failed', queue: 'agents-high' })
-  @Process({ name: 'failed', queue: 'agents-medium' })
-  @Process({ name: 'failed', queue: 'agents-low' })
+  @OnQueueFailed()
   async onFailed(job: Job<AgentJob>, error: Error): Promise<void> {
     this.logger.error(
       `Job ${job.id} failed permanently after ${job.attemptsMade} attempts: ${error.message}`,

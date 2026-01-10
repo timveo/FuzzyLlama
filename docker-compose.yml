@@ -22,28 +22,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRATION=${JWT_EXPIRATION}
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - RAILWAY_API_KEY=${RAILWAY_API_KEY}
-      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
-      - R2_ACCESS_KEY=${R2_ACCESS_KEY}
-      - R2_SECRET_KEY=${R2_SECRET_KEY}
-      - R2_BUCKET=${R2_BUCKET}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - SENTRY_DSN=${SENTRY_DSN}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
-      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=${PORT:-3000}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,14 +48,27 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     command: npm run start:websocket
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - REDIS_URL=${REDIS_URL}
-      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=${NODE_ENV:-development}
       - WS_PORT=${WS_PORT:-3001}
     depends_on:
       redis:
         condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - layercake-network
+
+  # Frontend (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    env_file:
+      - ./frontend/.env
+    depends_on:
+      - backend
     restart: unless-stopped
     networks:
       - layercake-network
@@ -81,19 +78,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.worker
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
-      - R2_ACCESS_KEY=${R2_ACCESS_KEY}
-      - R2_SECRET_KEY=${R2_SECRET_KEY}
-      - R2_BUCKET=${R2_BUCKET}
-      - SENTRY_DSN=${SENTRY_DSN}
-      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - NODE_ENV=${NODE_ENV:-development}
     depends_on:
       postgres:
         condition: service_healthy
@@ -166,7 +154,7 @@ services:
       - ./backend/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
     ports:
-      - "3001:3000"
+      - "3002:3000"  # Changed from 3001 to avoid conflict with websocket
     depends_on:
       - prometheus
     restart: unless-stopped

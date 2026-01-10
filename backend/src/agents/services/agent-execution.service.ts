@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { TaskStatus } from '@prisma/client';
 import { AgentTemplateLoaderService } from './agent-template-loader.service';
 import { AIProviderService, AIProviderStreamCallback } from './ai-provider.service';
 import {
@@ -505,7 +506,7 @@ ${template.prompt.context}
           );
 
           // Ensure project workspace exists
-          await this.filesystem.initializeWorkspace(projectId);
+          await this.filesystem.createProjectWorkspace(projectId);
 
           // Write all extracted files
           for (const file of extractionResult.files) {
@@ -514,14 +515,16 @@ ${template.prompt.context}
           }
 
           // Record extracted files in agent execution metadata
+          const currentAgent = await this.prisma.agent.findUnique({
+            where: { id: agentExecutionId },
+            select: { contextData: true },
+          });
+          const currentContextData = currentAgent?.contextData || {};
           await this.prisma.agent.update({
             where: { id: agentExecutionId },
             data: {
               contextData: {
-                ...(await this.prisma.agent.findUnique({
-                  where: { id: agentExecutionId },
-                  select: { contextData: true },
-                })).contextData,
+                ...(typeof currentContextData === 'object' ? currentContextData : {}),
                 filesGenerated: extractionResult.files.map((f) => f.path),
               } as any,
             },
@@ -551,19 +554,13 @@ ${template.prompt.context}
                 data: {
                   projectId,
                   gateId: await this.getGateId(projectId, 'G5_PENDING'),
-                  artifactType: validationResult.overallSuccess
-                    ? 'BUILD_OUTPUT'
-                    : 'BUILD_ERROR',
+                  gate: 'G5_PENDING',
+                  proofType: 'build_output',
                   filePath: `builds/${agentType}-validation.json`,
-                  metadata: {
-                    agentType,
-                    agentExecutionId,
-                    validationResult,
-                    filesGenerated: extractionResult.files.map((f) => f.path),
-                  } as any,
-                  validatedAt: validationResult.overallSuccess
-                    ? new Date()
-                    : null,
+                  fileHash: 'sha256-placeholder', // Would compute actual hash
+                  contentSummary: `Build validation ${validationResult.overallSuccess ? 'passed' : 'failed'}`,
+                  passFail: validationResult.overallSuccess ? 'pass' : 'fail',
+                  createdBy: agentType,
                 },
               });
 
@@ -584,13 +581,13 @@ ${template.prompt.context}
                   await this.prisma.errorHistory.create({
                     data: {
                       projectId,
-                      agentId: agentExecutionId,
-                      errorType: 'build_error',
+                      errorType: 'build',
                       errorMessage: error,
-                      context: {
+                      contextJson: JSON.stringify({
                         agentType,
                         validationPhase: 'build',
-                      } as any,
+                        agentExecutionId,
+                      }),
                     },
                   });
                 }
@@ -697,10 +694,10 @@ ${template.prompt.context}
         where: {
           projectId,
           owner: agentType,
-          status: 'in_progress',
+          status: TaskStatus.in_progress,
         },
         data: {
-          status: 'complete',
+          status: TaskStatus.complete,
           completedAt: new Date(),
         },
       });

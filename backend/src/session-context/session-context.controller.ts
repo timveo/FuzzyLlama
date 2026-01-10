@@ -25,12 +25,13 @@ export class SessionContextController {
     return this.sessionContextService.saveContext(saveContextDto);
   }
 
-  @Get(':projectId/:sessionKey')
+  @Get(':projectId/:sessionId/:key')
   async loadContext(
     @Param('projectId') projectId: string,
-    @Param('sessionKey') sessionKey: string,
+    @Param('sessionId') sessionId: string,
+    @Param('key') key: string,
   ) {
-    return this.sessionContextService.loadContext(projectId, sessionKey);
+    return this.sessionContextService.loadContext(projectId, sessionId, key);
   }
 
   @Get(':projectId')
@@ -46,12 +47,13 @@ export class SessionContextController {
     return this.sessionContextService.getHandoffContext(projectId);
   }
 
-  @Delete(':projectId/:sessionKey')
+  @Delete(':projectId/:sessionId/:key')
   async deleteContext(
     @Param('projectId') projectId: string,
-    @Param('sessionKey') sessionKey: string,
+    @Param('sessionId') sessionId: string,
+    @Param('key') key: string,
   ) {
-    await this.sessionContextService.deleteContext(projectId, sessionKey);
+    await this.sessionContextService.deleteContext(projectId, sessionId, key);
     return { success: true };
   }
 
@@ -67,15 +69,17 @@ export class SessionContextController {
     return this.sessionContextService.getContextStatistics(projectId);
   }
 
-  @Post(':projectId/:sessionKey/extend-ttl')
+  @Post(':projectId/:sessionId/:key/extend-ttl')
   async extendTTL(
     @Param('projectId') projectId: string,
-    @Param('sessionKey') sessionKey: string,
+    @Param('sessionId') sessionId: string,
+    @Param('key') key: string,
     @Body() extendTTLDto: ExtendTTLDto,
   ) {
     return this.sessionContextService.extendTTL(
       projectId,
-      sessionKey,
+      sessionId,
+      key,
       extendTTLDto.additionalSeconds,
     );
   }

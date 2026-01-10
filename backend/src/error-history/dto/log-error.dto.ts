@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsNumber, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsObject, IsEnum } from 'class-validator';
+import { ErrorType } from '@prisma/client';
 
 export class LogErrorDto {
   @IsString()
@@ -6,25 +7,17 @@ export class LogErrorDto {
 
   @IsOptional()
   @IsString()
-  agentId?: string;
-
-  @IsOptional()
-  @IsString()
-  agentType?: string;
-
-  @IsOptional()
-  @IsString()
   taskId?: string;
 
-  @IsString()
-  errorType: string;
+  @IsEnum(ErrorType)
+  errorType: ErrorType;
 
   @IsString()
   errorMessage: string;
 
   @IsOptional()
   @IsString()
-  errorStack?: string;
+  stackTrace?: string;
 
   @IsOptional()
   @IsString()
@@ -36,9 +29,5 @@ export class LogErrorDto {
 
   @IsOptional()
   @IsObject()
-  context?: Record<string, any>;
-
-  @IsOptional()
-  @IsNumber()
-  attemptNumber?: number;
+  context?: Record<string, unknown>;
 }

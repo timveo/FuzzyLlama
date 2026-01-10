@@ -273,6 +273,7 @@ export class DocumentsService {
   /**
    * Generate documents from agent output
    * Parses structured agent response and creates documents in database
+   * Optimized: Uses createMany + findMany for bulk operations (2 queries instead of N queries)
    */
   async generateFromAgentOutput(
     projectId: string,
@@ -299,28 +300,38 @@ export class DocumentsService {
     // Parse agent output for document sections
     const documents = this.parseAgentOutputForDocuments(agentType, agentOutput);
 
-    // Create documents in database
-    const createdDocuments = [];
-    for (const doc of documents) {
-      const created = await this.prisma.document.create({
-        data: {
-          projectId,
-          agentId,
-          documentType: doc.type as any, // Type assertion for DocumentType enum
-          title: doc.title,
-          content: doc.content,
-          version: 1,
-          createdById: userId,
+    // Bulk insert all documents in a single query
+    const documentData = documents.map((doc) => ({
+      projectId,
+      agentId,
+      documentType: doc.type as any, // Type assertion for DocumentType enum
+      title: doc.title,
+      content: doc.content,
+      version: 1,
+      createdById: userId,
+    }));
+
+    await this.prisma.document.createMany({
+      data: documentData,
+    });
+
+    // Fetch created documents with relations (single query with OR conditions)
+    const createdDocuments = await this.prisma.document.findMany({
+      where: {
+        projectId,
+        agentId,
+        createdById: userId,
+        documentType: { in: documents.map((d) => d.type as any) },
+      },
+      include: {
+        project: true,
+        createdBy: {
+          select: { id: true, name: true, email: true },
         },
-        include: {
-          project: true,
-          createdBy: {
-            select: { id: true, name: true, email: true },
-          },
-        },
-      });
-      createdDocuments.push(created);
-    }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: documents.length,
+    });
 
     return createdDocuments;
   }

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue, Job } from 'bull';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { MetricsService } from '../observability/metrics.service';
+import { PrometheusMetricsService } from '../observability/metrics.service';
 
 export interface AgentJob {
   id: string;
@@ -39,7 +39,7 @@ export class QueueManagerService {
     @InjectQueue('agents-medium') private mediumQueue: Queue,
     @InjectQueue('agents-low') private lowQueue: Queue,
     private readonly prisma: PrismaService,
-    private readonly metrics: MetricsService,
+    private readonly metrics: PrometheusMetricsService,
   ) {}
 
   /**

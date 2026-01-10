@@ -1,27 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { Severity, EscalationLevel } from '@prisma/client';
 
 export interface CreateBlockerInput {
   projectId: string;
-  taskId?: string;
-  gateId?: string;
-  blockerType: string;
   description: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  reportedBy: string;
-  affectedAgents?: string[];
+  severity: Severity;
+  owner?: string;
 }
 
 export interface ResolveBlockerInput {
   resolution: string;
-  resolvedBy: string;
-  resolutionNotes?: string;
 }
 
 export interface EscalateBlockerInput {
-  escalationLevel: 'L1' | 'L2' | 'L3';
-  escalationReason: string;
-  escalatedBy: string;
+  escalationLevel: EscalationLevel;
 }
 
 /**
@@ -32,12 +25,6 @@ export interface EscalateBlockerInput {
  * - Escalate critical blockers to appropriate level
  * - Resolve blockers with audit trail
  * - Get active blockers for agents to avoid
- *
- * Use Cases:
- * 1. Agent encounters external dependency blocker → Create blocker
- * 2. Gate approval fails due to missing artifact → Create blocker
- * 3. Critical security issue → Escalate to L3
- * 4. Blocker resolved → Mark resolved with notes
  */
 @Injectable()
 export class BlockersService {
@@ -47,33 +34,18 @@ export class BlockersService {
    * Create a new blocker
    */
   async createBlocker(input: CreateBlockerInput): Promise<any> {
-    const blocker = await this.prisma.blocker.create({
+    return this.prisma.blocker.create({
       data: {
         projectId: input.projectId,
-        taskId: input.taskId,
-        gateId: input.gateId,
-        blockerType: input.blockerType,
         description: input.description,
         severity: input.severity,
-        reportedBy: input.reportedBy,
-        affectedAgents: input.affectedAgents
-          ? JSON.stringify(input.affectedAgents)
-          : null,
-        status: 'open',
+        owner: input.owner,
       },
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
+        blockerAgents: true,
       },
     });
-
-    return {
-      ...blocker,
-      affectedAgents: blocker.affectedAgents
-        ? JSON.parse(blocker.affectedAgents as string)
-        : [],
-    };
   }
 
   /**
@@ -82,53 +54,44 @@ export class BlockersService {
   async getBlockers(
     projectId: string,
     options?: {
-      status?: 'open' | 'resolved' | 'escalated';
-      severity?: 'critical' | 'high' | 'medium' | 'low';
-      taskId?: string;
-      gateId?: string;
+      resolved?: boolean;
+      severity?: Severity;
+      escalated?: boolean;
     },
   ): Promise<any[]> {
     const where: any = { projectId };
 
-    if (options?.status) {
-      where.status = options.status;
+    if (options?.resolved !== undefined) {
+      if (options.resolved) {
+        where.resolvedAt = { not: null };
+      } else {
+        where.resolvedAt = null;
+      }
     }
 
     if (options?.severity) {
       where.severity = options.severity;
     }
 
-    if (options?.taskId) {
-      where.taskId = options.taskId;
+    if (options?.escalated !== undefined) {
+      where.escalated = options.escalated;
     }
 
-    if (options?.gateId) {
-      where.gateId = options.gateId;
-    }
-
-    const blockers = await this.prisma.blocker.findMany({
+    return this.prisma.blocker.findMany({
       where,
-      orderBy: [{ severity: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }],
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
+        blockerAgents: true,
       },
     });
-
-    return blockers.map((blocker) => ({
-      ...blocker,
-      affectedAgents: blocker.affectedAgents
-        ? JSON.parse(blocker.affectedAgents as string)
-        : [],
-    }));
   }
 
   /**
    * Get active (unresolved) blockers
    */
   async getActiveBlockers(projectId: string): Promise<any[]> {
-    return this.getBlockers(projectId, { status: 'open' });
+    return this.getBlockers(projectId, { resolved: false });
   }
 
   /**
@@ -139,8 +102,7 @@ export class BlockersService {
       where: { id: blockerId },
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
+        blockerAgents: true,
       },
     });
 
@@ -148,12 +110,7 @@ export class BlockersService {
       throw new NotFoundException(`Blocker with ID ${blockerId} not found`);
     }
 
-    return {
-      ...blocker,
-      affectedAgents: blocker.affectedAgents
-        ? JSON.parse(blocker.affectedAgents as string)
-        : [],
-    };
+    return blocker;
   }
 
   /**
@@ -171,28 +128,17 @@ export class BlockersService {
       throw new NotFoundException(`Blocker with ID ${blockerId} not found`);
     }
 
-    const updated = await this.prisma.blocker.update({
+    return this.prisma.blocker.update({
       where: { id: blockerId },
       data: {
-        status: 'resolved',
         resolvedAt: new Date(),
         resolution: input.resolution,
-        resolvedBy: input.resolvedBy,
-        resolutionNotes: input.resolutionNotes,
       },
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
+        blockerAgents: true,
       },
     });
-
-    return {
-      ...updated,
-      affectedAgents: updated.affectedAgents
-        ? JSON.parse(updated.affectedAgents as string)
-        : [],
-    };
   }
 
   /**
@@ -210,28 +156,17 @@ export class BlockersService {
       throw new NotFoundException(`Blocker with ID ${blockerId} not found`);
     }
 
-    const updated = await this.prisma.blocker.update({
+    return this.prisma.blocker.update({
       where: { id: blockerId },
       data: {
-        status: 'escalated',
+        escalated: true,
         escalationLevel: input.escalationLevel,
-        escalationReason: input.escalationReason,
-        escalatedAt: new Date(),
-        escalatedBy: input.escalatedBy,
       },
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
+        blockerAgents: true,
       },
     });
-
-    return {
-      ...updated,
-      affectedAgents: updated.affectedAgents
-        ? JSON.parse(updated.affectedAgents as string)
-        : [],
-    };
   }
 
   /**
@@ -253,27 +188,16 @@ export class BlockersService {
 
     if (updates.description) data.description = updates.description;
     if (updates.severity) data.severity = updates.severity;
-    if (updates.blockerType) data.blockerType = updates.blockerType;
-    if (updates.affectedAgents) {
-      data.affectedAgents = JSON.stringify(updates.affectedAgents);
-    }
+    if (updates.owner !== undefined) data.owner = updates.owner;
 
-    const updated = await this.prisma.blocker.update({
+    return this.prisma.blocker.update({
       where: { id: blockerId },
       data,
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
+        blockerAgents: true,
       },
     });
-
-    return {
-      ...updated,
-      affectedAgents: updated.affectedAgents
-        ? JSON.parse(updated.affectedAgents as string)
-        : [],
-    };
   }
 
   /**
@@ -285,28 +209,22 @@ export class BlockersService {
     resolvedBlockers: number;
     escalatedBlockers: number;
     blockersBySeverity: Record<string, number>;
-    blockersByType: Record<string, number>;
     averageResolutionTime: number | null;
   }> {
     const blockers = await this.prisma.blocker.findMany({
       where: { projectId },
       select: {
         severity: true,
-        blockerType: true,
-        status: true,
+        escalated: true,
         createdAt: true,
         resolvedAt: true,
       },
     });
 
     const totalBlockers = blockers.length;
-    const openBlockers = blockers.filter((b) => b.status === 'open').length;
-    const resolvedBlockers = blockers.filter(
-      (b) => b.status === 'resolved',
-    ).length;
-    const escalatedBlockers = blockers.filter(
-      (b) => b.status === 'escalated',
-    ).length;
+    const openBlockers = blockers.filter((b) => !b.resolvedAt).length;
+    const resolvedBlockers = blockers.filter((b) => b.resolvedAt).length;
+    const escalatedBlockers = blockers.filter((b) => b.escalated).length;
 
     // Group by severity
     const blockersBySeverity: Record<string, number> = {};
@@ -314,17 +232,8 @@ export class BlockersService {
       blockersBySeverity[b.severity] = (blockersBySeverity[b.severity] || 0) + 1;
     });
 
-    // Group by type
-    const blockersByType: Record<string, number> = {};
-    blockers.forEach((b) => {
-      blockersByType[b.blockerType] =
-        (blockersByType[b.blockerType] || 0) + 1;
-    });
-
     // Calculate average resolution time (in hours)
-    const resolvedWithTimes = blockers.filter(
-      (b) => b.status === 'resolved' && b.resolvedAt,
-    );
+    const resolvedWithTimes = blockers.filter((b) => b.resolvedAt);
     let averageResolutionTime: number | null = null;
 
     if (resolvedWithTimes.length > 0) {
@@ -344,8 +253,33 @@ export class BlockersService {
       resolvedBlockers,
       escalatedBlockers,
       blockersBySeverity,
-      blockersByType,
       averageResolutionTime,
     };
+  }
+
+  /**
+   * Add an agent to a blocker
+   */
+  async addBlockerAgent(blockerId: string, agent: string): Promise<any> {
+    return this.prisma.blockerAgent.create({
+      data: {
+        blockerId,
+        agent,
+      },
+    });
+  }
+
+  /**
+   * Remove an agent from a blocker
+   */
+  async removeBlockerAgent(blockerId: string, agent: string): Promise<void> {
+    await this.prisma.blockerAgent.delete({
+      where: {
+        blockerId_agent: {
+          blockerId,
+          agent,
+        },
+      },
+    });
   }
 }

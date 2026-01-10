@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { PhaseHistoryService } from './phase-history.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,7 +24,7 @@ export class PhaseHistoryController {
 
   @Post(':id/complete')
   async completePhase(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() completePhaseDto: CompletePhaseDto,
   ) {
     return this.phaseHistoryService.completePhase(id, completePhaseDto);

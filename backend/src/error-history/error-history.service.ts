@@ -1,34 +1,30 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ErrorType } from '@prisma/client';
 
 export interface LogErrorInput {
   projectId: string;
-  agentId?: string;
-  agentType?: string;
   taskId?: string;
-  errorType: string;
+  errorType: ErrorType;
   errorMessage: string;
-  errorStack?: string;
+  stackTrace?: string;
   filePath?: string;
   lineNumber?: number;
-  context?: Record<string, any>;
-  attemptNumber?: number;
+  context?: Record<string, unknown>;
 }
 
 export interface ErrorResolution {
   resolution: string;
   resolutionAgent?: string;
-  resolutionNotes?: string;
 }
 
 export interface SimilarError {
-  id: string;
+  id: number;
   errorMessage: string;
-  errorType: string;
-  resolution?: string;
-  resolutionAgent?: string;
+  errorType: ErrorType;
+  resolution?: string | null;
+  resolutionAgent?: string | null;
   similarity: number;
-  occurredAt: Date;
 }
 
 /**
@@ -54,24 +50,39 @@ export class ErrorHistoryService {
    * Log an error with full context
    */
   async logError(input: LogErrorInput): Promise<any> {
-    const errorRecord = await this.prisma.errorHistory.create({
+    return this.prisma.errorHistory.create({
       data: {
         projectId: input.projectId,
-        agentId: input.agentId,
-        agentType: input.agentType,
         taskId: input.taskId,
         errorType: input.errorType,
         errorMessage: input.errorMessage,
-        errorStack: input.errorStack,
+        stackTrace: input.stackTrace,
         filePath: input.filePath,
         lineNumber: input.lineNumber,
-        context: input.context ? JSON.stringify(input.context) : null,
-        attemptNumber: input.attemptNumber || 1,
-        resolved: false,
+        contextJson: input.context ? JSON.stringify(input.context) : null,
+        retryCount: 0,
       },
     });
+  }
 
-    return errorRecord;
+  /**
+   * Increment retry count for an error
+   */
+  async incrementRetryCount(errorId: number): Promise<any> {
+    const error = await this.prisma.errorHistory.findUnique({
+      where: { id: errorId },
+    });
+
+    if (!error) {
+      throw new NotFoundException(`Error with ID ${errorId} not found`);
+    }
+
+    return this.prisma.errorHistory.update({
+      where: { id: errorId },
+      data: {
+        retryCount: error.retryCount + 1,
+      },
+    });
   }
 
   /**
@@ -81,19 +92,18 @@ export class ErrorHistoryService {
     projectId: string,
     options?: {
       resolved?: boolean;
-      agentType?: string;
-      errorType?: string;
+      errorType?: ErrorType;
       limit?: number;
     },
   ): Promise<any[]> {
     const where: any = { projectId };
 
     if (options?.resolved !== undefined) {
-      where.resolved = options.resolved;
-    }
-
-    if (options?.agentType) {
-      where.agentType = options.agentType;
+      if (options.resolved) {
+        where.resolvedAt = { not: null };
+      } else {
+        where.resolvedAt = null;
+      }
     }
 
     if (options?.errorType) {
@@ -102,18 +112,21 @@ export class ErrorHistoryService {
 
     const errors = await this.prisma.errorHistory.findMany({
       where,
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { id: 'desc' },
       take: options?.limit || 100,
       include: {
         project: {
           select: { name: true },
+        },
+        task: {
+          select: { id: true, title: true },
         },
       },
     });
 
     return errors.map((error) => ({
       ...error,
-      context: error.context ? JSON.parse(error.context as string) : null,
+      context: error.contextJson ? JSON.parse(error.contextJson) : null,
     }));
   }
 
@@ -121,7 +134,7 @@ export class ErrorHistoryService {
    * Mark an error as resolved with resolution details
    */
   async resolveError(
-    errorId: string,
+    errorId: number,
     resolution: ErrorResolution,
   ): Promise<any> {
     const error = await this.prisma.errorHistory.findUnique({
@@ -135,17 +148,15 @@ export class ErrorHistoryService {
     const updated = await this.prisma.errorHistory.update({
       where: { id: errorId },
       data: {
-        resolved: true,
         resolvedAt: new Date(),
         resolution: resolution.resolution,
         resolutionAgent: resolution.resolutionAgent,
-        resolutionNotes: resolution.resolutionNotes,
       },
     });
 
     return {
       ...updated,
-      context: updated.context ? JSON.parse(updated.context as string) : null,
+      context: updated.contextJson ? JSON.parse(updated.contextJson) : null,
     };
   }
 
@@ -157,21 +168,22 @@ export class ErrorHistoryService {
     errorMessage: string,
     projectId: string,
     options?: {
-      errorType?: string;
+      errorType?: ErrorType;
       limit?: number;
     },
   ): Promise<SimilarError[]> {
-    // Get all resolved errors from this project and similar projects
+    // Get all resolved errors from this project
+    const where: any = {
+      resolvedAt: { not: null },
+      projectId,
+    };
+
+    if (options?.errorType) {
+      where.errorType = options.errorType;
+    }
+
     const resolvedErrors = await this.prisma.errorHistory.findMany({
-      where: {
-        resolved: true,
-        errorType: options?.errorType,
-        // Get from this project and potentially others (for cross-project learning)
-        OR: [
-          { projectId },
-          // Could expand to similar projects based on tech stack
-        ],
-      },
+      where,
       orderBy: { resolvedAt: 'desc' },
       take: 50, // Get recent resolved errors
     });
@@ -184,7 +196,6 @@ export class ErrorHistoryService {
       resolution: error.resolution,
       resolutionAgent: error.resolutionAgent,
       similarity: this.calculateSimilarity(errorMessage, error.errorMessage),
-      occurredAt: error.occurredAt,
     }));
 
     // Sort by similarity and return top matches
@@ -206,7 +217,7 @@ export class ErrorHistoryService {
   }> {
     const taskErrors = await this.prisma.errorHistory.findMany({
       where: { taskId },
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { id: 'desc' },
     });
 
     if (taskErrors.length === 0) {
@@ -224,7 +235,7 @@ export class ErrorHistoryService {
       return {
         taskErrors: taskErrors.map((e) => ({
           ...e,
-          context: e.context ? JSON.parse(e.context as string) : null,
+          context: e.contextJson ? JSON.parse(e.contextJson) : null,
         })),
         similarResolutions: [],
       };
@@ -240,7 +251,7 @@ export class ErrorHistoryService {
     return {
       taskErrors: taskErrors.map((e) => ({
         ...e,
-        context: e.context ? JSON.parse(e.context as string) : null,
+        context: e.contextJson ? JSON.parse(e.contextJson) : null,
       })),
       similarResolutions,
     };
@@ -254,35 +265,25 @@ export class ErrorHistoryService {
     resolvedErrors: number;
     unresolvedErrors: number;
     errorsByType: Record<string, number>;
-    errorsByAgent: Record<string, number>;
     mostCommonErrors: Array<{ errorMessage: string; count: number }>;
   }> {
     const errors = await this.prisma.errorHistory.findMany({
       where: { projectId },
       select: {
         errorType: true,
-        agentType: true,
         errorMessage: true,
-        resolved: true,
+        resolvedAt: true,
       },
     });
 
     const totalErrors = errors.length;
-    const resolvedErrors = errors.filter((e) => e.resolved).length;
+    const resolvedErrors = errors.filter((e) => e.resolvedAt !== null).length;
     const unresolvedErrors = totalErrors - resolvedErrors;
 
     // Group by error type
     const errorsByType: Record<string, number> = {};
     errors.forEach((e) => {
       errorsByType[e.errorType] = (errorsByType[e.errorType] || 0) + 1;
-    });
-
-    // Group by agent type
-    const errorsByAgent: Record<string, number> = {};
-    errors.forEach((e) => {
-      if (e.agentType) {
-        errorsByAgent[e.agentType] = (errorsByAgent[e.agentType] || 0) + 1;
-      }
     });
 
     // Find most common error messages
@@ -303,7 +304,6 @@ export class ErrorHistoryService {
       resolvedErrors,
       unresolvedErrors,
       errorsByType,
-      errorsByAgent,
       mostCommonErrors,
     };
   }

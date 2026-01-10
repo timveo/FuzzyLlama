@@ -296,12 +296,12 @@ export class RailwayService {
       }
 
       // Check if already deployed
-      if (project.railwayProjectId && project.deploymentUrl) {
+      if (project.railwayProjectId) {
         return {
           success: true,
           projectId: project.railwayProjectId,
           projectUrl: `https://railway.app/project/${project.railwayProjectId}`,
-          deploymentUrl: project.deploymentUrl,
+          deploymentUrl: `https://railway.app/project/${project.railwayProjectId}`,
           error: 'Project already deployed to Railway',
         };
       }
@@ -320,8 +320,8 @@ export class RailwayService {
       const { projectId: railwayProjectId, projectUrl } =
         await this.createProject(railwayToken, projectName);
 
-      // Extract GitHub repo name (owner/repo)
-      const repoFullName = project.githubRepoName || this.extractRepoName(project.githubRepoUrl);
+      // Extract GitHub repo name (owner/repo) from URL
+      const repoFullName = this.extractRepoName(project.githubRepoUrl);
 
       // Connect GitHub repository
       const { serviceId } = await this.connectGitHubRepo(
@@ -363,12 +363,11 @@ export class RailwayService {
       const deploymentUrl = status.deployments.find((d) => d.url)?.url || null;
 
       // Update LayerCake project with Railway info
+      // Note: Project schema only has railwayProjectId, not deploymentUrl/deploymentStatus
       await this.prisma.project.update({
         where: { id: projectId },
         data: {
           railwayProjectId,
-          deploymentUrl,
-          deploymentStatus: status.status,
         },
       });
 
@@ -445,16 +444,9 @@ export class RailwayService {
         project.railwayProjectId,
       );
 
-      const deploymentUrl = status.deployments.find((d) => d.url)?.url || project.deploymentUrl;
+      const deploymentUrl = status.deployments.find((d) => d.url)?.url || null;
 
-      // Update deployment status
-      await this.prisma.project.update({
-        where: { id: projectId },
-        data: {
-          deploymentStatus: status.status,
-          deploymentUrl,
-        },
-      });
+      // Note: Project schema doesn't have deploymentUrl/deploymentStatus fields
 
       console.log(`[Railway] Triggered redeploy for project ${projectId}`);
 

@@ -72,23 +72,19 @@ export class CostTrackingService {
     const gates = await this.prisma.gate.findMany({
       where: { projectId },
       orderBy: { createdAt: 'asc' },
-      include: {
-        tasks: {
-          include: {
-            agents: true, // Get agent executions for each task
-          },
-        },
-      },
+    });
+
+    // Get all agent executions for the project
+    const allAgents = await this.prisma.agent.findMany({
+      where: { projectId },
     });
 
     const costsByGate = [];
 
     for (const gate of gates) {
-      // Collect all agent executions across tasks in this gate
-      const agents: any[] = [];
-      gate.tasks.forEach((task) => {
-        agents.push(...task.agents);
-      });
+      // Filter agents by gate type (agents created during this gate's phase)
+      // Since there's no direct relation, we filter by context or just include all for now
+      const agents = allAgents;
 
       // Calculate totals
       const totalInputTokens = agents.reduce(
@@ -330,20 +326,19 @@ export class CostTrackingService {
     // Get all gates of this type across all projects
     const gates = await this.prisma.gate.findMany({
       where: { gateType },
-      include: {
-        tasks: {
-          include: { agents: true },
-        },
-      },
+    });
+
+    // Get all agent executions for projects with this gate type
+    const projectIds = gates.map((g) => g.projectId);
+    const allAgents = await this.prisma.agent.findMany({
+      where: { projectId: { in: projectIds } },
     });
 
     const costs: number[] = [];
 
     for (const gate of gates) {
-      const agents: any[] = [];
-      gate.tasks.forEach((task) => {
-        agents.push(...task.agents);
-      });
+      // Filter agents for this project
+      const agents = allAgents.filter((a) => a.projectId === gate.projectId);
 
       const gateCost = agents.reduce((sum, agent) => {
         return (

@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { DeliverableStatus } from '@prisma/client';
 
 export class UpdateDeliverableDto {
   @IsOptional()
@@ -7,13 +8,17 @@ export class UpdateDeliverableDto {
 
   @IsOptional()
   @IsString()
-  description?: string;
+  path?: string;
+
+  @IsOptional()
+  @IsEnum(DeliverableStatus)
+  status?: DeliverableStatus;
 
   @IsOptional()
   @IsString()
-  filePath?: string;
+  owner?: string;
 
   @IsOptional()
-  @IsEnum(['pending', 'in_progress', 'completed', 'approved'])
-  status?: 'pending' | 'in_progress' | 'completed' | 'approved';
+  @IsString()
+  version?: string;
 }

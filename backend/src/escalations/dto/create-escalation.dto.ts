@@ -1,34 +1,26 @@
-import { IsString, IsOptional, IsEnum, IsObject } from 'class-validator';
+import { IsString, IsEnum } from 'class-validator';
+import {
+  EscalationLevel,
+  EscalationType,
+  Severity,
+} from '@prisma/client';
 
 export class CreateEscalationDto {
   @IsString()
   projectId: string;
 
-  @IsString()
-  escalationType: string;
+  @IsEnum(EscalationLevel)
+  level: EscalationLevel;
 
   @IsString()
-  description: string;
+  fromAgent: string;
 
-  @IsEnum(['critical', 'high', 'medium', 'low'])
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  @IsEnum(Severity)
+  severity: Severity;
+
+  @IsEnum(EscalationType)
+  type: EscalationType;
 
   @IsString()
-  escalatedBy: string;
-
-  @IsOptional()
-  @IsString()
-  escalatedTo?: string;
-
-  @IsOptional()
-  @IsString()
-  relatedTaskId?: string;
-
-  @IsOptional()
-  @IsString()
-  relatedGateId?: string;
-
-  @IsOptional()
-  @IsObject()
-  context?: Record<string, any>;
+  summary: string;
 }

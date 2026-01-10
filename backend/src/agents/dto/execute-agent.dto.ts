@@ -36,6 +36,15 @@ export class ExecuteAgentDto {
   @IsObject()
   context?: Record<string, any>;
 
+  @ApiPropertyOptional({ description: 'Input documents and specifications' })
+  @IsOptional()
+  @IsObject()
+  inputs?: {
+    documents?: string[];
+    specifications?: string[];
+    context?: any;
+  };
+
   @ApiPropertyOptional({ description: 'Stream output via WebSocket' })
   @IsOptional()
   streaming?: boolean;

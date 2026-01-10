@@ -3,10 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 
 export interface CreateNoteInput {
   projectId: string;
-  noteType: string;
   content: string;
-  createdBy: string;
-  tags?: string[];
 }
 
 @Injectable()
@@ -17,10 +14,7 @@ export class NotesService {
     return this.prisma.note.create({
       data: {
         projectId: input.projectId,
-        noteType: input.noteType,
         content: input.content,
-        createdBy: input.createdBy,
-        tags: input.tags ? JSON.stringify(input.tags) : null,
       },
       include: { project: { select: { name: true } } },
     });
@@ -29,27 +23,18 @@ export class NotesService {
   async getNotes(
     projectId: string,
     options?: {
-      noteType?: string;
       limit?: number;
     },
   ): Promise<any[]> {
-    const where: any = { projectId };
-    if (options?.noteType) where.noteType = options.noteType;
-
-    const notes = await this.prisma.note.findMany({
-      where,
+    return this.prisma.note.findMany({
+      where: { projectId },
       orderBy: { createdAt: 'desc' },
       take: options?.limit || 100,
       include: { project: { select: { name: true } } },
     });
-
-    return notes.map((note) => ({
-      ...note,
-      tags: note.tags ? JSON.parse(note.tags as string) : [],
-    }));
   }
 
-  async getNote(noteId: string): Promise<any> {
+  async getNote(noteId: number): Promise<any> {
     const note = await this.prisma.note.findUnique({
       where: { id: noteId },
       include: { project: { select: { name: true } } },
@@ -59,26 +44,42 @@ export class NotesService {
       throw new NotFoundException(`Note with ID ${noteId} not found`);
     }
 
-    return {
-      ...note,
-      tags: note.tags ? JSON.parse(note.tags as string) : [],
-    };
+    return note;
   }
 
-  async updateNote(noteId: string, content: string): Promise<any> {
-    const updated = await this.prisma.note.update({
+  async updateNote(noteId: number, content: string): Promise<any> {
+    const note = await this.prisma.note.findUnique({
       where: { id: noteId },
-      data: { content, updatedAt: new Date() },
-      include: { project: { select: { name: true } } },
     });
 
-    return {
-      ...updated,
-      tags: updated.tags ? JSON.parse(updated.tags as string) : [],
-    };
+    if (!note) {
+      throw new NotFoundException(`Note with ID ${noteId} not found`);
+    }
+
+    return this.prisma.note.update({
+      where: { id: noteId },
+      data: { content },
+      include: { project: { select: { name: true } } },
+    });
   }
 
-  async deleteNote(noteId: string): Promise<void> {
+  async deleteNote(noteId: number): Promise<void> {
+    const note = await this.prisma.note.findUnique({
+      where: { id: noteId },
+    });
+
+    if (!note) {
+      throw new NotFoundException(`Note with ID ${noteId} not found`);
+    }
+
     await this.prisma.note.delete({ where: { id: noteId } });
+  }
+
+  async getNotesByProject(projectId: string): Promise<any[]> {
+    return this.prisma.note.findMany({
+      where: { projectId },
+      orderBy: { createdAt: 'desc' },
+      include: { project: { select: { name: true } } },
+    });
   }
 }

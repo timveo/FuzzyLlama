@@ -52,11 +52,10 @@ export class AgentRetryService {
       throw new Error('Agent execution not found');
     }
 
-    // Get error history for this agent
+    // Get error history for this project (using taskId or recent errors)
     const errors = await this.prisma.errorHistory.findMany({
       where: {
         projectId: agentExecution.projectId,
-        agentId: agentExecutionId,
         resolvedAt: null,
       },
       orderBy: { createdAt: 'desc' },
@@ -175,10 +174,6 @@ export class AgentRetryService {
           await this.prisma.errorHistory.updateMany({
             where: {
               projectId: context.projectId,
-              agentId: await this.getAgentExecutionId(
-                context.projectId,
-                context.agentType,
-              ),
               resolvedAt: null,
             },
             data: {
@@ -367,12 +362,12 @@ Generate complete, working code files. No placeholders or TODOs.`;
       await this.prisma.escalation.create({
         data: {
           projectId,
-          escalationType: 'technical_blocker',
+          type: 'technical',
+          level: 'L1',
           severity: 'high',
-          title: `${agent.agentType} unable to fix build errors`,
-          description: `After ${retryResult.attemptNumber} retry attempts, ${retryResult.remainingErrors.length} errors remain:\n\n${retryResult.remainingErrors.slice(0, 3).join('\n')}`,
-          status: 'open',
-          raisedBy: 'system',
+          fromAgent: agent.agentType,
+          summary: `Build errors after ${retryResult.attemptNumber} attempts: ${retryResult.remainingErrors.slice(0, 3).join(', ')}`,
+          status: 'pending',
         },
       });
 

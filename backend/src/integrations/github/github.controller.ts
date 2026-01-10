@@ -19,6 +19,7 @@ import {
 import { GitHubService } from './github.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestUser } from '../../common/types/user.types';
 
 @ApiTags('github')
 @Controller('github')

@@ -1,20 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { QueryType, QueryStatus } from '@prisma/client';
 
 export interface CreateQueryInput {
   projectId: string;
   fromAgent: string;
   toAgent: string;
-  queryType: string;
+  type: QueryType;
   question: string;
-  context?: Record<string, any>;
-  priority?: 'critical' | 'high' | 'medium' | 'low';
 }
 
 export interface AnswerQueryInput {
   answer: string;
-  answeredBy: string;
-  answerContext?: Record<string, any>;
 }
 
 /**
@@ -40,26 +37,19 @@ export class QueriesService {
    * Create a new inter-agent query
    */
   async createQuery(input: CreateQueryInput): Promise<any> {
-    const query = await this.prisma.query.create({
+    return this.prisma.query.create({
       data: {
         projectId: input.projectId,
         fromAgent: input.fromAgent,
         toAgent: input.toAgent,
-        queryType: input.queryType,
+        type: input.type,
         question: input.question,
-        context: input.context ? JSON.stringify(input.context) : null,
-        priority: input.priority || 'medium',
-        status: 'pending',
+        status: QueryStatus.pending,
       },
       include: {
         project: { select: { name: true } },
       },
     });
-
-    return {
-      ...query,
-      context: query.context ? JSON.parse(query.context as string) : null,
-    };
   }
 
   /**
@@ -68,10 +58,10 @@ export class QueriesService {
   async getQueries(
     projectId: string,
     options?: {
-      status?: 'pending' | 'answered';
+      status?: QueryStatus;
       fromAgent?: string;
       toAgent?: string;
-      priority?: 'critical' | 'high' | 'medium' | 'low';
+      type?: QueryType;
     },
   ): Promise<any[]> {
     const where: any = { projectId };
@@ -88,25 +78,17 @@ export class QueriesService {
       where.toAgent = options.toAgent;
     }
 
-    if (options?.priority) {
-      where.priority = options.priority;
+    if (options?.type) {
+      where.type = options.type;
     }
 
-    const queries = await this.prisma.query.findMany({
+    return this.prisma.query.findMany({
       where,
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }],
       include: {
         project: { select: { name: true } },
       },
     });
-
-    return queries.map((query) => ({
-      ...query,
-      context: query.context ? JSON.parse(query.context as string) : null,
-      answerContext: query.answerContext
-        ? JSON.parse(query.answerContext as string)
-        : null,
-    }));
   }
 
   /**
@@ -117,7 +99,7 @@ export class QueriesService {
     toAgent: string,
   ): Promise<any[]> {
     return this.getQueries(projectId, {
-      status: 'pending',
+      status: QueryStatus.pending,
       toAgent,
     });
   }
@@ -137,13 +119,7 @@ export class QueriesService {
       throw new NotFoundException(`Query with ID ${queryId} not found`);
     }
 
-    return {
-      ...query,
-      context: query.context ? JSON.parse(query.context as string) : null,
-      answerContext: query.answerContext
-        ? JSON.parse(query.answerContext as string)
-        : null,
-    };
+    return query;
   }
 
   /**
@@ -161,33 +137,44 @@ export class QueriesService {
       throw new NotFoundException(`Query with ID ${queryId} not found`);
     }
 
-    if (query.status === 'answered') {
+    if (query.status === QueryStatus.answered) {
       throw new Error('Query has already been answered');
     }
 
-    const updated = await this.prisma.query.update({
+    return this.prisma.query.update({
       where: { id: queryId },
       data: {
-        status: 'answered',
+        status: QueryStatus.answered,
         answer: input.answer,
-        answeredBy: input.answeredBy,
         answeredAt: new Date(),
-        answerContext: input.answerContext
-          ? JSON.stringify(input.answerContext)
-          : null,
       },
       include: {
         project: { select: { name: true } },
       },
     });
+  }
 
-    return {
-      ...updated,
-      context: updated.context ? JSON.parse(updated.context as string) : null,
-      answerContext: updated.answerContext
-        ? JSON.parse(updated.answerContext as string)
-        : null,
-    };
+  /**
+   * Mark a query as expired
+   */
+  async expireQuery(queryId: string): Promise<any> {
+    const query = await this.prisma.query.findUnique({
+      where: { id: queryId },
+    });
+
+    if (!query) {
+      throw new NotFoundException(`Query with ID ${queryId} not found`);
+    }
+
+    return this.prisma.query.update({
+      where: { id: queryId },
+      data: {
+        status: QueryStatus.expired,
+      },
+      include: {
+        project: { select: { name: true } },
+      },
+    });
   }
 
   /**
@@ -197,6 +184,7 @@ export class QueriesService {
     totalQueries: number;
     pendingQueries: number;
     answeredQueries: number;
+    expiredQueries: number;
     queriesByAgent: Record<string, { sent: number; received: number }>;
     queriesByType: Record<string, number>;
     averageResponseTime: number | null;
@@ -206,7 +194,7 @@ export class QueriesService {
       select: {
         fromAgent: true,
         toAgent: true,
-        queryType: true,
+        type: true,
         status: true,
         createdAt: true,
         answeredAt: true,
@@ -214,14 +202,12 @@ export class QueriesService {
     });
 
     const totalQueries = queries.length;
-    const pendingQueries = queries.filter((q) => q.status === 'pending').length;
-    const answeredQueries = queries.filter(
-      (q) => q.status === 'answered',
-    ).length;
+    const pendingQueries = queries.filter((q) => q.status === QueryStatus.pending).length;
+    const answeredQueries = queries.filter((q) => q.status === QueryStatus.answered).length;
+    const expiredQueries = queries.filter((q) => q.status === QueryStatus.expired).length;
 
     // Group by agent (sent and received)
-    const queriesByAgent: Record<string, { sent: number; received: number }> =
-      {};
+    const queriesByAgent: Record<string, { sent: number; received: number }> = {};
 
     queries.forEach((q) => {
       if (!queriesByAgent[q.fromAgent]) {
@@ -238,12 +224,12 @@ export class QueriesService {
     // Group by query type
     const queriesByType: Record<string, number> = {};
     queries.forEach((q) => {
-      queriesByType[q.queryType] = (queriesByType[q.queryType] || 0) + 1;
+      queriesByType[q.type] = (queriesByType[q.type] || 0) + 1;
     });
 
     // Calculate average response time (in minutes)
     const answeredWithTimes = queries.filter(
-      (q) => q.status === 'answered' && q.answeredAt,
+      (q) => q.status === QueryStatus.answered && q.answeredAt,
     );
     let averageResponseTime: number | null = null;
 
@@ -262,6 +248,7 @@ export class QueriesService {
       totalQueries,
       pendingQueries,
       answeredQueries,
+      expiredQueries,
       queriesByAgent,
       queriesByType,
       averageResponseTime,
@@ -276,7 +263,7 @@ export class QueriesService {
     agent1: string,
     agent2: string,
   ): Promise<any[]> {
-    const queries = await this.prisma.query.findMany({
+    return this.prisma.query.findMany({
       where: {
         projectId,
         OR: [
@@ -289,13 +276,5 @@ export class QueriesService {
         project: { select: { name: true } },
       },
     });
-
-    return queries.map((query) => ({
-      ...query,
-      context: query.context ? JSON.parse(query.context as string) : null,
-      answerContext: query.answerContext
-        ? JSON.parse(query.answerContext as string)
-        : null,
-    }));
   }
 }

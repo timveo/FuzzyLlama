@@ -15,9 +15,12 @@ import { UpdateMetricsDto } from './dto/update-metrics.dto';
 export class MetricsController {
   constructor(private readonly metricsService: MetricsService) {}
 
-  @Post()
-  async updateMetrics(@Body() updateMetricsDto: UpdateMetricsDto) {
-    return this.metricsService.updateMetrics(updateMetricsDto);
+  @Post(':projectId')
+  async updateMetrics(
+    @Param('projectId') projectId: string,
+    @Body() updateMetricsDto: UpdateMetricsDto,
+  ) {
+    return this.metricsService.updateMetrics(projectId, updateMetricsDto);
   }
 
   @Get(':projectId')

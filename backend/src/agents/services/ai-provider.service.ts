@@ -25,7 +25,7 @@ export class AIProviderService {
   private openai: OpenAI;
 
   constructor(private config: ConfigService) {
-    const claudeKey = this.config.get<string>('CLAUDE_API_KEY');
+    const claudeKey = this.config.get<string>('ANTHROPIC_API_KEY');
     const openaiKey = this.config.get<string>('OPENAI_API_KEY');
 
     if (claudeKey) {

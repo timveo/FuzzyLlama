@@ -1,22 +1,23 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import {
+  EscalationLevel,
+  EscalationType,
+  EscalationStatus,
+  Severity,
+} from '@prisma/client';
 
 export interface CreateEscalationInput {
   projectId: string;
-  escalationType: string;
-  description: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  escalatedBy: string;
-  escalatedTo?: string;
-  relatedTaskId?: string;
-  relatedGateId?: string;
-  context?: Record<string, any>;
+  level: EscalationLevel;
+  fromAgent: string;
+  severity: Severity;
+  type: EscalationType;
+  summary: string;
 }
 
 export interface ResolveEscalationInput {
   resolution: string;
-  resolvedBy: string;
-  resolutionNotes?: string;
 }
 
 /**
@@ -42,32 +43,20 @@ export class EscalationsService {
    * Create a new escalation
    */
   async createEscalation(input: CreateEscalationInput): Promise<any> {
-    const escalation = await this.prisma.escalation.create({
+    return this.prisma.escalation.create({
       data: {
         projectId: input.projectId,
-        escalationType: input.escalationType,
-        description: input.description,
+        level: input.level,
+        fromAgent: input.fromAgent,
         severity: input.severity,
-        escalatedBy: input.escalatedBy,
-        escalatedTo: input.escalatedTo,
-        relatedTaskId: input.relatedTaskId,
-        relatedGateId: input.relatedGateId,
-        context: input.context ? JSON.stringify(input.context) : null,
-        status: 'pending',
+        type: input.type,
+        summary: input.summary,
+        status: EscalationStatus.pending,
       },
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
       },
     });
-
-    return {
-      ...escalation,
-      context: escalation.context
-        ? JSON.parse(escalation.context as string)
-        : null,
-    };
   }
 
   /**
@@ -76,9 +65,10 @@ export class EscalationsService {
   async getEscalations(
     projectId: string,
     options?: {
-      status?: 'pending' | 'resolved';
-      severity?: 'critical' | 'high' | 'medium' | 'low';
-      escalationType?: string;
+      status?: EscalationStatus;
+      severity?: Severity;
+      type?: EscalationType;
+      level?: EscalationLevel;
     },
   ): Promise<any[]> {
     const where: any = { projectId };
@@ -91,33 +81,28 @@ export class EscalationsService {
       where.severity = options.severity;
     }
 
-    if (options?.escalationType) {
-      where.escalationType = options.escalationType;
+    if (options?.type) {
+      where.type = options.type;
     }
 
-    const escalations = await this.prisma.escalation.findMany({
+    if (options?.level) {
+      where.level = options.level;
+    }
+
+    return this.prisma.escalation.findMany({
       where,
-      orderBy: [{ severity: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }],
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
       },
     });
-
-    return escalations.map((escalation) => ({
-      ...escalation,
-      context: escalation.context
-        ? JSON.parse(escalation.context as string)
-        : null,
-    }));
   }
 
   /**
    * Get pending escalations (requiring user action)
    */
   async getPendingEscalations(projectId: string): Promise<any[]> {
-    return this.getEscalations(projectId, { status: 'pending' });
+    return this.getEscalations(projectId, { status: EscalationStatus.pending });
   }
 
   /**
@@ -128,8 +113,6 @@ export class EscalationsService {
       where: { id: escalationId },
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
       },
     });
 
@@ -139,12 +122,7 @@ export class EscalationsService {
       );
     }
 
-    return {
-      ...escalation,
-      context: escalation.context
-        ? JSON.parse(escalation.context as string)
-        : null,
-    };
+    return escalation;
   }
 
   /**
@@ -164,26 +142,47 @@ export class EscalationsService {
       );
     }
 
-    const updated = await this.prisma.escalation.update({
+    return this.prisma.escalation.update({
       where: { id: escalationId },
       data: {
-        status: 'resolved',
+        status: EscalationStatus.resolved,
         resolvedAt: new Date(),
         resolution: input.resolution,
-        resolvedBy: input.resolvedBy,
-        resolutionNotes: input.resolutionNotes,
       },
       include: {
         project: { select: { name: true } },
-        task: { select: { name: true } },
-        gate: { select: { gateType: true } },
       },
     });
+  }
 
-    return {
-      ...updated,
-      context: updated.context ? JSON.parse(updated.context as string) : null,
-    };
+  /**
+   * Auto-resolve an escalation (by system/agent)
+   */
+  async autoResolveEscalation(
+    escalationId: string,
+    resolution: string,
+  ): Promise<any> {
+    const escalation = await this.prisma.escalation.findUnique({
+      where: { id: escalationId },
+    });
+
+    if (!escalation) {
+      throw new NotFoundException(
+        `Escalation with ID ${escalationId} not found`,
+      );
+    }
+
+    return this.prisma.escalation.update({
+      where: { id: escalationId },
+      data: {
+        status: EscalationStatus.auto_resolved,
+        resolvedAt: new Date(),
+        resolution,
+      },
+      include: {
+        project: { select: { name: true } },
+      },
+    });
   }
 
   /**
@@ -193,15 +192,18 @@ export class EscalationsService {
     totalEscalations: number;
     pendingEscalations: number;
     resolvedEscalations: number;
+    autoResolvedEscalations: number;
     escalationsBySeverity: Record<string, number>;
     escalationsByType: Record<string, number>;
+    escalationsByLevel: Record<string, number>;
     averageResolutionTime: number | null;
   }> {
     const escalations = await this.prisma.escalation.findMany({
       where: { projectId },
       select: {
         severity: true,
-        escalationType: true,
+        type: true,
+        level: true,
         status: true,
         createdAt: true,
         resolvedAt: true,
@@ -210,10 +212,13 @@ export class EscalationsService {
 
     const totalEscalations = escalations.length;
     const pendingEscalations = escalations.filter(
-      (e) => e.status === 'pending',
+      (e) => e.status === EscalationStatus.pending,
     ).length;
     const resolvedEscalations = escalations.filter(
-      (e) => e.status === 'resolved',
+      (e) => e.status === EscalationStatus.resolved,
+    ).length;
+    const autoResolvedEscalations = escalations.filter(
+      (e) => e.status === EscalationStatus.auto_resolved,
     ).length;
 
     // Group by severity
@@ -226,13 +231,21 @@ export class EscalationsService {
     // Group by type
     const escalationsByType: Record<string, number> = {};
     escalations.forEach((e) => {
-      escalationsByType[e.escalationType] =
-        (escalationsByType[e.escalationType] || 0) + 1;
+      escalationsByType[e.type] = (escalationsByType[e.type] || 0) + 1;
+    });
+
+    // Group by level
+    const escalationsByLevel: Record<string, number> = {};
+    escalations.forEach((e) => {
+      escalationsByLevel[e.level] = (escalationsByLevel[e.level] || 0) + 1;
     });
 
     // Calculate average resolution time (in hours)
     const resolvedWithTimes = escalations.filter(
-      (e) => e.status === 'resolved' && e.resolvedAt,
+      (e) =>
+        (e.status === EscalationStatus.resolved ||
+          e.status === EscalationStatus.auto_resolved) &&
+        e.resolvedAt,
     );
     let averageResolutionTime: number | null = null;
 
@@ -251,8 +264,10 @@ export class EscalationsService {
       totalEscalations,
       pendingEscalations,
       resolvedEscalations,
+      autoResolvedEscalations,
       escalationsBySeverity,
       escalationsByType,
+      escalationsByLevel,
       averageResolutionTime,
     };
   }

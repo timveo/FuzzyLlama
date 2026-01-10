@@ -1,16 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { PhaseStatus } from '@prisma/client';
 
 export interface StartPhaseInput {
   projectId: string;
   phase: string;
-  startedBy: string;
+  agent: string;
+  startedAt: Date;
+  notes?: string;
 }
 
 export interface CompletePhaseInput {
-  duration?: number;
-  outcome?: string;
-  completedBy: string;
+  notes?: string;
 }
 
 @Injectable()
@@ -21,25 +22,77 @@ export class PhaseHistoryService {
     return this.prisma.phaseHistory.create({
       data: {
         projectId: input.projectId,
-        phase: input.phase as any,
-        startedBy: input.startedBy,
-        status: 'in_progress',
+        phase: input.phase,
+        agent: input.agent,
+        startedAt: input.startedAt,
+        status: PhaseStatus.in_progress,
+        notes: input.notes,
       },
     });
   }
 
   async completePhase(
-    phaseHistoryId: string,
-    input: CompletePhaseInput,
+    phaseHistoryId: number,
+    input?: CompletePhaseInput,
   ): Promise<any> {
+    const phaseHistory = await this.prisma.phaseHistory.findUnique({
+      where: { id: phaseHistoryId },
+    });
+
+    if (!phaseHistory) {
+      throw new NotFoundException(
+        `PhaseHistory with ID ${phaseHistoryId} not found`,
+      );
+    }
+
     return this.prisma.phaseHistory.update({
       where: { id: phaseHistoryId },
       data: {
-        status: 'completed',
+        status: PhaseStatus.completed,
         completedAt: new Date(),
-        duration: input.duration,
-        outcome: input.outcome,
-        completedBy: input.completedBy,
+        notes: input?.notes,
+      },
+    });
+  }
+
+  async skipPhase(phaseHistoryId: number, notes?: string): Promise<any> {
+    const phaseHistory = await this.prisma.phaseHistory.findUnique({
+      where: { id: phaseHistoryId },
+    });
+
+    if (!phaseHistory) {
+      throw new NotFoundException(
+        `PhaseHistory with ID ${phaseHistoryId} not found`,
+      );
+    }
+
+    return this.prisma.phaseHistory.update({
+      where: { id: phaseHistoryId },
+      data: {
+        status: PhaseStatus.skipped,
+        completedAt: new Date(),
+        notes,
+      },
+    });
+  }
+
+  async failPhase(phaseHistoryId: number, notes?: string): Promise<any> {
+    const phaseHistory = await this.prisma.phaseHistory.findUnique({
+      where: { id: phaseHistoryId },
+    });
+
+    if (!phaseHistory) {
+      throw new NotFoundException(
+        `PhaseHistory with ID ${phaseHistoryId} not found`,
+      );
+    }
+
+    return this.prisma.phaseHistory.update({
+      where: { id: phaseHistoryId },
+      data: {
+        status: PhaseStatus.failed,
+        completedAt: new Date(),
+        notes,
       },
     });
   }
@@ -54,7 +107,7 @@ export class PhaseHistoryService {
 
   async getCurrentPhase(projectId: string): Promise<any | null> {
     return this.prisma.phaseHistory.findFirst({
-      where: { projectId, status: 'in_progress' },
+      where: { projectId, status: PhaseStatus.in_progress },
       orderBy: { startedAt: 'desc' },
     });
   }

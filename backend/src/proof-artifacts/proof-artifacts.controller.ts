@@ -19,6 +19,7 @@ import { ProofArtifactsService } from './proof-artifacts.service';
 import { CreateProofArtifactDto } from './dto/create-proof-artifact.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequestUser } from '../common/types/user.types';
 
 @ApiTags('proof-artifacts')
 @Controller('proof-artifacts')

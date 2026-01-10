@@ -1,5 +1,5 @@
 import { Controller, Get, Header } from '@nestjs/common';
-import { MetricsService } from './metrics.service';
+import { PrometheusMetricsService } from './metrics.service';
 import { Public } from '../auth/decorators/public.decorator';
 
 /**
@@ -9,7 +9,7 @@ import { Public } from '../auth/decorators/public.decorator';
  */
 @Controller()
 export class MetricsController {
-  constructor(private readonly metricsService: MetricsService) {}
+  constructor(private readonly metricsService: PrometheusMetricsService) {}
 
   /**
    * Prometheus metrics endpoint

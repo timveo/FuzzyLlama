@@ -9,7 +9,7 @@ import { TokenStorageService } from './token-storage.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: jest.Mocked<PrismaService>;
+  let prisma: { user: { findUnique: jest.Mock; create: jest.Mock } };
   let jwtService: jest.Mocked<JwtService>;
   let tokenStorage: jest.Mocked<TokenStorageService>;
 
@@ -22,17 +22,19 @@ describe('AuthService', () => {
   };
 
   beforeEach(async () => {
+    const mockPrisma = {
+      user: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         {
           provide: PrismaService,
-          useValue: {
-            user: {
-              findUnique: jest.fn(),
-              create: jest.fn(),
-            },
-          },
+          useValue: mockPrisma,
         },
         {
           provide: JwtService,
@@ -66,7 +68,7 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = module.get(PrismaService) as jest.Mocked<PrismaService>;
+    prisma = module.get(PrismaService);
     jwtService = module.get(JwtService) as jest.Mocked<JwtService>;
     tokenStorage = module.get(TokenStorageService) as jest.Mocked<TokenStorageService>;
 

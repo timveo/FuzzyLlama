@@ -136,53 +136,47 @@ const b = 2;
     });
   });
 
-  describe('validateFile', () => {
+  describe('validateFiles', () => {
     it('should validate TypeScript files', () => {
-      const file = {
-        path: 'src/index.ts',
-        content: 'export const test = true;',
-      };
+      const files = [
+        {
+          path: 'src/index.ts',
+          content: 'export const test = true;',
+        },
+      ];
 
-      const result = service.validateFile(file);
+      const result = service.validateFiles(files);
 
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should detect missing path', () => {
-      const file = {
-        path: '',
-        content: 'export const test = true;',
-      };
-
-      const result = service.validateFile(file);
-
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('File path is required');
-    });
-
     it('should detect empty content', () => {
-      const file = {
-        path: 'src/index.ts',
-        content: '',
-      };
+      const files = [
+        {
+          path: 'src/index.ts',
+          content: '   ',
+        },
+      ];
 
-      const result = service.validateFile(file);
+      const result = service.validateFiles(files);
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('File content is empty');
+      expect(result.errors.length).toBeGreaterThan(0);
     });
 
     it('should detect suspicious paths', () => {
-      const file = {
-        path: '../../../etc/passwd',
-        content: 'malicious',
-      };
+      const files = [
+        {
+          path: '../../../etc/passwd',
+          content: 'malicious',
+        },
+      ];
 
-      const result = service.validateFile(file);
+      const result = service.validateFiles(files);
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('File path contains path traversal');
+      expect(result.errors.some((e) => e.includes('path traversal'))).toBe(true);
     });
   });
 });

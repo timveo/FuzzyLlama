@@ -20,6 +20,7 @@ import { WorkflowCoordinatorService } from './services/workflow-coordinator.serv
 import { ExecuteAgentDto } from './dto/execute-agent.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequestUser } from '../common/types/user.types';
 import { AppWebSocketGateway } from '../websocket/websocket.gateway';
 
 @ApiTags('agents')

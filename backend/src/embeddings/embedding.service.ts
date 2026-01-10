@@ -200,19 +200,18 @@ export class EmbeddingService {
       similarity: number;
     }>
   > {
-    // Get the target file's content
-    const targetFile = await this.prisma.codeEmbedding.findUnique({
-      where: {
-        projectId_filePath: {
-          projectId,
-          filePath: targetFilePath,
-        },
-      },
-    });
+    // Get the target file's content using raw query (CodeEmbedding is a raw SQL table)
+    const targetFiles: any[] = await this.prisma.$queryRaw`
+      SELECT content FROM "CodeEmbedding"
+      WHERE "projectId" = ${projectId} AND "filePath" = ${targetFilePath}
+      LIMIT 1
+    `;
 
-    if (!targetFile) {
+    if (targetFiles.length === 0) {
       throw new Error(`File not indexed: ${targetFilePath}`);
     }
+
+    const targetFile = targetFiles[0];
 
     // Search using target file's content
     return this.searchSimilarCode(projectId, targetFile.content, limit + 1).then((results) =>
@@ -229,19 +228,17 @@ export class EmbeddingService {
     totalCharacters: number;
     languages: Record<string, number>;
   }> {
-    const embeddings = await this.prisma.codeEmbedding.findMany({
-      where: { projectId },
-      select: {
-        content: true,
-        language: true,
-      },
-    });
+    // Use raw query since CodeEmbedding is not in Prisma schema
+    const embeddings: any[] = await this.prisma.$queryRaw`
+      SELECT content, language FROM "CodeEmbedding"
+      WHERE "projectId" = ${projectId}
+    `;
 
     const languages: Record<string, number> = {};
     let totalCharacters = 0;
 
     for (const embedding of embeddings) {
-      totalCharacters += embedding.content.length;
+      totalCharacters += embedding.content?.length || 0;
 
       if (embedding.language) {
         languages[embedding.language] = (languages[embedding.language] || 0) + 1;
@@ -259,27 +256,25 @@ export class EmbeddingService {
    * Delete embeddings for a project
    */
   async deleteProjectEmbeddings(projectId: string): Promise<number> {
-    const result = await this.prisma.codeEmbedding.deleteMany({
-      where: { projectId },
-    });
+    // Use raw query since CodeEmbedding is not in Prisma schema
+    const result = await this.prisma.$executeRaw`
+      DELETE FROM "CodeEmbedding" WHERE "projectId" = ${projectId}
+    `;
 
-    this.logger.log(`Deleted ${result.count} embeddings for project ${projectId}`);
+    this.logger.log(`Deleted ${result} embeddings for project ${projectId}`);
 
-    return result.count;
+    return result;
   }
 
   /**
    * Delete embedding for a specific file
    */
   async deleteFileEmbedding(projectId: string, filePath: string): Promise<void> {
-    await this.prisma.codeEmbedding.delete({
-      where: {
-        projectId_filePath: {
-          projectId,
-          filePath,
-        },
-      },
-    });
+    // Use raw query since CodeEmbedding is not in Prisma schema
+    await this.prisma.$executeRaw`
+      DELETE FROM "CodeEmbedding"
+      WHERE "projectId" = ${projectId} AND "filePath" = ${filePath}
+    `;
 
     this.logger.log(`Deleted embedding for file: ${filePath}`);
   }

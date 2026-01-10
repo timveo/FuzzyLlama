@@ -144,24 +144,24 @@ export class GateStateMachineService {
       }
     }
 
-    // Check if required deliverables are present and approved
+    // Check if required deliverables are present and complete
     const deliverables = await this.prisma.deliverable.findMany({
-      where: { gateId: gate.id },
+      where: { projectId },
     });
 
     if (deliverables.length > 0) {
-      // Check if all deliverables are approved
-      const unapprovedDeliverables = deliverables.filter(
-        (d) => d.status !== 'approved',
+      // Check if all deliverables are complete
+      const incompleteDeliverables = deliverables.filter(
+        (d) => d.status !== 'complete',
       );
 
-      if (unapprovedDeliverables.length > 0) {
-        const deliverableNames = unapprovedDeliverables
+      if (incompleteDeliverables.length > 0) {
+        const deliverableNames = incompleteDeliverables
           .map((d) => d.name)
           .join(', ');
         return {
           canTransition: false,
-          reason: `Gate has unapproved deliverables: ${deliverableNames}. All deliverables must be approved before gate approval.`,
+          reason: `Gate has incomplete deliverables: ${deliverableNames}. All deliverables must be complete before gate approval.`,
         };
       }
     }

@@ -4,7 +4,7 @@ import { GateStateMachineService } from '../../gates/services/gate-state-machine
 import { AgentExecutionService } from './agent-execution.service';
 import { getAgentTemplate } from '../templates';
 
-interface TaskDecompositionResult {
+export interface TaskDecompositionResult {
   tasks: Array<{
     agentType: string;
     taskDescription: string;
@@ -255,32 +255,37 @@ export class OrchestratorService {
 
   /**
    * Create tasks in database from decomposition
+   * Optimized: Uses createMany for bulk insert (single query instead of N queries)
    */
   async createTasksFromDecomposition(
     projectId: string,
     userId: string,
     decomposition: TaskDecompositionResult,
   ): Promise<void> {
-    for (const task of decomposition.tasks) {
+    // Map all tasks to database format
+    const taskData = decomposition.tasks.map((task) => {
       // Map priority to Task schema format
       let priorityValue: string;
       if (task.priority === 'P0') priorityValue = 'CRITICAL';
       else if (task.priority === 'P1') priorityValue = 'HIGH';
       else priorityValue = 'MEDIUM';
 
-      await this.prisma.task.create({
-        data: {
-          projectId,
-          phase: this.getPhaseForAgent(task.agentType),
-          name: `${task.agentType}: ${task.taskDescription}`,
-          title: `${task.agentType}: ${task.taskDescription}`,
-          description: task.taskDescription,
-          status: 'not_started',
-          priority: priorityValue,
-          owner: task.agentType,
-        },
-      });
-    }
+      return {
+        projectId,
+        phase: this.getPhaseForAgent(task.agentType),
+        name: `${task.agentType}: ${task.taskDescription}`,
+        title: `${task.agentType}: ${task.taskDescription}`,
+        description: task.taskDescription,
+        status: 'not_started' as const,
+        priority: priorityValue,
+        owner: task.agentType,
+      };
+    });
+
+    // Bulk insert all tasks in a single query
+    await this.prisma.task.createMany({
+      data: taskData,
+    });
   }
 
   /**
@@ -345,6 +350,7 @@ export class OrchestratorService {
 
   /**
    * Coordinate agent handoff with context
+   * Optimized: Uses createMany for bulk insert of deliverables (single query instead of N queries)
    */
   async coordinateHandoff(
     projectId: string,
@@ -366,13 +372,15 @@ export class OrchestratorService {
       },
     });
 
-    // Create handoff deliverables
-    for (const deliverable of deliverables) {
-      await this.prisma.handoffDeliverable.create({
-        data: {
-          handoffId: handoff.id,
-          deliverable,
-        },
+    // Create handoff deliverables in bulk (single query)
+    if (deliverables.length > 0) {
+      const deliverablesData = deliverables.map((deliverable) => ({
+        handoffId: handoff.id,
+        deliverable,
+      }));
+
+      await this.prisma.handoffDeliverable.createMany({
+        data: deliverablesData,
       });
     }
 

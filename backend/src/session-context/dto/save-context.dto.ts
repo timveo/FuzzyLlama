@@ -1,14 +1,18 @@
-import { IsString, IsOptional, IsNumber, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsObject, IsEnum } from 'class-validator';
+import { ContextType } from '@prisma/client';
 
 export class SaveContextDto {
   @IsString()
   projectId: string;
 
   @IsString()
-  sessionKey: string;
+  sessionId: string;
 
   @IsString()
-  contextType: string;
+  key: string;
+
+  @IsEnum(ContextType)
+  contextType: ContextType;
 
   @IsObject()
   contextData: Record<string, any>;

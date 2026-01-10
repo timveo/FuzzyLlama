@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsEnum, IsObject } from 'class-validator';
+import { IsString, IsEnum } from 'class-validator';
+import { QueryType } from '@prisma/client';
 
 export class CreateQueryDto {
   @IsString()
@@ -10,17 +11,9 @@ export class CreateQueryDto {
   @IsString()
   toAgent: string;
 
-  @IsString()
-  queryType: string;
+  @IsEnum(QueryType)
+  type: QueryType;
 
   @IsString()
   question: string;
-
-  @IsOptional()
-  @IsObject()
-  context?: Record<string, any>;
-
-  @IsOptional()
-  @IsEnum(['critical', 'high', 'medium', 'low'])
-  priority?: 'critical' | 'high' | 'medium' | 'low';
 }

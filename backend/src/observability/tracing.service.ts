@@ -5,8 +5,8 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION, SEMRESATTRS_DEPLOYMENT_ENVIRONMENT } from '@opentelemetry/semantic-conventions';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 
 /**
  * TracingService - OpenTelemetry Integration
@@ -69,11 +69,10 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
     });
 
     // Resource attributes
-    const resource = new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: 'layercake-backend',
-      [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
-      [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]:
-        this.config.get('NODE_ENV', 'development'),
+    const resource = resourceFromAttributes({
+      [SEMRESATTRS_SERVICE_NAME]: 'layercake-backend',
+      [SEMRESATTRS_SERVICE_VERSION]: '1.0.0',
+      [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: this.config.get('NODE_ENV', 'development'),
     });
 
     this.sdk = new NodeSDK({
@@ -84,7 +83,11 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
         getNodeAutoInstrumentations({
           // Customize auto-instrumentation
           '@opentelemetry/instrumentation-http': {
-            ignoreIncomingPaths: ['/health', '/metrics'],
+            // Use ignoreIncomingRequestHook instead of ignoreIncomingPaths
+            ignoreIncomingRequestHook: (req) => {
+              const ignoredPaths = ['/health', '/metrics'];
+              return ignoredPaths.some((path) => req.url?.startsWith(path));
+            },
           },
           '@opentelemetry/instrumentation-pg': {
             // Track database queries

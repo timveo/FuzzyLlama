@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { TaskStatus } from '@prisma/client';
 
 /**
  * ProjectionService - Event Sourcing Read Model Updates
@@ -180,6 +181,7 @@ export class ProjectionService {
       data: {
         projectId,
         phase: data.phase,
+        agent: data.agent || 'system',
         startedAt: new Date(),
       },
     });
@@ -241,7 +243,7 @@ export class ProjectionService {
       await this.prisma.task.update({
         where: { id: data.taskId },
         data: {
-          status: 'completed',
+          status: TaskStatus.complete,
           completedAt: new Date(),
         },
       });
@@ -255,34 +257,31 @@ export class ProjectionService {
 
   private async handleCodeGenerated(projectId: string, data: any): Promise<void> {
     // Record code generation metrics
+    // Note: Metrics model tracks stories/bugs/tests, not files/lines
+    // Just ensure metrics record exists
     await this.prisma.metrics.upsert({
       where: { projectId },
       create: {
         projectId,
-        filesGenerated: data.filesCount || 0,
-        linesGenerated: data.linesCount || 0,
       },
-      update: {
-        filesGenerated: { increment: data.filesCount || 0 },
-        linesGenerated: { increment: data.linesCount || 0 },
-      },
+      update: {},
     });
+    this.logger.debug(`Code generated event processed for project ${projectId}: ${data.filesCount || 0} files`);
   }
 
   private async handleBuildResult(projectId: string, data: any): Promise<void> {
-    // Record build metrics
+    // Record build result in metrics
+    // Metrics model has qualityGateStatus and retryCount
     await this.prisma.metrics.upsert({
       where: { projectId },
       create: {
         projectId,
-        buildAttempts: 1,
-        buildSuccesses: data.success ? 1 : 0,
-        buildFailures: data.success ? 0 : 1,
+        qualityGateStatus: data.success ? 'passing' : 'failing',
+        retryCount: data.success ? 0 : 1,
       },
       update: {
-        buildAttempts: { increment: 1 },
-        buildSuccesses: data.success ? { increment: 1 } : undefined,
-        buildFailures: data.success ? undefined : { increment: 1 },
+        qualityGateStatus: data.success ? 'passing' : 'failing',
+        retryCount: data.success ? undefined : { increment: 1 },
       },
     });
   }

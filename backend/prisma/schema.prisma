@@ -2,7 +2,8 @@
 // Migrated from MCP Server SQLite to PostgreSQL
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -148,7 +149,7 @@ model Project {
   specifications   Specification[] @relation("ProjectSpecifications")
   gates            Gate[] @relation("ProjectGates")
   events           ProjectEvent[] @relation("ProjectEvents")
-  codeEmbeddings   CodeEmbedding[] @relation("ProjectCodeEmbeddings")
+  // codeEmbeddings   CodeEmbedding[] @relation("ProjectCodeEmbeddings") // Temporarily disabled
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1226,22 +1227,23 @@ model ProjectEvent {
 }
 
 // ============================================================================
-// VECTOR SEARCH (pgvector)
+// VECTOR SEARCH (pgvector) - Temporarily disabled for local dev
+// To enable: uncomment and run raw SQL to create table with vector column
 // ============================================================================
 
-model CodeEmbedding {
-  id         String   @id @default(cuid())
-  projectId  String
-  project    Project  @relation("ProjectCodeEmbeddings", fields: [projectId], references: [id], onDelete: Cascade)
-
-  filePath   String
-  content    String   @db.Text
-  language   String?
-  embedding  Unsupported("vector(1536)")  // OpenAI embedding size
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@unique([projectId, filePath])
-  @@index([projectId])
-}
+// model CodeEmbedding {
+//   id         String   @id @default(cuid())
+//   projectId  String
+//   project    Project  @relation("ProjectCodeEmbeddings", fields: [projectId], references: [id], onDelete: Cascade)
+//
+//   filePath   String
+//   content    String   @db.Text
+//   language   String?
+//   embedding  Unsupported("vector(1536)")  // OpenAI embedding size
+//
+//   createdAt  DateTime @default(now())
+//   updatedAt  DateTime @updatedAt
+//
+//   @@unique([projectId, filePath])
+//   @@index([projectId])
+// }

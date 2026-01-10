@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { TaskStatus } from '@prisma/client';
 import { StateSyncService } from '../state-sync/state-sync.service';
 import { AgentExecutionService } from '../agents/services/agent-execution.service';
 import { FileSystemService } from '../code-generation/filesystem.service';
@@ -175,19 +176,19 @@ export class McpToolsService {
 
   private async createDecision(args: {
     projectId: string;
-    title: string;
-    decision: string;
+    description: string;
     rationale?: string;
+    gate?: string;
+    agent?: string;
   }): Promise<any> {
     const decision = await this.prisma.decision.create({
       data: {
         projectId: args.projectId,
-        title: args.title,
-        decision: args.decision,
+        description: args.description,
         rationale: args.rationale,
         decisionType: 'technical',
-        status: 'active',
-        madeBy: 'mcp-tool',
+        gate: args.gate || 'G0',
+        agent: args.agent || 'mcp-tool',
       },
     });
 
@@ -197,7 +198,7 @@ export class McpToolsService {
     // Record event
     await this.eventStore.appendEvent(args.projectId, {
       type: EventType.DECISION_MADE,
-      data: { decisionId: decision.id, title: args.title },
+      data: { decisionId: decision.id, description: args.description },
     });
 
     return decision;
@@ -364,8 +365,9 @@ export class McpToolsService {
   }
 
   private async listFiles(args: { projectId: string; directory?: string }): Promise<any> {
-    const files = await this.filesystem.listFiles(args.projectId, args.directory || '.');
-    return { files };
+    // Use getDirectoryTree instead of non-existent listFiles
+    const tree = await this.filesystem.getDirectoryTree(args.projectId, args.directory || '.');
+    return { files: tree };
   }
 
   private async deleteFile(args: { projectId: string; filePath: string }): Promise<string> {
@@ -381,7 +383,12 @@ export class McpToolsService {
     projectId: string;
     projectType: string;
   }): Promise<any> {
-    await this.filesystem.initializeWorkspace(args.projectId, args.projectType);
+    // Create workspace and initialize project structure
+    await this.filesystem.createProjectWorkspace(args.projectId);
+    await this.filesystem.initializeProjectStructure(
+      args.projectId,
+      args.projectType as 'react-vite' | 'nestjs' | 'nextjs' | 'express',
+    );
     return { success: true, message: 'Workspace initialized' };
   }
 
@@ -415,8 +422,14 @@ export class McpToolsService {
   }
 
   private async gitStatus(args: { projectId: string }): Promise<any> {
-    const result = await this.gitIntegration.getStatus(args.projectId);
-    return result;
+    // Use getUncommittedFiles and getCurrentBranch instead of non-existent getStatus
+    const uncommittedFiles = await this.gitIntegration.getUncommittedFiles(args.projectId);
+    const currentBranch = await this.gitIntegration.getCurrentBranch(args.projectId);
+    return {
+      branch: currentBranch,
+      uncommittedFiles,
+      hasChanges: uncommittedFiles.length > 0,
+    };
   }
 
   // ===========================
@@ -462,26 +475,29 @@ export class McpToolsService {
 
   private async createTask(args: {
     projectId: string;
-    title: string;
+    name: string;
     description?: string;
-    agentType: string;
+    phase: string;
+    owner?: string;
     priority?: string;
   }): Promise<any> {
     const task = await this.prisma.task.create({
       data: {
         projectId: args.projectId,
-        title: args.title,
+        name: args.name,
+        title: args.name,
         description: args.description,
-        agentType: args.agentType,
-        priority: args.priority || 'medium',
-        status: 'pending',
+        phase: args.phase,
+        owner: args.owner,
+        priority: args.priority || 'MEDIUM',
+        status: TaskStatus.not_started,
       },
     });
 
     // Record event
     await this.eventStore.appendEvent(args.projectId, {
       type: EventType.TASK_CREATED,
-      data: { taskId: task.id, title: args.title },
+      data: { taskId: task.id, name: args.name },
     });
 
     return task;
@@ -495,13 +511,13 @@ export class McpToolsService {
     return tasks;
   }
 
-  private async updateTask(args: { taskId: string; status: string }): Promise<any> {
+  private async updateTask(args: { taskId: string; status: TaskStatus }): Promise<any> {
     const task = await this.prisma.task.update({
       where: { id: args.taskId },
       data: { status: args.status },
     });
 
-    if (args.status === 'completed') {
+    if (args.status === TaskStatus.complete) {
       await this.eventStore.appendEvent(task.projectId, {
         type: EventType.TASK_COMPLETED,
         data: { taskId: task.id },

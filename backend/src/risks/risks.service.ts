@@ -1,14 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { Probability, Impact } from '@prisma/client';
 
 export interface CreateRiskInput {
   projectId: string;
-  riskType: string;
   description: string;
-  impact: 'critical' | 'high' | 'medium' | 'low';
-  probability: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
-  mitigationStrategy?: string;
-  identifiedBy: string;
+  impact: Impact;
+  probability: Probability;
+  mitigation?: string;
+  owner?: string;
 }
 
 export interface MitigateRiskInput {
@@ -23,7 +23,12 @@ export class RisksService {
   async createRisk(input: CreateRiskInput): Promise<any> {
     return this.prisma.risk.create({
       data: {
-        ...input,
+        projectId: input.projectId,
+        description: input.description,
+        impact: input.impact,
+        probability: input.probability,
+        mitigation: input.mitigation,
+        owner: input.owner,
         status: 'identified',
       },
       include: { project: { select: { name: true } } },
@@ -66,9 +71,8 @@ export class RisksService {
       where: { id: riskId },
       data: {
         status: 'mitigated',
-        mitigationStrategy: input.mitigationStrategy,
-        mitigatedAt: new Date(),
-        mitigatedBy: input.mitigatedBy,
+        mitigation: input.mitigationStrategy,
+        owner: input.mitigatedBy,
       },
       include: { project: { select: { name: true } } },
     });
@@ -78,8 +82,7 @@ export class RisksService {
     return this.prisma.risk.update({
       where: { id: riskId },
       data: {
-        status: 'occurred',
-        occurredAt: new Date(),
+        status: 'realized',
       },
       include: { project: { select: { name: true } } },
     });

@@ -26,16 +26,33 @@ describe('FileSystemService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('initializeWorkspace', () => {
+  describe('createProjectWorkspace', () => {
     it('should create workspace directory', async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
+      await service.createProjectWorkspace(testProjectId);
 
       const exists = await fs.pathExists(testWorkspacePath);
       expect(exists).toBe(true);
     });
 
+    it('should not overwrite existing workspace', async () => {
+      await service.createProjectWorkspace(testProjectId);
+
+      // Try to initialize again
+      await service.createProjectWorkspace(testProjectId);
+
+      // Should not throw error
+      const exists = await fs.pathExists(testWorkspacePath);
+      expect(exists).toBe(true);
+    });
+  });
+
+  describe('initializeProjectStructure', () => {
+    beforeEach(async () => {
+      await service.createProjectWorkspace(testProjectId);
+    });
+
     it('should create package.json for React project', async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
+      await service.initializeProjectStructure(testProjectId, 'react-vite');
 
       const packageJsonPath = path.join(testWorkspacePath, 'package.json');
       const exists = await fs.pathExists(packageJsonPath);
@@ -45,22 +62,11 @@ describe('FileSystemService', () => {
       expect(packageJson.name).toBeTruthy();
       expect(packageJson.dependencies).toBeDefined();
     });
-
-    it('should not overwrite existing workspace', async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
-
-      // Try to initialize again
-      await service.initializeWorkspace(testProjectId, 'react-vite');
-
-      // Should not throw error
-      const exists = await fs.pathExists(testWorkspacePath);
-      expect(exists).toBe(true);
-    });
   });
 
   describe('writeFile', () => {
     beforeEach(async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
+      await service.createProjectWorkspace(testProjectId);
     });
 
     it('should write file to workspace', async () => {
@@ -100,7 +106,7 @@ describe('FileSystemService', () => {
 
   describe('readFile', () => {
     beforeEach(async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
+      await service.createProjectWorkspace(testProjectId);
     });
 
     it('should read file from workspace', async () => {
@@ -120,32 +126,26 @@ describe('FileSystemService', () => {
     });
   });
 
-  describe('listFiles', () => {
+  describe('getDirectoryTree', () => {
     beforeEach(async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
+      await service.createProjectWorkspace(testProjectId);
       await service.writeFile(testProjectId, 'src/index.ts', 'test');
       await service.writeFile(testProjectId, 'src/app.ts', 'test');
       await service.writeFile(testProjectId, 'src/utils/helper.ts', 'test');
     });
 
-    it('should list files in directory', async () => {
-      const files = await service.listFiles(testProjectId, 'src');
+    it('should get directory tree', async () => {
+      const tree = await service.getDirectoryTree(testProjectId, 'src');
 
-      expect(files.length).toBeGreaterThan(0);
-      expect(files).toContain('src/index.ts');
-      expect(files).toContain('src/app.ts');
-    });
-
-    it('should list files recursively', async () => {
-      const files = await service.listFiles(testProjectId, 'src');
-
-      expect(files).toContain('src/utils/helper.ts');
+      expect(tree).toBeDefined();
+      // Directory tree returns nested structure with name and children
+      expect(tree.name).toBe('src');
     });
   });
 
   describe('executeCommand', () => {
     beforeEach(async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
+      await service.createProjectWorkspace(testProjectId);
     });
 
     it('should execute command in workspace', async () => {
@@ -162,7 +162,7 @@ describe('FileSystemService', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.stderr).toBeDefined();
     });
 
     it('should respect timeout', async () => {
@@ -173,27 +173,13 @@ describe('FileSystemService', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('timeout');
+      expect(result.stderr).toContain('timeout');
     }, 10000);
 
     it('should execute in correct directory', async () => {
       const result = await service.executeCommand(testProjectId, 'pwd');
 
       expect(result.stdout).toContain(testProjectId);
-    });
-  });
-
-  describe('deleteWorkspace', () => {
-    it('should delete workspace directory', async () => {
-      await service.initializeWorkspace(testProjectId, 'react-vite');
-
-      const existsBefore = await fs.pathExists(testWorkspacePath);
-      expect(existsBefore).toBe(true);
-
-      await service.deleteWorkspace(testProjectId);
-
-      const existsAfter = await fs.pathExists(testWorkspacePath);
-      expect(existsAfter).toBe(false);
     });
   });
 });

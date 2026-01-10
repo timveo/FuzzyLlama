@@ -88,7 +88,7 @@ import { envValidationSchema } from './config/env.validation';
     RailwayModule,
     StateSyncModule,
     EventsModule,
-    EmbeddingsModule,
+    // EmbeddingsModule, // Temporarily disabled - needs pgvector extension
     QueueModule,
   ],
   controllers: [AppController],

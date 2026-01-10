@@ -21,6 +21,7 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequestUser } from '../common/types/user.types';
 
 @ApiTags('documents')
 @Controller('documents')

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Counter, Histogram, Gauge, register } from 'prom-client';
 
 /**
- * MetricsService - Prometheus Metrics
+ * PrometheusMetricsService - Prometheus Metrics
  *
  * Custom application metrics:
  * - Agent execution metrics
@@ -10,10 +10,13 @@ import { Counter, Histogram, Gauge, register } from 'prom-client';
  * - Build metrics
  * - Queue metrics
  * - Cost metrics
+ *
+ * Note: Renamed from MetricsService to avoid collision with
+ * src/metrics/metrics.service.ts which handles project KPIs.
  */
 @Injectable()
-export class MetricsService {
-  private readonly logger = new Logger(MetricsService.name);
+export class PrometheusMetricsService {
+  private readonly logger = new Logger(PrometheusMetricsService.name);
 
   // Agent metrics
   readonly agentExecutionDuration = new Histogram({

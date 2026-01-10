@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { FileSystemService } from '../code-generation/filesystem.service';
 import { GitIntegrationService } from '../code-generation/git-integration.service';
-import { Project, ProjectState, Gate, Task, Document, Specification } from '@prisma/client';
+import { Project, ProjectState, Gate, Task, Document, Specification, Phase } from '@prisma/client';
 
 /**
  * StateSyncService - Hybrid MCP + Database Architecture
@@ -81,8 +81,8 @@ export class StateSyncService {
         agents: { orderBy: { createdAt: 'desc' }, take: 20 },
         decisions: { orderBy: { createdAt: 'desc' }, take: 50 },
         blockers: { where: { resolvedAt: null } },
-        queries: { where: { resolvedAt: null } },
-        risks: { orderBy: { severity: 'desc' } },
+        queries: { where: { status: 'pending' } },
+        risks: { orderBy: { createdAt: 'desc' } },
         phaseHistory: { orderBy: { createdAt: 'asc' } },
       },
     });
@@ -409,13 +409,14 @@ ${completed.slice(0, 20).map((t) => `- [x] **${t.title}** (${t.agentType})
   /**
    * Parse STATUS.md back to database updates
    */
-  private parseStatusMarkdown(statusMd: string): Partial<ProjectState> {
-    const updates: Partial<ProjectState> = {};
+  private parseStatusMarkdown(statusMd: string): Partial<Omit<ProjectState, 'projectId' | 'project' | 'updatedAt'>> {
+    const updates: Partial<Omit<ProjectState, 'projectId' | 'project' | 'updatedAt'>> = {};
 
     // Extract phase
     const phaseMatch = statusMd.match(/\*\*Phase\*\*: (.+)/);
     if (phaseMatch) {
-      updates.currentPhase = phaseMatch[1].trim();
+      const phaseValue = phaseMatch[1].trim() as Phase;
+      updates.currentPhase = phaseValue;
     }
 
     // Extract gate
@@ -424,11 +425,7 @@ ${completed.slice(0, 20).map((t) => `- [x] **${t.title}** (${t.agentType})
       updates.currentGate = gateMatch[1].trim();
     }
 
-    // Extract status
-    const statusMatch = statusMd.match(/\*\*Status\*\*: (.+)/);
-    if (statusMatch) {
-      updates.status = statusMatch[1].trim();
-    }
+    // Note: status is not a field in ProjectState, using currentGate instead
 
     return updates;
   }
@@ -500,7 +497,7 @@ ${completed.slice(0, 20).map((t) => `- [x] **${t.title}** (${t.agentType})
         blockers: true,
         queries: true,
         risks: true,
-        systemMemory: true,
+        // systemMemory: true, // Not a relation on Project model
         phaseHistory: true,
       },
     });

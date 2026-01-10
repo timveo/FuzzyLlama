@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Sentry from '@sentry/node';
-import { ProfilingIntegration } from '@sentry/profiling-node';
 
 /**
  * SentryService - Error Tracking & Performance Monitoring
@@ -35,11 +34,6 @@ export class SentryService implements OnModuleInit {
 
         // Performance monitoring
         tracesSampleRate: this.config.get('SENTRY_TRACES_SAMPLE_RATE', 1.0),
-        profilesSampleRate: this.config.get('SENTRY_PROFILES_SAMPLE_RATE', 1.0),
-
-        integrations: [
-          new ProfilingIntegration(),
-        ],
 
         // Filter out health check noise
         beforeSend(event) {
@@ -52,7 +46,7 @@ export class SentryService implements OnModuleInit {
 
       this.logger.log('Sentry initialized successfully');
     } catch (error) {
-      this.logger.error(`Failed to initialize Sentry: ${error.message}`);
+      this.logger.error(`Failed to initialize Sentry: ${(error as Error).message}`);
     }
   }
 
@@ -113,9 +107,9 @@ export class SentryService implements OnModuleInit {
   }
 
   /**
-   * Start transaction (for performance monitoring)
+   * Start span for performance monitoring
    */
-  startTransaction(name: string, op: string) {
-    return Sentry.startTransaction({ name, op });
+  startSpan(name: string, op: string) {
+    return Sentry.startSpan({ name, op }, () => {});
   }
 }

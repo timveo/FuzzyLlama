@@ -18,6 +18,7 @@ import {
 import { RailwayService } from './railway.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestUser } from '../../common/types/user.types';
 
 @ApiTags('railway')
 @Controller('railway')

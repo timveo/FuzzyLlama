@@ -1,25 +1,24 @@
 import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { Probability, Impact } from '@prisma/client';
 
 export class CreateRiskDto {
   @IsString()
   projectId: string;
 
   @IsString()
-  riskType: string;
-
-  @IsString()
   description: string;
 
-  @IsEnum(['critical', 'high', 'medium', 'low'])
-  impact: 'critical' | 'high' | 'medium' | 'low';
+  @IsEnum(Impact)
+  impact: Impact;
 
-  @IsEnum(['very_high', 'high', 'medium', 'low', 'very_low'])
-  probability: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  @IsEnum(Probability)
+  probability: Probability;
 
   @IsOptional()
   @IsString()
-  mitigationStrategy?: string;
+  mitigation?: string;
 
+  @IsOptional()
   @IsString()
-  identifiedBy: string;
+  owner?: string;
 }

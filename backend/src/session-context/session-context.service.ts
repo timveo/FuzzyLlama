@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 
+import { ContextType } from '@prisma/client';
+
 export interface SaveSessionContextInput {
   projectId: string;
-  sessionKey: string;
-  contextType: string;
+  sessionId: string;
+  key: string;
+  contextType: ContextType;
   contextData: Record<string, any>;
   ttlSeconds?: number; // Time to live in seconds
 }
@@ -35,7 +38,8 @@ export class SessionContextService {
     const existing = await this.prisma.sessionContext.findFirst({
       where: {
         projectId: input.projectId,
-        sessionKey: input.sessionKey,
+        sessionId: input.sessionId,
+        key: input.key,
       },
     });
 
@@ -47,10 +51,10 @@ export class SessionContextService {
       return this.prisma.sessionContext.update({
         where: { id: existing.id },
         data: {
-          contextData: JSON.stringify(input.contextData),
+          valueJson: JSON.stringify(input.contextData),
           contextType: input.contextType,
+          ttlSeconds,
           expiresAt,
-          updatedAt: new Date(),
         },
       });
     }
@@ -58,9 +62,11 @@ export class SessionContextService {
     return this.prisma.sessionContext.create({
       data: {
         projectId: input.projectId,
-        sessionKey: input.sessionKey,
+        sessionId: input.sessionId,
+        key: input.key,
         contextType: input.contextType,
-        contextData: JSON.stringify(input.contextData),
+        valueJson: JSON.stringify(input.contextData),
+        ttlSeconds,
         expiresAt,
       },
     });
@@ -69,24 +75,25 @@ export class SessionContextService {
   /**
    * Load session context by key
    */
-  async loadContext(projectId: string, sessionKey: string): Promise<any> {
+  async loadContext(projectId: string, sessionId: string, key: string): Promise<any> {
     const context = await this.prisma.sessionContext.findFirst({
       where: {
         projectId,
-        sessionKey,
+        sessionId,
+        key,
         expiresAt: { gte: new Date() }, // Not expired
       },
     });
 
     if (!context) {
       throw new NotFoundException(
-        `Session context with key '${sessionKey}' not found or expired`,
+        `Session context with key '${key}' not found or expired`,
       );
     }
 
     return {
       ...context,
-      contextData: JSON.parse(context.contextData as string),
+      contextData: JSON.parse(context.valueJson as string),
     };
   }
 
@@ -113,7 +120,7 @@ export class SessionContextService {
 
     return contexts.map((ctx) => ({
       ...ctx,
-      contextData: JSON.parse(ctx.contextData as string),
+      contextData: JSON.parse(ctx.valueJson as string),
     }));
   }
 
@@ -155,7 +162,7 @@ export class SessionContextService {
           handoffContext.pendingQueries.push(ctx.contextData);
           break;
         default:
-          handoffContext.sessionData[ctx.sessionKey] = ctx.contextData;
+          handoffContext.sessionData[ctx.key] = ctx.contextData;
       }
     }
 
@@ -165,14 +172,14 @@ export class SessionContextService {
   /**
    * Delete session context by key
    */
-  async deleteContext(projectId: string, sessionKey: string): Promise<void> {
+  async deleteContext(projectId: string, sessionId: string, key: string): Promise<void> {
     const deleted = await this.prisma.sessionContext.deleteMany({
-      where: { projectId, sessionKey },
+      where: { projectId, sessionId, key },
     });
 
     if (deleted.count === 0) {
       throw new NotFoundException(
-        `Session context with key '${sessionKey}' not found`,
+        `Session context with key '${key}' not found`,
       );
     }
   }
@@ -182,12 +189,14 @@ export class SessionContextService {
    */
   async deleteMultipleContexts(
     projectId: string,
-    sessionKeys: string[],
+    sessionId: string,
+    keys: string[],
   ): Promise<number> {
     const deleted = await this.prisma.sessionContext.deleteMany({
       where: {
         projectId,
-        sessionKey: { in: sessionKeys },
+        sessionId,
+        key: { in: keys },
       },
     });
 
@@ -274,22 +283,23 @@ export class SessionContextService {
    */
   async extendTTL(
     projectId: string,
-    sessionKey: string,
+    sessionId: string,
+    key: string,
     additionalSeconds: number,
   ): Promise<any> {
     const context = await this.prisma.sessionContext.findFirst({
-      where: { projectId, sessionKey },
+      where: { projectId, sessionId, key },
     });
 
     if (!context) {
       throw new NotFoundException(
-        `Session context with key '${sessionKey}' not found`,
+        `Session context with key '${key}' not found`,
       );
     }
 
-    const newExpiresAt = new Date(
-      context.expiresAt.getTime() + additionalSeconds * 1000,
-    );
+    const newExpiresAt = context.expiresAt
+      ? new Date(context.expiresAt.getTime() + additionalSeconds * 1000)
+      : new Date(Date.now() + additionalSeconds * 1000);
 
     return this.prisma.sessionContext.update({
       where: { id: context.id },
