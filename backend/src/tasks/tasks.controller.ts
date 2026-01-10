@@ -35,7 +35,7 @@ export class TasksController {
   @ApiResponse({ status: 404, description: 'Project or parent task not found' })
   async create(
     @Body() createTaskDto: CreateTaskDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.tasksService.create(createTaskDto, user.id);
   }
@@ -46,7 +46,7 @@ export class TasksController {
   @ApiResponse({ status: 403, description: 'Cannot view tasks for project you do not own' })
   async findAll(
     @Query('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.tasksService.findAll(projectId, user.id);
   }
@@ -56,7 +56,7 @@ export class TasksController {
   @ApiResponse({ status: 200, description: 'Tasks retrieved successfully' })
   async getTasksByAgent(
     @Param('agentId') agentId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.tasksService.getTasksByAgent(agentId, user.id);
   }
@@ -66,7 +66,7 @@ export class TasksController {
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   async getTaskStats(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.tasksService.getTaskStats(projectId, user.id);
   }
@@ -75,7 +75,7 @@ export class TasksController {
   @ApiOperation({ summary: 'Get a specific task by ID' })
   @ApiResponse({ status: 200, description: 'Task retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Task not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.tasksService.findOne(id, user.id);
   }
 
@@ -86,7 +86,7 @@ export class TasksController {
   async update(
     @Param('id') id: string,
     @Body() updateTaskDto: UpdateTaskDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.tasksService.update(id, updateTaskDto, user.id);
   }
@@ -95,7 +95,7 @@ export class TasksController {
   @ApiOperation({ summary: 'Delete a task' })
   @ApiResponse({ status: 200, description: 'Task deleted successfully' })
   @ApiResponse({ status: 404, description: 'Task not found' })
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.tasksService.delete(id, user.id);
   }
 }

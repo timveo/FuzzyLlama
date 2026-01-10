@@ -38,7 +38,7 @@ export class SpecificationsController {
   })
   async create(
     @Body() createSpecificationDto: CreateSpecificationDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.specificationsService.create(createSpecificationDto, user.id);
   }
@@ -57,7 +57,7 @@ export class SpecificationsController {
   async findAll(
     @Query('projectId') projectId: string,
     @Query('specificationType') specificationType: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.specificationsService.findAll(
       projectId,
@@ -74,7 +74,7 @@ export class SpecificationsController {
   })
   async getSpecificationsByAgent(
     @Param('agentId') agentId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.specificationsService.getSpecificationsByAgent(
       agentId,
@@ -87,7 +87,7 @@ export class SpecificationsController {
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   async getSpecificationStats(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.specificationsService.getSpecificationStats(projectId, user.id);
   }
@@ -99,7 +99,7 @@ export class SpecificationsController {
     description: 'Specification retrieved successfully',
   })
   @ApiResponse({ status: 404, description: 'Specification not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.specificationsService.findOne(id, user.id);
   }
 
@@ -113,7 +113,7 @@ export class SpecificationsController {
   async update(
     @Param('id') id: string,
     @Body() updateSpecificationDto: UpdateSpecificationDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.specificationsService.update(
       id,
@@ -129,7 +129,7 @@ export class SpecificationsController {
     description: 'Specification deleted successfully',
   })
   @ApiResponse({ status: 404, description: 'Specification not found' })
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.specificationsService.delete(id, user.id);
   }
 }

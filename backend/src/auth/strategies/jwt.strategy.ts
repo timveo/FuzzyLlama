@@ -3,11 +3,13 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { RequestUser } from '../../common/types/user.types';
 
 export interface JwtPayload {
   sub: string;
   email: string;
   type: 'access' | 'refresh';
+  jti?: string; // JWT ID for refresh tokens
 }
 
 @Injectable()
@@ -23,7 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload): Promise<RequestUser> {
     if (payload.type !== 'access') {
       throw new UnauthorizedException('Invalid token type');
     }
@@ -33,10 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: {
         id: true,
         email: true,
-        name: true,
         planTier: true,
-        emailVerified: true,
-        monthlyAgentExecutions: true,
       },
     });
 
@@ -44,6 +43,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found');
     }
 
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+      planTier: user.planTier,
+    };
   }
 }

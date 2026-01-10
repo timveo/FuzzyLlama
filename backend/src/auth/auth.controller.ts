@@ -22,6 +22,7 @@ import { Public } from './decorators/public.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequestUser, UserProfile } from '../common/types/user.types';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -78,7 +79,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getMe(@CurrentUser() user: any) {
+  async getMe(@CurrentUser() user: RequestUser): Promise<UserProfile> {
     return this.authService.getMe(user.id);
   }
 
@@ -89,7 +90,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout current session' })
   @ApiResponse({ status: 200, description: 'Successfully logged out' })
   async logout(
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
     @Body() body: { tokenId: string },
   ): Promise<{ message: string }> {
     await this.authService.logout(user.id, body.tokenId);
@@ -102,7 +103,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout all sessions' })
   @ApiResponse({ status: 200, description: 'Successfully logged out all sessions' })
-  async logoutAll(@CurrentUser() user: any): Promise<{ message: string }> {
+  async logoutAll(@CurrentUser() user: RequestUser): Promise<{ message: string }> {
     await this.authService.logoutAll(user.id);
     return { message: 'Successfully logged out all sessions' };
   }

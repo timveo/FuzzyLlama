@@ -44,7 +44,7 @@ export class UsersController {
   async update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.usersService.update(id, updateUserDto, user.id);
   }
@@ -58,7 +58,7 @@ export class UsersController {
   async changePassword(
     @Param('id') id: string,
     @Body() changePasswordDto: ChangePasswordDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.usersService.changePassword(id, changePasswordDto, user.id);
   }
@@ -69,7 +69,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Account deleted successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden - can only delete own account' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.usersService.delete(id, user.id);
   }
 
@@ -77,7 +77,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Get user usage statistics' })
   @ApiResponse({ status: 200, description: 'Usage statistics retrieved' })
   @ApiResponse({ status: 403, description: 'Forbidden - can only view own stats' })
-  async getUsageStats(@Param('id') id: string, @CurrentUser() user: any) {
+  async getUsageStats(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.usersService.getUsageStats(id, user.id);
   }
 }

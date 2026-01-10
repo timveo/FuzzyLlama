@@ -35,7 +35,7 @@ export class GatesController {
   @ApiResponse({ status: 403, description: 'Cannot create gate for project you do not own' })
   async create(
     @Body() createGateDto: CreateGateDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.gatesService.create(createGateDto, user.id);
   }
@@ -45,7 +45,7 @@ export class GatesController {
   @ApiResponse({ status: 200, description: 'Gates retrieved successfully' })
   async findAll(
     @Query('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.gatesService.findAll(projectId, user.id);
   }
@@ -55,7 +55,7 @@ export class GatesController {
   @ApiResponse({ status: 200, description: 'Current gate retrieved successfully' })
   async getCurrentGate(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.gatesService.getCurrentGate(projectId, user.id);
   }
@@ -65,7 +65,7 @@ export class GatesController {
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   async getGateStats(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.gatesService.getGateStats(projectId, user.id);
   }
@@ -74,7 +74,7 @@ export class GatesController {
   @ApiOperation({ summary: 'Get a specific gate by ID' })
   @ApiResponse({ status: 200, description: 'Gate retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Gate not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.gatesService.findOne(id, user.id);
   }
 
@@ -85,7 +85,7 @@ export class GatesController {
   async update(
     @Param('id') id: string,
     @Body() updateGateDto: UpdateGateDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.gatesService.update(id, updateGateDto, user.id);
   }
@@ -98,7 +98,7 @@ export class GatesController {
   async approve(
     @Param('id') id: string,
     @Body() approveGateDto: ApproveGateDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.gatesService.approve(id, approveGateDto, user.id);
   }
@@ -107,7 +107,7 @@ export class GatesController {
   @ApiOperation({ summary: 'Delete a gate' })
   @ApiResponse({ status: 200, description: 'Gate deleted successfully' })
   @ApiResponse({ status: 404, description: 'Gate not found' })
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.gatesService.delete(id, user.id);
   }
 }

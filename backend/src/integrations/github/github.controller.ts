@@ -84,7 +84,7 @@ export class GitHubController {
     @Param('id') projectId: string,
     @Headers('x-github-token') githubToken: string,
     @Body() body: { repoName?: string },
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     if (!githubToken) {
       throw new BadRequestException('GitHub token is required in x-github-token header');
@@ -111,7 +111,7 @@ export class GitHubController {
     @Param('id') projectId: string,
     @Headers('x-github-token') githubToken: string,
     @Body() body: { commitMessage?: string },
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     if (!githubToken) {
       throw new BadRequestException('GitHub token is required in x-github-token header');
@@ -148,7 +148,7 @@ export class GitHubController {
   @Post('projects/:id/readme')
   @ApiOperation({ summary: 'Generate and write README.md for project' })
   @ApiResponse({ status: 200, description: 'README created successfully' })
-  async createReadme(@Param('id') projectId: string, @CurrentUser() user: any) {
+  async createReadme(@Param('id') projectId: string, @CurrentUser() user: RequestUser) {
     const readme = await this.githubService.createReadme(projectId);
 
     return {

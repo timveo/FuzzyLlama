@@ -61,7 +61,7 @@ export class AgentsController {
   @ApiResponse({ status: 403, description: 'Cannot execute agent for project you do not own' })
   async execute(
     @Body() executeDto: ExecuteAgentDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.executionService.executeAgent(executeDto, user.id);
   }
@@ -73,7 +73,7 @@ export class AgentsController {
   @ApiResponse({ status: 403, description: 'Cannot execute agent for project you do not own' })
   async executeStream(
     @Body() executeDto: ExecuteAgentDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     // Start agent execution with streaming
     const agentExecutionId = await this.executionService.executeAgentStream(
@@ -119,7 +119,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Agent history retrieved successfully' })
   async getHistory(
     @Query('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.executionService.getAgentHistory(projectId, user.id);
   }
@@ -128,7 +128,7 @@ export class AgentsController {
   @ApiOperation({ summary: 'Get a specific agent execution by ID' })
   @ApiResponse({ status: 200, description: 'Agent execution retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Agent execution not found' })
-  async getExecution(@Param('id') id: string, @CurrentUser() user: any) {
+  async getExecution(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.executionService.getAgentExecution(id, user.id);
   }
 
@@ -137,7 +137,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Requirements decomposed successfully' })
   async decomposeRequirements(
     @Body() body: { projectId: string; requirements: string },
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.orchestrator.decomposeRequirements(body.projectId, body.requirements);
   }
@@ -147,7 +147,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Project progress retrieved successfully' })
   async getProgress(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.orchestrator.getProjectProgress(projectId);
   }
@@ -157,7 +157,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Next task retrieved successfully' })
   async getNextTask(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.orchestrator.getNextExecutableTask(projectId);
   }
@@ -167,7 +167,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Task routed successfully' })
   async routeTask(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.orchestrator.routeTaskToAgent(projectId, user.id);
   }
@@ -177,7 +177,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Workflow started successfully' })
   async startWorkflow(
     @Body() body: { projectId: string; requirements: string },
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.workflowCoordinator.startProjectWorkflow(
       body.projectId,
@@ -191,7 +191,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Next task execution started' })
   async executeNext(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.workflowCoordinator.executeNextTask(projectId, user.id);
   }
@@ -201,7 +201,7 @@ export class AgentsController {
   @ApiResponse({ status: 200, description: 'Workflow status retrieved successfully' })
   async getWorkflowStatus(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.workflowCoordinator.getWorkflowStatus(projectId, user.id);
   }

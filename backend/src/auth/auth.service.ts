@@ -13,6 +13,7 @@ import { TokenStorageService } from './token-storage.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { UserProfile } from '../common/types/user.types';
 
 @Injectable()
 export class AuthService {
@@ -170,7 +171,7 @@ export class AuthService {
     }
   }
 
-  async getMe(userId: string) {
+  async getMe(userId: string): Promise<UserProfile> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {

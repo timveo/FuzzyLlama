@@ -38,7 +38,7 @@ export class DocumentsController {
   })
   async create(
     @Body() createDocumentDto: CreateDocumentDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.documentsService.create(createDocumentDto, user.id);
   }
@@ -54,7 +54,7 @@ export class DocumentsController {
   async findAll(
     @Query('projectId') projectId: string,
     @Query('documentType') documentType: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.documentsService.findAll(projectId, user.id, documentType);
   }
@@ -64,7 +64,7 @@ export class DocumentsController {
   @ApiResponse({ status: 200, description: 'Documents retrieved successfully' })
   async getDocumentsByAgent(
     @Param('agentId') agentId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.documentsService.getDocumentsByAgent(agentId, user.id);
   }
@@ -74,7 +74,7 @@ export class DocumentsController {
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   async getDocumentStats(
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.documentsService.getDocumentStats(projectId, user.id);
   }
@@ -83,7 +83,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Get a specific document by ID' })
   @ApiResponse({ status: 200, description: 'Document retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Document not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.documentsService.findOne(id, user.id);
   }
 
@@ -94,7 +94,7 @@ export class DocumentsController {
   async update(
     @Param('id') id: string,
     @Body() updateDocumentDto: UpdateDocumentDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.documentsService.update(id, updateDocumentDto, user.id);
   }
@@ -103,7 +103,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Delete a document' })
   @ApiResponse({ status: 200, description: 'Document deleted successfully' })
   @ApiResponse({ status: 404, description: 'Document not found' })
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.documentsService.delete(id, user.id);
   }
 
@@ -125,7 +125,7 @@ export class DocumentsController {
       agentType: string;
       agentOutput: string;
     },
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.documentsService.generateFromAgentOutput(
       body.projectId,

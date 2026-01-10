@@ -61,7 +61,7 @@ export class RailwayController {
       projectName?: string;
       environmentVariables?: Record<string, string>;
     },
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     if (!railwayToken) {
       throw new BadRequestException(
@@ -87,7 +87,7 @@ export class RailwayController {
   async redeployProject(
     @Param('id') projectId: string,
     @Headers('x-railway-token') railwayToken: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     if (!railwayToken) {
       throw new BadRequestException(
@@ -126,7 +126,7 @@ export class RailwayController {
   async getDeploymentStatus(
     @Param('id') projectId: string,
     @Headers('x-railway-token') railwayToken: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     if (!railwayToken) {
       throw new BadRequestException(

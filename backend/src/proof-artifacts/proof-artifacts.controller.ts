@@ -41,7 +41,7 @@ export class ProofArtifactsController {
   })
   async create(
     @Body() createDto: CreateProofArtifactDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.proofArtifactsService.create(createDto, user.id);
   }
@@ -56,7 +56,7 @@ export class ProofArtifactsController {
   async findAll(
     @Query('projectId') projectId: string,
     @Query('gate') gate: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.proofArtifactsService.findAll(projectId, user.id, gate);
   }
@@ -69,7 +69,7 @@ export class ProofArtifactsController {
   })
   async getArtifactsForGate(
     @Param('gateId') gateId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.proofArtifactsService.getArtifactsForGate(gateId, user.id);
   }
@@ -82,7 +82,7 @@ export class ProofArtifactsController {
   })
   async validateGateArtifacts(
     @Param('gateId') gateId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
   ) {
     return this.proofArtifactsService.validateGateArtifacts(gateId, user.id);
   }
@@ -94,7 +94,7 @@ export class ProofArtifactsController {
     description: 'Proof artifact retrieved successfully',
   })
   @ApiResponse({ status: 404, description: 'Proof artifact not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.proofArtifactsService.findOne(id, user.id);
   }
 
@@ -105,7 +105,7 @@ export class ProofArtifactsController {
     description: 'Proof artifact validated successfully',
   })
   @ApiResponse({ status: 404, description: 'Proof artifact not found' })
-  async validate(@Param('id') id: string, @CurrentUser() user: any) {
+  async validate(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.proofArtifactsService.validate(id, user.id);
   }
 
@@ -116,7 +116,7 @@ export class ProofArtifactsController {
     description: 'Proof artifact deleted successfully',
   })
   @ApiResponse({ status: 404, description: 'Proof artifact not found' })
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.proofArtifactsService.delete(id, user.id);
   }
 }
