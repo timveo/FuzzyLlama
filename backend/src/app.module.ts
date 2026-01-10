@@ -31,6 +31,7 @@ import { RailwayModule } from './integrations/railway/railway.module';
 import { StateSyncModule } from './state-sync/state-sync.module';
 import { EventsModule } from './events/events.module';
 import { EmbeddingsModule } from './embeddings/embeddings.module';
+import { QueueModule } from './queue/queue.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -67,6 +68,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     StateSyncModule,
     EventsModule,
     EmbeddingsModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [
