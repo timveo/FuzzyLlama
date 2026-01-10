@@ -26,6 +26,7 @@ import { DeliverablesModule } from './deliverables/deliverables.module';
 import { SessionContextModule } from './session-context/session-context.module';
 import { CostTrackingModule } from './cost-tracking/cost-tracking.module';
 import { CodeGenerationModule } from './code-generation/code-generation.module';
+import { GitHubModule } from './integrations/github/github.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -57,6 +58,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     SessionContextModule,
     CostTrackingModule,
     CodeGenerationModule,
+    GitHubModule,
   ],
   controllers: [AppController],
   providers: [
