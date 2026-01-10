@@ -17,6 +17,7 @@ import { DocumentsService } from '../../documents/documents.service';
 import { CodeParserService } from '../../code-generation/code-parser.service';
 import { FileSystemService } from '../../code-generation/filesystem.service';
 import { BuildExecutorService } from '../../code-generation/build-executor.service';
+import { AgentRetryService } from './agent-retry.service';
 
 @Injectable()
 export class AgentExecutionService {
@@ -28,6 +29,7 @@ export class AgentExecutionService {
     private codeParser: CodeParserService,
     private filesystem: FileSystemService,
     private buildExecutor: BuildExecutorService,
+    private retryService: AgentRetryService,
   ) {}
 
   async executeAgent(
@@ -569,7 +571,7 @@ ${template.prompt.context}
                 `[${agentType}] Validation ${validationResult.overallSuccess ? 'PASSED' : 'FAILED'}`,
               );
 
-              // If validation failed, create error history entry
+              // If validation failed, create error history entry and trigger auto-retry
               if (!validationResult.overallSuccess) {
                 const errors = [
                   ...validationResult.build.errors,
@@ -591,6 +593,32 @@ ${template.prompt.context}
                       } as any,
                     },
                   });
+                }
+
+                // Trigger automatic self-healing retry
+                console.log(
+                  `[${agentType}] Build validation failed. Triggering self-healing...`,
+                );
+
+                try {
+                  const healingSuccess =
+                    await this.retryService.autoRetryOnBuildFailure(
+                      projectId,
+                      agentExecutionId,
+                      userId,
+                    );
+
+                  if (healingSuccess) {
+                    console.log(
+                      `[${agentType}] Self-healing succeeded. Code is now valid.`,
+                    );
+                  } else {
+                    console.log(
+                      `[${agentType}] Self-healing failed. Human intervention required.`,
+                    );
+                  }
+                } catch (retryError) {
+                  console.error('Self-healing error:', retryError);
                 }
               }
             } catch (error) {

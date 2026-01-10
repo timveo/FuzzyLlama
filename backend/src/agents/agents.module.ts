@@ -5,6 +5,7 @@ import { AgentTemplateLoaderService } from './services/agent-template-loader.ser
 import { AIProviderService } from './services/ai-provider.service';
 import { OrchestratorService } from './services/orchestrator.service';
 import { WorkflowCoordinatorService } from './services/workflow-coordinator.service';
+import { AgentRetryService } from './services/agent-retry.service';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { GatesModule } from '../gates/gates.module';
@@ -26,6 +27,7 @@ import { CodeGenerationModule } from '../code-generation/code-generation.module'
     AIProviderService,
     OrchestratorService,
     WorkflowCoordinatorService,
+    AgentRetryService,
   ],
   exports: [
     AgentExecutionService,
