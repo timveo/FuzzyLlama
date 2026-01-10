@@ -147,6 +147,8 @@ model Project {
   documents        Document[] @relation("ProjectDocuments")
   specifications   Specification[] @relation("ProjectSpecifications")
   gates            Gate[] @relation("ProjectGates")
+  events           ProjectEvent[] @relation("ProjectEvents")
+  codeEmbeddings   CodeEmbedding[] @relation("ProjectCodeEmbeddings")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1202,4 +1204,44 @@ enum GateStatus {
   APPROVED
   REJECTED
   BLOCKED
+}
+
+// ============================================================================
+// EVENT SOURCING
+// ============================================================================
+
+model ProjectEvent {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation("ProjectEvents", fields: [projectId], references: [id], onDelete: Cascade)
+
+  eventType     String   // 'ProjectCreated', 'GateApproved', 'AgentExecuted', etc.
+  eventData     Json     // Event payload
+  metadata      Json     // userId, timestamp, correlationId
+
+  createdAt     DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([eventType])
+}
+
+// ============================================================================
+// VECTOR SEARCH (pgvector)
+// ============================================================================
+
+model CodeEmbedding {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation("ProjectCodeEmbeddings", fields: [projectId], references: [id], onDelete: Cascade)
+
+  filePath   String
+  content    String   @db.Text
+  language   String?
+  embedding  Unsupported("vector(1536)")  // OpenAI embedding size
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([projectId, filePath])
+  @@index([projectId])
 }

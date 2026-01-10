@@ -28,6 +28,9 @@ import { CostTrackingModule } from './cost-tracking/cost-tracking.module';
 import { CodeGenerationModule } from './code-generation/code-generation.module';
 import { GitHubModule } from './integrations/github/github.module';
 import { RailwayModule } from './integrations/railway/railway.module';
+import { StateSyncModule } from './state-sync/state-sync.module';
+import { EventsModule } from './events/events.module';
+import { EmbeddingsModule } from './embeddings/embeddings.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -61,6 +64,9 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     CodeGenerationModule,
     GitHubModule,
     RailwayModule,
+    StateSyncModule,
+    EventsModule,
+    EmbeddingsModule,
   ],
   controllers: [AppController],
   providers: [
