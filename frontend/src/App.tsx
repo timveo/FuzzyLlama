@@ -20,6 +20,7 @@ import DashboardV1MissionControl from './pages/DashboardV1MissionControl';
 import DashboardV2JourneyMap from './pages/DashboardV2JourneyMap';
 import DashboardV3LivingCanvas from './pages/DashboardV3LivingCanvas';
 import UnifiedDashboard from './pages/UnifiedDashboard';
+import HomePage from './pages/HomePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,7 +46,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 const PublicRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/home" replace />;
   }
   return <>{children}</>;
 };
@@ -92,8 +93,9 @@ function App() {
           <Route path="/preview/journey-map" element={<DashboardV2JourneyMap />} />
           <Route path="/preview/living-canvas" element={<DashboardV3LivingCanvas />} />
           <Route path="/workspace" element={<UnifiedDashboard />} />
+          <Route path="/home" element={<HomePage />} />
 
-          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
+          <Route path="/" element={isAuthenticated ? <Navigate to="/home" replace /> : <Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
