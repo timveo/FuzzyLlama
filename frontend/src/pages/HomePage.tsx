@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import {
   Home,
   Search,
@@ -22,9 +23,14 @@ import {
   Plus,
   Paperclip,
   Palette,
+  CheckSquare,
+  GitBranch,
+  FileText,
 } from 'lucide-react';
 import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
+import { projectsApi } from '../api/projects';
+import type { Project } from '../types';
 import FuzzyLlamaLogo from '../assets/fuzzy-llama-logo.svg';
 
 const HomePage = () => {
@@ -35,24 +41,53 @@ const HomePage = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [promptValue, setPromptValue] = useState('');
 
+  // Fetch real projects from API
+  const { data: projects, isLoading: projectsLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+  });
+
+  // Quick actions with navigation targets
   const quickActions = [
-    'start a new project',
-    'view my tasks',
-    'check gate progress',
-    'review documents',
-    'team collaboration',
+    { label: 'start a new project', route: '/projects/new', icon: Plus },
+    { label: 'view my tasks', route: '/tasks', icon: CheckSquare },
+    { label: 'check gate progress', route: '/gates', icon: GitBranch },
+    { label: 'review documents', route: '/dashboard', icon: FileText },
+    { label: 'open workspace', route: '/workspace', icon: Layout },
   ];
 
-  const handlePromptSubmit = () => {
-    // Navigate to workspace/dashboard
-    navigate('/workspace');
+  const handleQuickAction = (route: string) => {
+    navigate(route);
   };
 
-  const recentProjects = [
-    { id: 1, name: 'E-Commerce Platform', phase: 'Build', progress: 65 },
-    { id: 2, name: 'Mobile App Redesign', phase: 'Design', progress: 40 },
-    { id: 3, name: 'API Integration', phase: 'Test', progress: 85 },
-  ];
+  const handlePromptSubmit = () => {
+    // Parse prompt to determine navigation
+    const prompt = promptValue.toLowerCase();
+    if (prompt.includes('new project') || prompt.includes('create')) {
+      navigate('/projects/new');
+    } else if (prompt.includes('task')) {
+      navigate('/tasks');
+    } else if (prompt.includes('gate')) {
+      navigate('/gates');
+    } else if (prompt.includes('document')) {
+      navigate('/dashboard');
+    } else {
+      navigate('/workspace');
+    }
+  };
+
+  // Get phase from project state
+  const getProjectPhase = (project: Project): string => {
+    return project.state?.currentPhase || 'Setup';
+  };
+
+  // Calculate progress from project state
+  const getProjectProgress = (project: Project): number => {
+    return project.state?.percentComplete || 0;
+  };
+
+  // Get recent projects (up to 3)
+  const recentProjects = projects?.slice(0, 3) || [];
 
   return (
     <div className="h-screen w-screen flex overflow-hidden">
@@ -81,23 +116,23 @@ const HomePage = () => {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 space-y-1">
-          <NavItem icon={Home} label="Home" active />
-          <NavItem icon={Search} label="Search" />
+          <NavItem icon={Home} label="Home" active isDark={isDark} />
+          <NavItem icon={Search} label="Search" isDark={isDark} />
 
           <div className="pt-4 pb-2">
             <span className={`px-3 text-xs font-medium ${isDark ? 'text-slate-500' : 'text-teal-300'} uppercase tracking-wider`}>Projects</span>
           </div>
-          <NavItem icon={Clock} label="Recent" hasSubmenu />
-          <NavItem icon={FolderOpen} label="All projects" />
-          <NavItem icon={Star} label="Starred" />
-          <NavItem icon={Users} label="Shared with me" />
+          <NavItem icon={Clock} label="Recent" onClick={() => navigate('/dashboard')} isDark={isDark} />
+          <NavItem icon={FolderOpen} label="All projects" onClick={() => navigate('/dashboard')} isDark={isDark} />
+          <NavItem icon={Plus} label="New project" onClick={() => navigate('/projects/new')} isDark={isDark} />
 
           <div className="pt-4 pb-2">
-            <span className={`px-3 text-xs font-medium ${isDark ? 'text-slate-500' : 'text-teal-300'} uppercase tracking-wider`}>Resources</span>
+            <span className={`px-3 text-xs font-medium ${isDark ? 'text-slate-500' : 'text-teal-300'} uppercase tracking-wider`}>Workspace</span>
           </div>
-          <NavItem icon={Compass} label="Discover" />
-          <NavItem icon={Layout} label="Templates" />
-          <NavItem icon={GraduationCap} label="Learn" />
+          <NavItem icon={CheckSquare} label="Tasks" onClick={() => navigate('/tasks')} isDark={isDark} />
+          <NavItem icon={GitBranch} label="Gates" onClick={() => navigate('/gates')} isDark={isDark} />
+          <NavItem icon={Layout} label="Workspace" onClick={() => navigate('/workspace')} isDark={isDark} />
+          <NavItem icon={Settings} label="Settings" onClick={() => navigate('/settings')} isDark={isDark} />
         </nav>
 
         {/* Bottom Section */}
@@ -233,15 +268,16 @@ const HomePage = () => {
                 <div className="flex flex-wrap gap-2 mb-4">
                   {quickActions.map((action) => (
                     <button
-                      key={action}
-                      onClick={() => setPromptValue(action)}
-                      className={`px-3 py-1.5 rounded-full text-sm ${
+                      key={action.label}
+                      onClick={() => handleQuickAction(action.route)}
+                      className={`px-3 py-1.5 rounded-full text-sm flex items-center gap-1.5 ${
                         isDark
                           ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                           : 'bg-teal-100 hover:bg-teal-200 text-teal-700'
                       } transition-colors`}
                     >
-                      {action}
+                      <action.icon className="w-3.5 h-3.5" />
+                      {action.label}
                     </button>
                   ))}
                 </div>
@@ -305,53 +341,92 @@ const HomePage = () => {
               <div className="flex items-center justify-between px-6 py-4">
                 <div className="flex gap-6">
                   <button className={`text-sm font-medium pb-1 border-b-2 border-teal-500 ${isDark ? 'text-white' : 'text-teal-800'}`}>
-                    Recently viewed
+                    Recent projects
                   </button>
-                  <button className={`text-sm ${isDark ? 'text-slate-400 hover:text-white' : 'text-teal-500 hover:text-teal-700'} transition-colors`}>
-                    Shared with me
-                  </button>
-                  <button className={`text-sm ${isDark ? 'text-slate-400 hover:text-white' : 'text-teal-500 hover:text-teal-700'} transition-colors`}>
-                    Templates
+                  <button
+                    onClick={() => navigate('/projects/new')}
+                    className={`text-sm ${isDark ? 'text-slate-400 hover:text-white' : 'text-teal-500 hover:text-teal-700'} transition-colors`}
+                  >
+                    + New project
                   </button>
                 </div>
-                <button className={`flex items-center gap-1 text-sm ${isDark ? 'text-slate-400 hover:text-white' : 'text-teal-500 hover:text-teal-700'} transition-colors`}>
-                  Browse all
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className={`flex items-center gap-1 text-sm ${isDark ? 'text-slate-400 hover:text-white' : 'text-teal-500 hover:text-teal-700'} transition-colors`}
+                >
+                  View all
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Project Cards */}
               <div className="px-6 pb-6 grid grid-cols-3 gap-4">
-                {recentProjects.map((project) => (
-                  <button
-                    key={project.id}
-                    onClick={() => navigate('/workspace')}
-                    className={`p-4 rounded-xl ${
-                      isDark ? 'bg-slate-800 hover:bg-slate-700 border-slate-700' : 'bg-teal-50 hover:bg-teal-100 border-teal-200'
-                    } border text-left transition-colors`}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center p-1.5">
-                        <img src={FuzzyLlamaLogo} alt="Project" className="w-full h-full" />
+                {projectsLoading ? (
+                  // Loading skeleton
+                  [...Array(3)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`p-4 rounded-xl ${
+                        isDark ? 'bg-slate-800 border-slate-700' : 'bg-teal-50 border-teal-200'
+                      } border animate-pulse`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className={`w-10 h-10 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-teal-200'}`} />
+                        <div className={`w-16 h-5 rounded-full ${isDark ? 'bg-slate-700' : 'bg-teal-200'}`} />
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        project.phase === 'Build' ? 'bg-teal-500/20 text-teal-600' :
-                        project.phase === 'Design' ? 'bg-purple-500/20 text-purple-600' :
-                        'bg-amber-500/20 text-amber-600'
-                      }`}>
-                        {project.phase}
-                      </span>
+                      <div className={`h-5 w-3/4 rounded ${isDark ? 'bg-slate-700' : 'bg-teal-200'} mb-2`} />
+                      <div className={`h-1.5 w-full rounded-full ${isDark ? 'bg-slate-700' : 'bg-teal-200'}`} />
                     </div>
-                    <h3 className={`font-medium mb-2 ${isDark ? 'text-white' : 'text-teal-900'}`}>{project.name}</h3>
-                    <div className={`w-full h-1.5 ${isDark ? 'bg-slate-700' : 'bg-teal-200'} rounded-full overflow-hidden`}>
-                      <div
-                        className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full"
-                        style={{ width: `${project.progress}%` }}
-                      />
-                    </div>
-                    <span className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>{project.progress}% complete</span>
-                  </button>
-                ))}
+                  ))
+                ) : recentProjects.length > 0 ? (
+                  recentProjects.map((project) => {
+                    const phase = getProjectPhase(project);
+                    const progress = getProjectProgress(project);
+                    return (
+                      <button
+                        key={project.id}
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                        className={`p-4 rounded-xl ${
+                          isDark ? 'bg-slate-800 hover:bg-slate-700 border-slate-700' : 'bg-teal-50 hover:bg-teal-100 border-teal-200'
+                        } border text-left transition-colors`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center p-1.5">
+                            <img src={FuzzyLlamaLogo} alt="Project" className="w-full h-full" />
+                          </div>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            phase === 'Build' || phase === 'build' ? 'bg-teal-500/20 text-teal-600' :
+                            phase === 'Design' || phase === 'design' ? 'bg-purple-500/20 text-purple-600' :
+                            phase === 'Test' || phase === 'test' ? 'bg-amber-500/20 text-amber-600' :
+                            'bg-slate-500/20 text-slate-600'
+                          }`}>
+                            {phase}
+                          </span>
+                        </div>
+                        <h3 className={`font-medium mb-2 ${isDark ? 'text-white' : 'text-teal-900'}`}>{project.name}</h3>
+                        <div className={`w-full h-1.5 ${isDark ? 'bg-slate-700' : 'bg-teal-200'} rounded-full overflow-hidden`}>
+                          <div
+                            className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <span className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>{progress}% complete</span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  // Empty state
+                  <div className={`col-span-3 text-center py-8 ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>
+                    <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm mb-2">No projects yet</p>
+                    <button
+                      onClick={() => navigate('/projects/new')}
+                      className="text-sm text-teal-500 hover:text-teal-400 underline"
+                    >
+                      Create your first project
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -366,18 +441,23 @@ const NavItem = ({
   icon: Icon,
   label,
   active = false,
-  hasSubmenu = false
+  hasSubmenu = false,
+  onClick,
+  isDark = false
 }: {
   icon: React.ElementType;
   label: string;
   active?: boolean;
   hasSubmenu?: boolean;
+  onClick?: () => void;
+  isDark?: boolean;
 }) => (
   <button
+    onClick={onClick}
     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
       active
-        ? 'bg-teal-700 text-white'
-        : 'text-teal-200 hover:bg-teal-700 hover:text-white'
+        ? isDark ? 'bg-slate-700 text-white' : 'bg-teal-700 text-white'
+        : isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-white' : 'text-teal-200 hover:bg-teal-700 hover:text-white'
     }`}
   >
     <Icon className="w-5 h-5" />
