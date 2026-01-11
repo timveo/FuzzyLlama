@@ -4,14 +4,8 @@ import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import {
   Home,
-  Search,
-  Clock,
   FolderOpen,
-  Star,
-  Users,
-  Compass,
   Layout,
-  GraduationCap,
   Settings,
   ChevronDown,
   LogOut,
@@ -23,9 +17,6 @@ import {
   Plus,
   Paperclip,
   Palette,
-  CheckSquare,
-  GitBranch,
-  FileText,
 } from 'lucide-react';
 import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
@@ -50,9 +41,7 @@ const HomePage = () => {
   // Quick actions with navigation targets
   const quickActions = [
     { label: 'start a new project', route: '/projects/new', icon: Plus },
-    { label: 'view my tasks', route: '/tasks', icon: CheckSquare },
-    { label: 'check gate progress', route: '/gates', icon: GitBranch },
-    { label: 'review documents', route: '/dashboard', icon: FileText },
+    { label: 'view projects', route: '/dashboard', icon: FolderOpen },
     { label: 'open workspace', route: '/workspace', icon: Layout },
   ];
 
@@ -65,11 +54,7 @@ const HomePage = () => {
     const prompt = promptValue.toLowerCase();
     if (prompt.includes('new project') || prompt.includes('create')) {
       navigate('/projects/new');
-    } else if (prompt.includes('task')) {
-      navigate('/tasks');
-    } else if (prompt.includes('gate')) {
-      navigate('/gates');
-    } else if (prompt.includes('document')) {
+    } else if (prompt.includes('project')) {
       navigate('/dashboard');
     } else {
       navigate('/workspace');
@@ -117,20 +102,16 @@ const HomePage = () => {
         {/* Navigation */}
         <nav className="flex-1 px-3 space-y-1">
           <NavItem icon={Home} label="Home" active isDark={isDark} />
-          <NavItem icon={Search} label="Search" isDark={isDark} />
 
           <div className="pt-4 pb-2">
             <span className={`px-3 text-xs font-medium ${isDark ? 'text-slate-500' : 'text-teal-300'} uppercase tracking-wider`}>Projects</span>
           </div>
-          <NavItem icon={Clock} label="Recent" onClick={() => navigate('/dashboard')} isDark={isDark} />
-          <NavItem icon={FolderOpen} label="All projects" onClick={() => navigate('/dashboard')} isDark={isDark} />
+          <NavItem icon={FolderOpen} label="Projects" onClick={() => navigate('/dashboard')} isDark={isDark} />
           <NavItem icon={Plus} label="New project" onClick={() => navigate('/projects/new')} isDark={isDark} />
 
           <div className="pt-4 pb-2">
             <span className={`px-3 text-xs font-medium ${isDark ? 'text-slate-500' : 'text-teal-300'} uppercase tracking-wider`}>Workspace</span>
           </div>
-          <NavItem icon={CheckSquare} label="Tasks" onClick={() => navigate('/tasks')} isDark={isDark} />
-          <NavItem icon={GitBranch} label="Gates" onClick={() => navigate('/gates')} isDark={isDark} />
           <NavItem icon={Layout} label="Workspace" onClick={() => navigate('/workspace')} isDark={isDark} />
           <NavItem icon={Settings} label="Settings" onClick={() => navigate('/settings')} isDark={isDark} />
         </nav>
