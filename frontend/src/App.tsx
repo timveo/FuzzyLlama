@@ -92,8 +92,10 @@ function App() {
           <Route path="/preview/mission-control" element={<DashboardV1MissionControl />} />
           <Route path="/preview/journey-map" element={<DashboardV2JourneyMap />} />
           <Route path="/preview/living-canvas" element={<DashboardV3LivingCanvas />} />
-          <Route path="/workspace" element={<UnifiedDashboard />} />
-          <Route path="/home" element={<HomePage />} />
+
+          {/* Protected user routes */}
+          <Route path="/workspace" element={<ProtectedRoute><UnifiedDashboard /></ProtectedRoute>} />
+          <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
 
           <Route path="/" element={isAuthenticated ? <Navigate to="/home" replace /> : <Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

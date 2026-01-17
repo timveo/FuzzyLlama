@@ -3,9 +3,12 @@ import {
   ConflictException,
   UnauthorizedException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, TokenExpiredError, JsonWebTokenError } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { Logger } from 'winston';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -24,6 +27,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly tokenStorage: TokenStorageService,
+    @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
@@ -169,7 +173,23 @@ export class AuthService {
         },
       };
     } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
+      // Distinguish between JWT errors and other errors for debugging
+      if (error instanceof TokenExpiredError) {
+        throw new UnauthorizedException('Refresh token has expired');
+      }
+      if (error instanceof JsonWebTokenError) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+      if (error instanceof UnauthorizedException) {
+        throw error; // Re-throw our own auth errors
+      }
+      // Log unexpected errors for debugging (e.g., database errors)
+      this.logger.error('Unexpected error during token refresh', {
+        context: 'AuthService',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw new UnauthorizedException('Unable to refresh token');
     }
   }
 
@@ -234,9 +254,8 @@ export class AuthService {
       },
     });
 
-    // In production, send email here
-    // For now, log the token (remove in production!)
-    console.log(`Password reset token for ${email}: ${resetToken}`);
+    // TODO: In production, send email with reset link
+    // Example: await this.emailService.sendPasswordReset(email, resetToken);
 
     return {
       message:

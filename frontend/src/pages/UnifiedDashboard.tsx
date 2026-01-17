@@ -485,7 +485,7 @@ const GateApprovalPopup = ({
             </div>
 
             {/* Agent Recommendation */}
-            <div className={`rounded-xl p-3 border-l-4 border-teal-500 ${isDark ? 'bg-teal-1000/10' : 'bg-teal-600/20'}`}>
+            <div className={`rounded-xl p-3 border-l-4 border-teal-500 ${isDark ? 'bg-teal-950/10' : 'bg-teal-600/20'}`}>
               <div className="flex items-start gap-2">
                 <span className="text-lg">🤖</span>
                 <div>
@@ -619,7 +619,7 @@ const SplashPage = ({ onGetStarted }: { onGetStarted: () => void }) => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onGetStarted}
-          className="px-8 py-4 bg-teal-1000 hover:bg-teal-400 text-white font-semibold rounded-full text-lg shadow-lg shadow-teal-500/30 transition-colors"
+          className="px-8 py-4 bg-teal-950 hover:bg-teal-400 text-white font-semibold rounded-full text-lg shadow-lg shadow-teal-500/30 transition-colors"
         >
           Get Started
         </motion.button>
@@ -806,7 +806,7 @@ const AgentOrchestratorPanel = ({ theme }: { theme: ThemeMode }) => {
       {/* Header - compact */}
       <div className={`flex items-center gap-2 px-3 py-1.5 border-b ${isDark ? 'border-slate-700/50' : 'border-teal-200'}`}>
         <div className="relative">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isDark ? 'bg-teal-1000' : 'bg-teal-600'}`}>
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}>
             <CpuChipIcon className="w-4 h-4 text-white" />
           </div>
           <motion.div
@@ -834,7 +834,7 @@ const AgentOrchestratorPanel = ({ theme }: { theme: ThemeMode }) => {
           >
             <div className={`max-w-[90%] px-3 py-2 text-xs leading-relaxed rounded-2xl ${
               msg.role === 'user'
-                ? isDark ? 'bg-teal-1000 text-white rounded-br-md' : 'bg-teal-600 text-white rounded-br-md'
+                ? isDark ? 'bg-teal-950 text-white rounded-br-md' : 'bg-teal-600 text-white rounded-br-md'
                 : msg.role === 'system'
                 ? isDark ? 'bg-slate-700/50 text-teal-200 rounded-bl-md italic' : 'bg-teal-200/50 text-teal-800 rounded-bl-md italic'
                 : isDark ? 'bg-slate-700 text-white rounded-bl-md' : 'bg-white text-teal-900 rounded-bl-md border border-teal-100'
@@ -849,7 +849,7 @@ const AgentOrchestratorPanel = ({ theme }: { theme: ThemeMode }) => {
               {[0, 1, 2].map((i) => (
                 <motion.span
                   key={i}
-                  className={`w-1.5 h-1.5 rounded-full ${isDark ? 'bg-teal-1000' : 'bg-teal-600'}`}
+                  className={`w-1.5 h-1.5 rounded-full ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}
                   animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 0.5, delay: i * 0.1, repeat: Infinity }}
                 />
@@ -876,7 +876,7 @@ const AgentOrchestratorPanel = ({ theme }: { theme: ThemeMode }) => {
               <StopIcon className="w-3 h-3" />
             </button>
           ) : (
-            <button onClick={handleSend} className={`w-7 h-7 rounded-full text-white flex items-center justify-center ${isDark ? 'bg-teal-1000' : 'bg-teal-600'}`}>
+            <button onClick={handleSend} className={`w-7 h-7 rounded-full text-white flex items-center justify-center ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}>
               <PaperAirplaneIcon className="w-3 h-3" />
             </button>
           )}
@@ -1098,7 +1098,7 @@ const CodeContent = ({ theme }: { theme: ThemeMode }) => {
             else if (isMarkdown) setSelectedFile(node);
           }}
           className={`w-full flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all ${
-            isSelected ? 'bg-teal-1000/20 text-teal-300' : 'hover:bg-slate-700/30'
+            isSelected ? 'bg-teal-950/20 text-teal-300' : 'hover:bg-slate-700/30'
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
@@ -1354,7 +1354,7 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: gateNum * 0.05 + 0.1 }}
                         className={`w-2/3 p-2.5 rounded-lg border ${
-                          isDark ? 'bg-teal-1000/5 border-teal-500/20' : 'bg-teal-100/50 border-teal-200'
+                          isDark ? 'bg-teal-950/5 border-teal-500/20' : 'bg-teal-100/50 border-teal-200'
                         }`}
                       >
                         <div className={`${isLeft ? 'text-right' : 'text-left'}`}>
@@ -1395,7 +1395,7 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
                                     key={i}
                                     href={doc.path}
                                     className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] transition-colors ${
-                                      isDark ? 'bg-teal-1000/10 hover:bg-teal-1000/20 border border-teal-500/20 text-teal-300' : 'bg-teal-200 hover:bg-teal-300 border border-teal-300 text-teal-700'
+                                      isDark ? 'bg-teal-950/10 hover:bg-teal-950/20 border border-teal-500/20 text-teal-300' : 'bg-teal-200 hover:bg-teal-300 border border-teal-300 text-teal-700'
                                     }`}
                                   >
                                     <span>{doc.icon}</span>
@@ -1424,7 +1424,7 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
                         : isCurrent
                           ? isDark
                             ? `${colors.bg} border-white/30 text-white ring-2 ring-offset-1 ring-offset-slate-900 ring-white/20 shadow-lg ${colors.glow}`
-                            : `bg-teal-1000 border-teal-400 text-white ring-2 ring-offset-1 ring-offset-white ring-teal-300 shadow-lg shadow-teal-300/50`
+                            : `bg-teal-950 border-teal-400 text-white ring-2 ring-offset-1 ring-offset-white ring-teal-300 shadow-lg shadow-teal-300/50`
                           : isDark
                             ? 'bg-slate-800 border-slate-600 text-slate-500'
                             : 'bg-slate-100 border-slate-300 text-slate-400'
@@ -1612,7 +1612,7 @@ const GateProgressRing = ({ currentGate, selectedPhase, theme, onGateClick }: {
           </div>
           <button
             onClick={() => onGateClick(currentGate)}
-            className={`w-full py-0.5 rounded text-[8px] font-medium transition-colors ${isDark ? 'bg-teal-1000/20 hover:bg-teal-1000/30 text-teal-300' : 'bg-white/60 hover:bg-white text-teal-700'}`}
+            className={`w-full py-0.5 rounded text-[8px] font-medium transition-colors ${isDark ? 'bg-teal-950/20 hover:bg-teal-950/30 text-teal-300' : 'bg-white/60 hover:bg-white text-teal-700'}`}
           >
             Review →
           </button>
@@ -1953,7 +1953,7 @@ const PhaseSelector = ({ currentPhase, selectedPhase, onPhaseSelect, theme }: {
               selectedPhase === p.id
                 ? 'bg-teal-600 shadow-md'
                 : currentPhase === p.id
-                  ? isDark ? 'bg-teal-1000/30 ring-1 ring-teal-500/50' : 'bg-teal-100 ring-1 ring-teal-300'
+                  ? isDark ? 'bg-teal-950/30 ring-1 ring-teal-500/50' : 'bg-teal-100 ring-1 ring-teal-300'
                   : `${isDark ? 'bg-slate-700/30 hover:bg-slate-700/50' : 'bg-white/60 hover:bg-white'}`
             }`}
           >
@@ -1979,7 +1979,7 @@ const ProjectsView = ({ theme, onSelectProject }: { theme: ThemeMode; onSelectPr
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-teal-800'}`}>Projects</h2>
-        <button className={`px-4 py-2 text-white rounded-full text-sm font-medium transition-colors ${isDark ? 'bg-teal-1000 hover:bg-teal-400' : 'bg-teal-600 hover:bg-teal-700'}`}>
+        <button className={`px-4 py-2 text-white rounded-full text-sm font-medium transition-colors ${isDark ? 'bg-teal-950 hover:bg-teal-400' : 'bg-teal-600 hover:bg-teal-700'}`}>
           + New Project
         </button>
       </div>
@@ -1993,12 +1993,12 @@ const ProjectsView = ({ theme, onSelectProject }: { theme: ThemeMode; onSelectPr
             <div onClick={() => onSelectProject(project.name)}>
               <h3 className={`font-semibold mb-2 ${isDark ? 'text-white' : 'text-teal-800'}`}>{project.name}</h3>
               <div className="flex items-center gap-2 mb-3">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${project.status === 'completed' ? isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700' : isDark ? 'bg-teal-1000/20 text-teal-300' : 'bg-teal-50 text-teal-700'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${project.status === 'completed' ? isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700' : isDark ? 'bg-teal-950/20 text-teal-300' : 'bg-teal-50 text-teal-700'}`}>
                   {project.status === 'completed' ? 'Completed' : `Gate ${project.gate}`}
                 </span>
               </div>
               <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
-                <div className={`h-full rounded-full ${isDark ? 'bg-teal-1000' : 'bg-teal-500'}`} style={{ width: `${project.progress}%` }} />
+                <div className={`h-full rounded-full ${isDark ? 'bg-teal-950' : 'bg-teal-500'}`} style={{ width: `${project.progress}%` }} />
               </div>
               <div className={`text-xs mt-2 ${isDark ? 'text-teal-400' : 'text-slate-500'}`}>{project.progress}% complete</div>
             </div>
@@ -2084,7 +2084,7 @@ export default function UnifiedDashboard() {
         <div className="flex items-center gap-3">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden ${isDark ? 'bg-teal-1000' : 'bg-teal-600'}`}>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}>
               <img src={FuzzyLlamaLogoSvg} alt="Fuzzy Llama" className="w-7 h-7" />
             </div>
             <span className={`font-bold text-sm ${isDark ? 'text-white' : 'text-white'}`}>Fuzzy Llama</span>
@@ -2096,7 +2096,7 @@ export default function UnifiedDashboard() {
               onClick={() => setMainView('dashboard')}
               className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                 mainView === 'dashboard'
-                  ? isDark ? 'bg-teal-1000 text-white' : 'bg-white text-teal-800'
+                  ? isDark ? 'bg-teal-950 text-white' : 'bg-white text-teal-800'
                   : isDark ? 'text-teal-300 hover:text-white' : 'text-teal-200 hover:text-white'
               }`}
             >
@@ -2106,7 +2106,7 @@ export default function UnifiedDashboard() {
               onClick={() => setMainView('projects')}
               className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                 mainView === 'projects'
-                  ? isDark ? 'bg-teal-1000 text-white' : 'bg-white text-teal-800'
+                  ? isDark ? 'bg-teal-950 text-white' : 'bg-white text-teal-800'
                   : isDark ? 'text-teal-300 hover:text-white' : 'text-teal-200 hover:text-white'
               }`}
             >
@@ -2140,7 +2140,7 @@ export default function UnifiedDashboard() {
           {/* Profile Avatar */}
           <button
             onClick={() => setShowSettings(true)}
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${isDark ? 'bg-teal-1000' : 'bg-teal-600'}`}
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}
           >
             JD
           </button>

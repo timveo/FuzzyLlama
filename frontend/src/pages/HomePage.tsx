@@ -249,14 +249,12 @@ const NavItem = ({
   icon: Icon,
   label,
   active = false,
-  hasSubmenu = false,
   onClick,
   isDark = false
 }: {
   icon: React.ElementType;
   label: string;
   active?: boolean;
-  hasSubmenu?: boolean;
   onClick?: () => void;
   isDark?: boolean;
 }) => (
@@ -270,7 +268,6 @@ const NavItem = ({
   >
     <Icon className="w-5 h-5" />
     <span className="text-sm flex-1 text-left">{label}</span>
-    {hasSubmenu && <ChevronDown className="w-4 h-4" />}
   </button>
 );
 

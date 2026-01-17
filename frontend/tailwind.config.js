@@ -8,6 +8,10 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Extended teal scale for darker shades
+        teal: {
+          950: '#042f2e',
+        },
         // Teal Wave Theme
         primary: {
           50: '#f0fdfa',
