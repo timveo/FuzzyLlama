@@ -190,7 +190,7 @@ export default function DashboardSelector() {
               Building with Confidence
             </h2>
             <p className="text-dark-text-secondary leading-relaxed">
-              LayerCake isn't just about writing code faster—it's about feeling great
+              FuzzyLlama isn't just about writing code faster—it's about feeling great
               throughout the entire process. Every decision is transparent, every milestone
               is celebrated, and every learning moment is captured. This is enterprise-quality
               development that respects both your time and your craft.

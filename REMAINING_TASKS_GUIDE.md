@@ -1,4 +1,4 @@
-# LayerCake Remaining Tasks Implementation Guide
+# FuzzyLlama Remaining Tasks Implementation Guide
 
 **Date**: 2026-01-09
 **Status**: 8 of 17 tasks complete, 9 remaining
@@ -55,7 +55,7 @@ export class TracingService {
     this.sdk = new NodeSDK({
       traceExporter,
       instrumentations: [getNodeAutoInstrumentations()],
-      serviceName: 'layercake-backend',
+      serviceName: 'fuzzyllama-backend',
     });
   }
 
@@ -256,7 +256,7 @@ jobs:
         image: pgvector/pgvector:pg14
         env:
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: layercake_test
+          POSTGRES_DB: fuzzyllama_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -292,7 +292,7 @@ jobs:
       - name: Run migrations
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://postgres:test@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fuzzyllama_test
         run: npx prisma migrate deploy
 
       - name: Run linter
@@ -306,14 +306,14 @@ jobs:
       - name: Run integration tests
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://postgres:test@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fuzzyllama_test
           REDIS_URL: redis://localhost:6379
         run: npm run test:integration
 
       - name: Run E2E tests
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://postgres:test@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fuzzyllama_test
           REDIS_URL: redis://localhost:6379
         run: npm run test:e2e
 
@@ -563,7 +563,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: layercake
+      POSTGRES_DB: fuzzyllama
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -731,7 +731,7 @@ SENTRY_DSN=https://...@sentry.io/...
 CLOUDFLARE_ACCOUNT_ID=...
 CLOUDFLARE_R2_ACCESS_KEY=...
 CLOUDFLARE_R2_SECRET_KEY=...
-CLOUDFLARE_R2_BUCKET=layercake-artifacts
+CLOUDFLARE_R2_BUCKET=fuzzyllama-artifacts
 CLOUDFLARE_R2_PUBLIC_DOMAIN=...
 
 # PostHog

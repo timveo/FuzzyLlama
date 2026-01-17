@@ -1,8 +1,8 @@
 {
-  "name": "layercake-backend",
+  "name": "fuzzyllama-backend",
   "version": "1.0.0",
-  "description": "LayerCake web application backend",
-  "author": "LayerCake",
+  "description": "FuzzyLlama web application backend",
+  "author": "FuzzyLlama",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

@@ -135,7 +135,7 @@ export class RailwayController {
       );
     }
 
-    // Get LayerCake project to find Railway project ID
+    // Get FuzzyLlama project to find Railway project ID
     const project = await this.railwayService['prisma'].project.findUnique({
       where: { id: projectId },
     });

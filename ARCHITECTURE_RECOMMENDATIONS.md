@@ -1,13 +1,13 @@
-# LayerCake Architecture Recommendations
+# FuzzyLlama Architecture Recommendations
 
 **Date**: 2026-01-09
-**Purpose**: State-of-the-art architecture for LayerCake to integrate with Multi-Agent-Product-Creator framework
+**Purpose**: State-of-the-art architecture for FuzzyLlama to integrate with Multi-Agent-Product-Creator framework
 
 ---
 
 ## Executive Summary
 
-After analyzing your Multi-Agent-Product-Creator framework and cndo-proto-3 project, here are the **impactful architectural recommendations** to make LayerCake production-ready and optimal:
+After analyzing your Multi-Agent-Product-Creator framework and cndo-proto-3 project, here are the **impactful architectural recommendations** to make FuzzyLlama production-ready and optimal:
 
 ### Top 3 Critical Changes
 1. **Hybrid MCP + Database Architecture** - Best of both worlds
@@ -26,7 +26,7 @@ After analyzing your Multi-Agent-Product-Creator framework and cndo-proto-3 proj
 
 ### Current State
 
-**LayerCake (Database-First)**:
+**FuzzyLlama (Database-First)**:
 - PostgreSQL with 20+ tables
 - Structured queries with Prisma
 - Real-time updates via WebSocket
@@ -499,7 +499,7 @@ export class WorkerService implements OnModuleInit {
 @Injectable()
 export class TracingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const tracer = trace.getTracer('layercake');
+    const tracer = trace.getTracer('fuzzyllama');
     const request = context.switchToHttp().getRequest();
 
     return tracer.startActiveSpan(
@@ -527,7 +527,7 @@ export class TracingInterceptor implements NestInterceptor {
 
 // Agent execution tracing
 async executeAgent(job: AgentJob) {
-  const span = trace.getTracer('layercake').startSpan('agent.execute', {
+  const span = trace.getTracer('fuzzyllama').startSpan('agent.execute', {
     attributes: {
       'agent.type': job.agentType,
       'project.id': job.projectId,
@@ -602,7 +602,7 @@ const buildSuccessRate = new Gauge({
 ## 6. MCP Integration Layer
 
 ### Current Gap
-- LayerCake has features, Multi-Agent-Product-Creator has MCP protocol
+- FuzzyLlama has features, Multi-Agent-Product-Creator has MCP protocol
 - No bridge between them
 
 ### Recommendation: **MCP Adapter Service** ⭐⭐⭐
@@ -620,7 +620,7 @@ const buildSuccessRate = new Gauge({
 │         ├──► 160+ Tools                    │
 │         │    (file ops, state, git, etc.)  │
 │         │                                   │
-│         └──► LayerCake API (REST/GraphQL)  │
+│         └──► FuzzyLlama API (REST/GraphQL)  │
 │                    │                        │
 │                    ▼                        │
 │              PostgreSQL + Files             │
@@ -633,7 +633,7 @@ const buildSuccessRate = new Gauge({
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-export class LayerCakeMCPServer {
+export class FuzzyLlamaMCPServer {
   private server: Server;
 
   constructor(
@@ -642,7 +642,7 @@ export class LayerCakeMCPServer {
     private readonly filesystem: FileSystemService,
   ) {
     this.server = new Server(
-      { name: 'layercake', version: '1.0.0' },
+      { name: 'fuzzyllama', version: '1.0.0' },
       { capabilities: { tools: {}, resources: {} } }
     );
 
@@ -727,7 +727,7 @@ export class LayerCakeMCPServer {
   async start() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.log('LayerCake MCP server running on stdio');
+    console.log('FuzzyLlama MCP server running on stdio');
   }
 }
 ```
@@ -736,7 +736,7 @@ export class LayerCakeMCPServer {
 ```json
 {
   "mcpServers": {
-    "layercake": {
+    "fuzzyllama": {
       "command": "node",
       "args": ["dist/mcp/mcp-server.js"],
       "env": {
@@ -953,7 +953,7 @@ services:
     image: pgvector/pgvector:pg14  # Use pgvector image
     volumes: [postgres-data:/var/lib/postgresql/data]
     environment:
-      POSTGRES_DB: layercake
+      POSTGRES_DB: fuzzyllama
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
   redis:
@@ -979,7 +979,7 @@ volumes:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     LayerCake Architecture                      │
+│                     FuzzyLlama Architecture                      │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1065,7 +1065,7 @@ volumes:
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  MCP Server (stdio transport)                           │  │
 │  │  • 160+ tools                                           │  │
-│  │  • Bidirectional sync with LayerCake API               │  │
+│  │  • Bidirectional sync with FuzzyLlama API               │  │
 │  │  • Compatible with Multi-Agent-Product-Creator         │  │
 │  └─────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
@@ -1165,7 +1165,7 @@ volumes:
 
 ## Conclusion
 
-**To build LayerCake "the right way" and make it compatible with your Multi-Agent-Product-Creator framework, implement these 3 critical changes:**
+**To build FuzzyLlama "the right way" and make it compatible with your Multi-Agent-Product-Creator framework, implement these 3 critical changes:**
 
 1. **Hybrid MCP + Database Architecture** (3-4 days)
    - Database for queries, markdown files for agent context
@@ -1178,13 +1178,13 @@ volumes:
    - Replay project history
 
 3. **MCP Adapter Layer** (5-7 days)
-   - Bridge between LayerCake API and MCP protocol
+   - Bridge between FuzzyLlama API and MCP protocol
    - 160+ tools exposed to Claude Code
    - Full compatibility with Multi-Agent-Product-Creator
 
 **Total implementation time**: ~2-3 weeks for all 3 critical changes.
 
-**After these changes, LayerCake will be able to**:
+**After these changes, FuzzyLlama will be able to**:
 - ✅ Handle all Multi-Agent-Product-Creator workflows
 - ✅ Deliver production-ready apps like cndo-proto-3
 - ✅ Work seamlessly with Claude Code via MCP

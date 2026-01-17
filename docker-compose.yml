@@ -1,4 +1,4 @@
-# Simplified LayerCake Development Setup
+# Simplified FuzzyLlama Development Setup
 # Requires: Local PostgreSQL running on localhost:5432
 
 services:
@@ -24,7 +24,7 @@ services:
       - .env
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://layercake:layercake@host.docker.internal:5432/layercake
+      - DATABASE_URL=postgresql://fuzzyllama:fuzzyllama@host.docker.internal:5432/fuzzyllama
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

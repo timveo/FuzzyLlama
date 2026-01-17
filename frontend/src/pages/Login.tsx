@@ -70,7 +70,7 @@ export const Login: React.FC = () => {
               <span className="text-3xl">🎂</span>
             </div>
             <h1 className="text-3xl font-bold text-light-text-primary dark:text-dark-text-primary">
-              LayerCake
+              FuzzyLlama
             </h1>
             <p className="text-light-text-muted dark:text-dark-text-muted mt-2">
               AI-powered development platform

@@ -1,4 +1,4 @@
-# LayerCake MVP - Production Readiness Assessment
+# FuzzyLlama MVP - Production Readiness Assessment
 
 **Question**: Can this current app build production-ready software as is?
 

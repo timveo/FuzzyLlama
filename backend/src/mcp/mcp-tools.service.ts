@@ -16,7 +16,7 @@ import { EventType } from '../events/domain-event.interface';
  * McpToolsService - Tool Execution Layer
  *
  * Implements all 160+ tools for MCP protocol
- * Bridges MCP requests to LayerCake services
+ * Bridges MCP requests to FuzzyLlama services
  */
 @Injectable()
 export class McpToolsService {

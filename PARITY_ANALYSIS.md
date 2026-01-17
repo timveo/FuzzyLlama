@@ -1,8 +1,8 @@
-# LayerCake MVP vs Previous Framework - Parity Analysis
+# FuzzyLlama MVP vs Previous Framework - Parity Analysis
 
 ## Executive Summary
 
-This document compares the current **LayerCake MVP Web Application** with the previous **MCP-based Agent Framework** to identify feature parity, gaps, and improvements.
+This document compares the current **FuzzyLlama MVP Web Application** with the previous **MCP-based Agent Framework** to identify feature parity, gaps, and improvements.
 
 **Overall Status:** ✅ **90% Parity + Significant Enhancements**
 
@@ -482,7 +482,7 @@ The MVP has achieved near-complete parity with the MCP framework while adding su
 
 ## Conclusion
 
-The LayerCake MVP has achieved **90% parity** with the previous MCP framework while adding significant enhancements for web-based, multi-user operation:
+The FuzzyLlama MVP has achieved **90% parity** with the previous MCP framework while adding significant enhancements for web-based, multi-user operation:
 
 **✅ Complete Parity:**
 - All 14 agents

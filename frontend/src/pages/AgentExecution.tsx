@@ -253,7 +253,7 @@ export const AgentExecution: React.FC = () => {
                 <div className="w-3 h-3 rounded-full bg-green-500" />
               </div>
               <span className="text-sm font-mono text-dark-text-secondary">
-                LayerCake Agent Terminal
+                FuzzyLlama Agent Terminal
               </span>
             </div>
             <div className="flex items-center gap-4">

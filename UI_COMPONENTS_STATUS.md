@@ -1,4 +1,4 @@
-# LayerCake MVP - UI Components Status
+# FuzzyLlama MVP - UI Components Status
 
 ## ✅ Completed Pages (10/10)
 

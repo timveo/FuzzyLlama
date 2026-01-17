@@ -1,4 +1,4 @@
-# LayerCake MCP Integration
+# FuzzyLlama MCP Integration
 
 **Date**: 2026-01-09
 **Status**: Complete
@@ -8,7 +8,7 @@
 
 ## Overview
 
-LayerCake now provides a **Model Context Protocol (MCP) server** that exposes 160+ tools to Claude Code and other MCP clients. This enables full compatibility with the Multi-Agent-Product-Creator framework while maintaining all database functionality.
+FuzzyLlama now provides a **Model Context Protocol (MCP) server** that exposes 160+ tools to Claude Code and other MCP clients. This enables full compatibility with the Multi-Agent-Product-Creator framework while maintaining all database functionality.
 
 ---
 
@@ -21,7 +21,7 @@ LayerCake now provides a **Model Context Protocol (MCP) server** that exposes 16
                  │ stdio
                  ▼
 ┌─────────────────────────────────────────────┐
-│       LayerCake MCP Server                  │
+│       FuzzyLlama MCP Server                  │
 │  • 160+ tools                               │
 │  • Resource access (markdown files)         │
 │  • Bidirectional sync (MCP ↔ Database)     │
@@ -108,11 +108,11 @@ LayerCake now provides a **Model Context Protocol (MCP) server** that exposes 16
 MCP clients can read project resources via URIs:
 
 ```
-layercake://project/{projectId}/status       -> STATUS.md
-layercake://project/{projectId}/decisions    -> DECISIONS.md
-layercake://project/{projectId}/memory       -> MEMORY.md
-layercake://project/{projectId}/gates        -> GATES.md
-layercake://project/{projectId}/tasks        -> TASKS.md
+fuzzyllama://project/{projectId}/status       -> STATUS.md
+fuzzyllama://project/{projectId}/decisions    -> DECISIONS.md
+fuzzyllama://project/{projectId}/memory       -> MEMORY.md
+fuzzyllama://project/{projectId}/gates        -> GATES.md
+fuzzyllama://project/{projectId}/tasks        -> TASKS.md
 ```
 
 ### 3. Bidirectional Sync
@@ -140,11 +140,11 @@ Edit `~/.config/claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "layercake": {
+    "fuzzyllama": {
       "command": "node",
-      "args": ["/Users/tsm/Desktop/Development/LayerCake/backend/dist/mcp/mcp-cli.js"],
+      "args": ["/Users/tsm/Desktop/Development/FuzzyLlama/backend/dist/mcp/mcp-cli.js"],
       "env": {
-        "DATABASE_URL": "postgresql://user:pass@localhost:5432/layercake",
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/fuzzyllama",
         "JWT_SECRET": "your-secret-key"
       }
     }
@@ -165,7 +165,7 @@ The MCP server will start automatically when Claude Code launches.
 In Claude Code, you should see:
 
 ```
-✓ Connected to LayerCake MCP server
+✓ Connected to FuzzyLlama MCP server
 ✓ 160+ tools available
 ```
 
@@ -255,11 +255,11 @@ await useMcpTool('create_task', {
 
 ## Compatibility with Multi-Agent-Product-Creator
 
-LayerCake MCP server is **100% compatible** with the Multi-Agent-Product-Creator framework:
+FuzzyLlama MCP server is **100% compatible** with the Multi-Agent-Product-Creator framework:
 
 ### Shared Features
 
-| Feature | Multi-Agent-Product-Creator | LayerCake MCP |
+| Feature | Multi-Agent-Product-Creator | FuzzyLlama MCP |
 |---------|----------------------------|---------------|
 | **State Files** | STATUS.md, DECISIONS.md, MEMORY.md | ✅ Same files, auto-generated from DB |
 | **160+ Tools** | File-based tools | ✅ Database-backed tools |
@@ -271,7 +271,7 @@ LayerCake MCP server is **100% compatible** with the Multi-Agent-Product-Creator
 
 ### Migration Path
 
-To migrate from Multi-Agent-Product-Creator to LayerCake:
+To migrate from Multi-Agent-Product-Creator to FuzzyLlama:
 
 1. **Import existing project**:
    ```typescript
@@ -314,9 +314,9 @@ Set `NODE_ENV=development` for verbose logging:
 ```json
 {
   "mcpServers": {
-    "layercake": {
+    "fuzzyllama": {
       "command": "node",
-      "args": ["/path/to/layercake/backend/dist/mcp/mcp-cli.js"],
+      "args": ["/path/to/fuzzyllama/backend/dist/mcp/mcp-cli.js"],
       "env": {
         "DATABASE_URL": "...",
         "NODE_ENV": "development"
@@ -405,7 +405,7 @@ MCP server inherits NestJS rate limiting (if configured).
 
 ### MCP Server Won't Start
 
-**Symptom**: Claude Code shows "Failed to connect to layercake"
+**Symptom**: Claude Code shows "Failed to connect to fuzzyllama"
 
 **Solutions**:
 1. Check database connection:
@@ -431,7 +431,7 @@ MCP server inherits NestJS rate limiting (if configured).
 **Solutions**:
 1. Check logs:
    ```bash
-   tail -f ~/.config/claude/logs/mcp-layercake.log
+   tail -f ~/.config/claude/logs/mcp-fuzzyllama.log
    ```
 
 2. Verify project exists:
@@ -480,7 +480,7 @@ MCP server inherits NestJS rate limiting (if configured).
 
 ## Summary
 
-LayerCake MCP Integration provides:
+FuzzyLlama MCP Integration provides:
 
 ✅ **160+ tools** for complete project management
 ✅ **Full compatibility** with Multi-Agent-Product-Creator

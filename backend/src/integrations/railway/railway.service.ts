@@ -282,7 +282,7 @@ export class RailwayService {
     options?: Partial<RailwayDeploymentOptions>,
   ): Promise<RailwayDeploymentResult> {
     try {
-      // Get LayerCake project
+      // Get FuzzyLlama project
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
       });
@@ -314,7 +314,7 @@ export class RailwayService {
       }
 
       const projectName =
-        options?.projectName || project.name || `layercake-${project.id.substring(0, 8)}`;
+        options?.projectName || project.name || `fuzzyllama-${project.id.substring(0, 8)}`;
 
       // Create Railway project
       const { projectId: railwayProjectId, projectUrl } =
@@ -362,7 +362,7 @@ export class RailwayService {
 
       const deploymentUrl = status.deployments.find((d) => d.url)?.url || null;
 
-      // Update LayerCake project with Railway info
+      // Update FuzzyLlama project with Railway info
       // Note: Project schema only has railwayProjectId, not deploymentUrl/deploymentStatus
       await this.prisma.project.update({
         where: { id: projectId },

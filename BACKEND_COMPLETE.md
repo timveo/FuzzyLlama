@@ -1,4 +1,4 @@
-# LayerCake Backend - 100% Complete
+# FuzzyLlama Backend - 100% Complete
 
 **Date**: 2026-01-09
 **Status**: ✅ **PRODUCTION READY**
@@ -8,7 +8,7 @@
 
 ## 🎉 Major Milestone Achieved
 
-The LayerCake backend is now **100% feature-complete** and ready for production deployment. The system can autonomously generate, validate, self-heal, version control, and deploy production-ready applications from G0 (Intake) to G9 (Production Deployment).
+The FuzzyLlama backend is now **100% feature-complete** and ready for production deployment. The system can autonomously generate, validate, self-heal, version control, and deploy production-ready applications from G0 (Intake) to G9 (Production Deployment).
 
 ---
 
@@ -567,7 +567,7 @@ describe('Full G0-G9 Workflow', () => {
 Create `.env` file:
 ```bash
 # Database
-DATABASE_URL="postgresql://user:pass@host:5432/layercake?schema=public"
+DATABASE_URL="postgresql://user:pass@host:5432/fuzzyllama?schema=public"
 REDIS_URL="redis://default:pass@host:6379"
 
 # Authentication
@@ -581,10 +581,10 @@ OPENAI_API_KEY="sk-..."
 # Application
 NODE_ENV="production"
 PORT="3000"
-FRONTEND_URL="https://app.layercake.dev"
+FRONTEND_URL="https://app.fuzzyllama.dev"
 
 # File Storage
-WORKSPACES_PATH="/var/layercake/workspaces"
+WORKSPACES_PATH="/var/fuzzyllama/workspaces"
 
 # Optional: External Services
 SENTRY_DSN="https://..."
@@ -662,8 +662,8 @@ CMD ["npm", "run", "start:prod"]
 
 ```bash
 # Build and run
-docker build -t layercake-backend .
-docker run -p 3000:3000 --env-file .env layercake-backend
+docker build -t fuzzyllama-backend .
+docker run -p 3000:3000 --env-file .env fuzzyllama-backend
 ```
 
 ### Health Checks
@@ -747,7 +747,7 @@ curl http://localhost:3000/health/db
 
 ## 🎉 Conclusion
 
-The LayerCake backend is now **100% feature-complete** and ready for production. The system can autonomously:
+The FuzzyLlama backend is now **100% feature-complete** and ready for production. The system can autonomously:
 
 1. ✅ Generate actual working code files (not just specs)
 2. ✅ Validate code with full build/test/lint/security pipelines

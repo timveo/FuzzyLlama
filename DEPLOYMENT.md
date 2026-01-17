@@ -1,6 +1,6 @@
-# LayerCake Deployment Guide
+# FuzzyLlama Deployment Guide
 
-This guide covers deploying LayerCake to production using Docker Compose and Railway.
+This guide covers deploying FuzzyLlama to production using Docker Compose and Railway.
 
 ## Table of Contents
 
@@ -41,8 +41,8 @@ You'll need API keys for:
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/your-org/layercake.git
-cd layercake
+git clone https://github.com/your-org/fuzzyllama.git
+cd fuzzyllama
 ```
 
 ### 2. Install Dependencies
@@ -67,7 +67,7 @@ Edit `.env` with your API keys:
 
 ```bash
 # Minimum required for local dev
-DATABASE_URL=postgresql://layercake:layercake_dev@localhost:5432/layercake
+DATABASE_URL=postgresql://fuzzyllama:fuzzyllama_dev@localhost:5432/fuzzyllama
 REDIS_HOST=localhost
 REDIS_PORT=6379
 JWT_SECRET=your-dev-secret-key
@@ -144,8 +144,8 @@ sudo apt install docker-compose -y
 ### 2. Clone Repository
 
 ```bash
-git clone https://github.com/your-org/layercake.git
-cd layercake
+git clone https://github.com/your-org/fuzzyllama.git
+cd fuzzyllama
 ```
 
 ### 3. Configure Environment
@@ -163,10 +163,10 @@ FRONTEND_URL=https://your-domain.com
 BACKEND_URL=https://api.your-domain.com
 
 # Database
-DATABASE_URL=postgresql://layercake:STRONG_PASSWORD@postgres:5432/layercake
-POSTGRES_USER=layercake
+DATABASE_URL=postgresql://fuzzyllama:STRONG_PASSWORD@postgres:5432/fuzzyllama
+POSTGRES_USER=fuzzyllama
 POSTGRES_PASSWORD=STRONG_PASSWORD
-POSTGRES_DB=layercake
+POSTGRES_DB=fuzzyllama
 
 # Redis
 REDIS_HOST=redis
@@ -189,7 +189,7 @@ GITHUB_CALLBACK_URL=https://your-domain.com/auth/github/callback
 R2_ACCOUNT_ID=your-account-id
 R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
-R2_BUCKET=layercake-production
+R2_BUCKET=fuzzyllama-production
 
 # Sentry (Error Tracking)
 SENTRY_DSN=https://your-key@o123456.ingest.sentry.io/7890123
@@ -242,7 +242,7 @@ docker-compose logs -f worker
 ### 7. Setup Nginx Reverse Proxy
 
 ```nginx
-# /etc/nginx/sites-available/layercake
+# /etc/nginx/sites-available/fuzzyllama
 server {
     listen 80;
     server_name your-domain.com;
@@ -287,7 +287,7 @@ server {
 Enable and reload:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/layercake /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/fuzzyllama /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -399,9 +399,9 @@ Once deployed, access monitoring tools:
    - Configuration → Data Sources → Tempo (should be auto-configured)
 3. Import dashboards:
    - Dashboards → Browse → Should see 3 dashboards:
-     - LayerCake Overview
-     - LayerCake Agents
-     - LayerCake Gates & Workflows
+     - FuzzyLlama Overview
+     - FuzzyLlama Agents
+     - FuzzyLlama Gates & Workflows
 
 ### Configure Alerts
 
@@ -421,11 +421,11 @@ Create `docker/prometheus/alerts.yml`:
 
 ```yaml
 groups:
-  - name: layercake
+  - name: fuzzyllama
     interval: 30s
     rules:
       - alert: HighErrorRate
-        expr: sum(rate(layercake_errors_total[5m])) > 0.05
+        expr: sum(rate(fuzzyllama_errors_total[5m])) > 0.05
         for: 5m
         labels:
           severity: warning
@@ -433,7 +433,7 @@ groups:
           summary: "High error rate detected"
 
       - alert: AgentFailureRate
-        expr: sum(layercake_agent_execution_total{status="failed"}) / sum(layercake_agent_execution_total) > 0.1
+        expr: sum(fuzzyllama_agent_execution_total{status="failed"}) / sum(fuzzyllama_agent_execution_total) > 0.1
         for: 10m
         labels:
           severity: critical
@@ -441,7 +441,7 @@ groups:
           summary: "Agent failure rate above 10%"
 
       - alert: HighQueueDepth
-        expr: layercake_queue_depth{status="waiting"} > 50
+        expr: fuzzyllama_queue_depth{status="waiting"} > 50
         for: 15m
         labels:
           severity: warning
@@ -585,17 +585,17 @@ curl -X POST http://localhost:4318/v1/traces \
 
 ```bash
 # Backup
-docker-compose exec postgres pg_dump -U layercake layercake > backup.sql
+docker-compose exec postgres pg_dump -U fuzzyllama fuzzyllama > backup.sql
 
 # Restore
-docker-compose exec -T postgres psql -U layercake layercake < backup.sql
+docker-compose exec -T postgres psql -U fuzzyllama fuzzyllama < backup.sql
 ```
 
 ### Automated Backups
 
 ```bash
 # Add to crontab
-0 2 * * * docker-compose exec postgres pg_dump -U layercake layercake | gzip > /backups/layercake-$(date +\%Y\%m\%d).sql.gz
+0 2 * * * docker-compose exec postgres pg_dump -U fuzzyllama fuzzyllama | gzip > /backups/fuzzyllama-$(date +\%Y\%m\%d).sql.gz
 ```
 
 ---
@@ -631,7 +631,7 @@ services:
 
 ```bash
 # .env
-DATABASE_URL=postgresql://user:pass@postgres:5432/layercake?connection_limit=20
+DATABASE_URL=postgresql://user:pass@postgres:5432/fuzzyllama?connection_limit=20
 ```
 
 ### Redis Cluster (High Availability)
@@ -642,10 +642,10 @@ For production at scale, consider Redis Sentinel or Redis Cluster.
 
 ## Support
 
-- **Documentation:** https://docs.layercake.dev
-- **GitHub Issues:** https://github.com/your-org/layercake/issues
-- **Discord:** https://discord.gg/layercake
-- **Email:** support@layercake.dev
+- **Documentation:** https://docs.fuzzyllama.dev
+- **GitHub Issues:** https://github.com/your-org/fuzzyllama/issues
+- **Discord:** https://discord.gg/fuzzyllama
+- **Email:** support@fuzzyllama.dev
 
 ---
 

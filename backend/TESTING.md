@@ -1,4 +1,4 @@
-# LayerCake Backend Testing Guide
+# FuzzyLlama Backend Testing Guide
 
 **Date**: 2026-01-09
 **Coverage Target**: >80% for critical paths
@@ -165,7 +165,7 @@ npm run test -- agent-workflow.integration.spec
 
 ```bash
 # Set up test database
-export DATABASE_URL="postgresql://test:test@localhost:5432/layercake_test"
+export DATABASE_URL="postgresql://test:test@localhost:5432/fuzzyllama_test"
 
 # Run all E2E tests
 npm run test:e2e
@@ -192,10 +192,10 @@ open coverage/lcov-report/index.html
 
 ```bash
 # Create test database
-createdb layercake_test
+createdb fuzzyllama_test
 
 # Set environment variable
-export DATABASE_URL="postgresql://user:pass@localhost:5432/layercake_test"
+export DATABASE_URL="postgresql://user:pass@localhost:5432/fuzzyllama_test"
 
 # Run migrations
 npx prisma migrate deploy
@@ -209,14 +209,14 @@ npm run test:e2e
 ```bash
 # Start PostgreSQL container
 docker run -d \
-  --name layercake-test-db \
+  --name fuzzyllama-test-db \
   -e POSTGRES_PASSWORD=test \
-  -e POSTGRES_DB=layercake_test \
+  -e POSTGRES_DB=fuzzyllama_test \
   -p 5433:5432 \
   postgres:14
 
 # Set environment variable
-export DATABASE_URL="postgresql://postgres:test@localhost:5433/layercake_test"
+export DATABASE_URL="postgresql://postgres:test@localhost:5433/fuzzyllama_test"
 
 # Run migrations and tests
 npx prisma migrate deploy
@@ -360,7 +360,7 @@ jobs:
         image: postgres:14
         env:
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: layercake_test
+          POSTGRES_DB: fuzzyllama_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -382,7 +382,7 @@ jobs:
 
       - name: Run migrations
         env:
-          DATABASE_URL: postgresql://postgres:test@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fuzzyllama_test
         run: npx prisma migrate deploy
 
       - name: Run unit tests
@@ -390,12 +390,12 @@ jobs:
 
       - name: Run integration tests
         env:
-          DATABASE_URL: postgresql://postgres:test@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fuzzyllama_test
         run: npm run test:integration
 
       - name: Run E2E tests
         env:
-          DATABASE_URL: postgresql://postgres:test@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fuzzyllama_test
         run: npm run test:e2e
 
       - name: Upload coverage

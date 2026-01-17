@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive automated testing implementation for LayerCake MVP covering backend unit tests, integration tests, and frontend component tests.
+Comprehensive automated testing implementation for FuzzyLlama MVP covering backend unit tests, integration tests, and frontend component tests.
 
 **Date:** 2026-01-09
 **Coverage Target:** >80% for both backend and frontend

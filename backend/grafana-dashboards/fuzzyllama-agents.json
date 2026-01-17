@@ -1,7 +1,7 @@
 {
   "dashboard": {
-    "title": "LayerCake Agents",
-    "tags": ["layercake", "agents"],
+    "title": "FuzzyLlama Agents",
+    "tags": ["fuzzyllama", "agents"],
     "timezone": "browser",
     "panels": [
       {
@@ -10,12 +10,12 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "sum(rate(layercake_agent_execution_total{status=\"success\"}[5m])) by (agent_type)",
+            "expr": "sum(rate(fuzzyllama_agent_execution_total{status=\"success\"}[5m])) by (agent_type)",
             "refId": "A",
             "legendFormat": "{{agent_type}} - Success"
           },
           {
-            "expr": "sum(rate(layercake_agent_execution_total{status=\"failed\"}[5m])) by (agent_type)",
+            "expr": "sum(rate(fuzzyllama_agent_execution_total{status=\"failed\"}[5m])) by (agent_type)",
             "refId": "B",
             "legendFormat": "{{agent_type}} - Failed"
           }
@@ -28,7 +28,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum(rate(layercake_agent_execution_duration_seconds_bucket[5m])) by (le, model))",
+            "expr": "histogram_quantile(0.95, sum(rate(fuzzyllama_agent_execution_duration_seconds_bucket[5m])) by (le, model))",
             "refId": "A",
             "legendFormat": "{{model}} (p95)"
           }
@@ -46,12 +46,12 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "sum(rate(layercake_agent_tokens_used_total{token_type=\"input\"}[5m])) by (agent_type)",
+            "expr": "sum(rate(fuzzyllama_agent_tokens_used_total{token_type=\"input\"}[5m])) by (agent_type)",
             "refId": "A",
             "legendFormat": "{{agent_type}} - Input"
           },
           {
-            "expr": "sum(rate(layercake_agent_tokens_used_total{token_type=\"output\"}[5m])) by (agent_type)",
+            "expr": "sum(rate(fuzzyllama_agent_tokens_used_total{token_type=\"output\"}[5m])) by (agent_type)",
             "refId": "B",
             "legendFormat": "{{agent_type}} - Output"
           }
@@ -64,7 +64,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "sum(rate(layercake_agent_cost_usd_total[5m])) by (agent_type)",
+            "expr": "sum(rate(fuzzyllama_agent_cost_usd_total[5m])) by (agent_type)",
             "refId": "A",
             "legendFormat": "{{agent_type}}"
           }
@@ -82,7 +82,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "sum(rate(layercake_agent_cost_usd_total[5m])) by (model)",
+            "expr": "sum(rate(fuzzyllama_agent_cost_usd_total[5m])) by (model)",
             "refId": "A",
             "legendFormat": "{{model}}"
           }

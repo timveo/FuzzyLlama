@@ -2,7 +2,7 @@
 
 ## Overview
 
-LayerCake MVP is now production-ready with all CRITICAL and HIGH priority issues resolved.
+FuzzyLlama MVP is now production-ready with all CRITICAL and HIGH priority issues resolved.
 
 **Date:** 2026-01-09
 **Status:** ✅ **100% Production Ready** (All CRITICAL + HIGH Priority Items Complete)
@@ -535,7 +535,7 @@ NODE_ENV=production
 PORT=3000
 
 # Database
-DATABASE_URL=postgresql://user:password@host:5432/layercake?schema=public
+DATABASE_URL=postgresql://user:password@host:5432/fuzzyllama?schema=public
 
 # Redis
 REDIS_HOST=redis-host.railway.app
@@ -547,7 +547,7 @@ JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 JWT_EXPIRATION=7d
 
 # Frontend
-FRONTEND_URL=https://layercake.app
+FRONTEND_URL=https://fuzzyllama.app
 
 # AI Providers
 OPENAI_API_KEY=sk-...
@@ -561,7 +561,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
 S3_ENDPOINT=https://...r2.cloudflarestorage.com
 S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
-S3_BUCKET=layercake-artifacts
+S3_BUCKET=fuzzyllama-artifacts
 ```
 
 ---
@@ -611,7 +611,7 @@ If production deployment fails:
 
 3. **Verify Health**
    ```bash
-   curl https://api.layercake.app/health
+   curl https://api.fuzzyllama.app/health
    ```
 
 4. **Investigate**

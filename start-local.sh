@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# LayerCake Local Development Startup Script
+# FuzzyLlama Local Development Startup Script
 
 set -e
 
-echo "🎂 Starting LayerCake Local Development Environment..."
+echo "🎂 Starting FuzzyLlama Local Development Environment..."
 echo ""
 
 # Colors for output
@@ -64,8 +64,8 @@ echo -e "${GREEN}✓ Redis is running${NC}"
 
 # Create database if it doesn't exist
 echo -e "${BLUE}Setting up database...${NC}"
-psql -h localhost -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'layercake_dev'" | grep -q 1 || \
-    psql -h localhost -U postgres -c "CREATE DATABASE layercake_dev;" && \
+psql -h localhost -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'fuzzyllama_dev'" | grep -q 1 || \
+    psql -h localhost -U postgres -c "CREATE DATABASE fuzzyllama_dev;" && \
     echo -e "${GREEN}✓ Database created${NC}" || \
     echo -e "${GREEN}✓ Database already exists${NC}"
 
@@ -102,7 +102,7 @@ echo -e "${GREEN}✓ Frontend setup complete${NC}"
 cd ..
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}🚀 Starting LayerCake Services...${NC}"
+echo -e "${GREEN}🚀 Starting FuzzyLlama Services...${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
@@ -146,7 +146,7 @@ fi
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}✅ LayerCake is running!${NC}"
+echo -e "${GREEN}✅ FuzzyLlama is running!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}📱 Frontend:${NC}  http://localhost:5173"

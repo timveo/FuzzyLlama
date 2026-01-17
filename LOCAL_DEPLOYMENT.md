@@ -1,8 +1,8 @@
-# LayerCake Local Deployment Guide
+# FuzzyLlama Local Deployment Guide
 
 ## Quick Start (Automated)
 
-The easiest way to run LayerCake locally:
+The easiest way to run FuzzyLlama locally:
 
 ```bash
 # Make sure you have PostgreSQL and Redis running, then:
@@ -38,7 +38,7 @@ brew services start postgresql@14
 
 # Or using Docker
 docker run -d \
-  --name layercake-postgres \
+  --name fuzzyllama-postgres \
   -p 5432:5432 \
   -e POSTGRES_PASSWORD=postgres \
   postgres:14
@@ -52,7 +52,7 @@ brew services start redis
 
 # Or using Docker
 docker run -d \
-  --name layercake-redis \
+  --name fuzzyllama-redis \
   -p 6379:6379 \
   redis:7-alpine
 ```
@@ -70,11 +70,11 @@ brew install node@18
 
 ```bash
 # Create database
-psql -h localhost -U postgres -c "CREATE DATABASE layercake_dev;"
+psql -h localhost -U postgres -c "CREATE DATABASE fuzzyllama_dev;"
 
 # Or if you need to reset:
-psql -h localhost -U postgres -c "DROP DATABASE layercake_dev;"
-psql -h localhost -U postgres -c "CREATE DATABASE layercake_dev;"
+psql -h localhost -U postgres -c "DROP DATABASE fuzzyllama_dev;"
+psql -h localhost -U postgres -c "CREATE DATABASE fuzzyllama_dev;"
 ```
 
 ### Backend Setup
@@ -123,7 +123,7 @@ Already created with sensible defaults. Key variables:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/layercake_dev
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fuzzyllama_dev
 
 # Redis
 REDIS_HOST=localhost
@@ -169,7 +169,7 @@ After logging in, you'll see:
 
 ### Dashboard Versions
 
-LayerCake has 3 different dashboard UI options to choose from:
+FuzzyLlama has 3 different dashboard UI options to choose from:
 
 1. **Mission Control** (V1): Dark, technical, developer-focused
    - http://localhost:5173/dashboard/mission-control

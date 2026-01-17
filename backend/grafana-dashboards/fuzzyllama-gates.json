@@ -1,7 +1,7 @@
 {
   "dashboard": {
-    "title": "LayerCake Gates & Workflows",
-    "tags": ["layercake", "gates", "workflows"],
+    "title": "FuzzyLlama Gates & Workflows",
+    "tags": ["fuzzyllama", "gates", "workflows"],
     "timezone": "browser",
     "panels": [
       {
@@ -10,7 +10,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "sum(rate(layercake_gate_transitions_total[5m])) by (to_gate)",
+            "expr": "sum(rate(fuzzyllama_gate_transitions_total[5m])) by (to_gate)",
             "refId": "A",
             "legendFormat": "{{to_gate}}"
           }
@@ -23,7 +23,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum(rate(layercake_gate_approval_duration_seconds_bucket[5m])) by (le, gate_type))",
+            "expr": "histogram_quantile(0.95, sum(rate(fuzzyllama_gate_approval_duration_seconds_bucket[5m])) by (le, gate_type))",
             "refId": "A",
             "legendFormat": "{{gate_type}} (p95)"
           }
@@ -41,7 +41,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "layercake_current_gate_status",
+            "expr": "fuzzyllama_current_gate_status",
             "refId": "A",
             "legendFormat": "{{gate_type}} - {{project_id}}"
           }
@@ -63,7 +63,7 @@
         "type": "gauge",
         "targets": [
           {
-            "expr": "sum(layercake_build_executions_total{status=\"success\"}) / sum(layercake_build_executions_total) * 100",
+            "expr": "sum(fuzzyllama_build_executions_total{status=\"success\"}) / sum(fuzzyllama_build_executions_total) * 100",
             "refId": "A"
           }
         ],
@@ -88,7 +88,7 @@
         "type": "gauge",
         "targets": [
           {
-            "expr": "avg(layercake_test_coverage_percentage)",
+            "expr": "avg(fuzzyllama_test_coverage_percentage)",
             "refId": "A"
           }
         ],
@@ -113,7 +113,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum(rate(layercake_build_duration_seconds_bucket[5m])) by (le, stage))",
+            "expr": "histogram_quantile(0.95, sum(rate(fuzzyllama_build_duration_seconds_bucket[5m])) by (le, stage))",
             "refId": "A",
             "legendFormat": "{{stage}} (p95)"
           }

@@ -1,6 +1,6 @@
-# LayerCake Architecture - Complete Implementation
+# FuzzyLlama Architecture - Complete Implementation
 
-This document describes the **complete** LayerCake architecture as implemented. All 17 recommended architectural improvements have been integrated.
+This document describes the **complete** FuzzyLlama architecture as implemented. All 17 recommended architectural improvements have been integrated.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ This document describes the **complete** LayerCake architecture as implemented. 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    LayerCake Platform                       │
+│                    FuzzyLlama Platform                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
@@ -61,7 +61,7 @@ This document describes the **complete** LayerCake architecture as implemented. 
 
 ### Overview
 
-LayerCake uses a **hybrid architecture** that combines the best of both worlds:
+FuzzyLlama uses a **hybrid architecture** that combines the best of both worlds:
 
 - **PostgreSQL** as the **source of truth** for queryable, relational data
 - **Markdown files** (via StateSyncService) for human-readable state that Claude Code can access via MCP
@@ -106,7 +106,7 @@ const status = await mcp.callTool('read_status', { projectId });
 
 ### Overview
 
-LayerCake uses **event sourcing** to maintain a complete audit trail of all actions:
+FuzzyLlama uses **event sourcing** to maintain a complete audit trail of all actions:
 
 - **ProjectEvent** table stores immutable events (append-only log)
 - **Projections** transform events into read models
@@ -158,7 +158,7 @@ await stateSyncService.syncProjectToMarkdown(projectId);
 
 ### Overview
 
-LayerCake uses a **4-tier priority queue** with **variable concurrency** to ensure critical work never blocks:
+FuzzyLlama uses a **4-tier priority queue** with **variable concurrency** to ensure critical work never blocks:
 
 | Priority | Agents | Concurrency | Use Cases |
 |----------|--------|-------------|-----------|
@@ -214,7 +214,7 @@ async processHigh(job: Job<AgentJob>) {
 
 ### Overview
 
-LayerCake uses **pgvector** + **OpenAI embeddings** for semantic code search:
+FuzzyLlama uses **pgvector** + **OpenAI embeddings** for semantic code search:
 
 - Generate vector embeddings for all code files
 - Store in PostgreSQL with pgvector extension
@@ -262,7 +262,7 @@ const response = await claude.generate(prompt + context);
 
 ### Overview
 
-LayerCake has **production-grade observability** with three pillars:
+FuzzyLlama has **production-grade observability** with three pillars:
 
 1. **Distributed Tracing** (OpenTelemetry + Tempo)
 2. **Error Tracking** (Sentry)
@@ -285,9 +285,9 @@ LayerCake has **production-grade observability** with three pillars:
          ↓                             ↓
 ┌─────────────────────────────────────────────┐
 │               Grafana Dashboards            │
-│  • layercake-overview.json                 │
-│  • layercake-agents.json                   │
-│  • layercake-gates.json                    │
+│  • fuzzyllama-overview.json                 │
+│  • fuzzyllama-agents.json                   │
+│  • fuzzyllama-gates.json                    │
 └─────────────────────────────────────────────┘
 ```
 
@@ -430,7 +430,7 @@ See [.env.example](.env.example) for full list. Key variables:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://user:pass@postgres:5432/layercake
+DATABASE_URL=postgresql://user:pass@postgres:5432/fuzzyllama
 
 # AI Providers
 ANTHROPIC_API_KEY=sk-ant-...

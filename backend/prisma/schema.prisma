@@ -1,4 +1,4 @@
-// LayerCake Database Schema
+// FuzzyLlama Database Schema
 // Migrated from MCP Server SQLite to PostgreSQL
 
 generator client {

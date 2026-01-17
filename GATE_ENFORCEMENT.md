@@ -1,6 +1,6 @@
 # Gate Approval Enforcement Rules
 
-This document describes all validation rules enforced before a gate can be approved in the LayerCake MVP system.
+This document describes all validation rules enforced before a gate can be approved in the FuzzyLlama MVP system.
 
 ---
 
@@ -395,7 +395,7 @@ describe('Gate Approval with Deliverables', () => {
 
 ## Related Documentation
 
-- [WORKFLOW_IMPLEMENTATION.md](file:///Users/tsm/Desktop/Development/LayerCake/WORKFLOW_IMPLEMENTATION.md) - Complete G0-G9 workflow
-- [PARITY_COMPLETE_STATUS.md](file:///Users/tsm/Desktop/Development/LayerCake/PARITY_COMPLETE_STATUS.md) - Feature parity analysis
-- [backend/src/gates/services/gate-state-machine.service.ts](file:///Users/tsm/Desktop/Development/LayerCake/backend/src/gates/services/gate-state-machine.service.ts) - Implementation
-- [backend/src/deliverables/deliverables.service.ts](file:///Users/tsm/Desktop/Development/LayerCake/backend/src/deliverables/deliverables.service.ts) - Deliverables API
+- [WORKFLOW_IMPLEMENTATION.md](file:///Users/tsm/Desktop/Development/FuzzyLlama/WORKFLOW_IMPLEMENTATION.md) - Complete G0-G9 workflow
+- [PARITY_COMPLETE_STATUS.md](file:///Users/tsm/Desktop/Development/FuzzyLlama/PARITY_COMPLETE_STATUS.md) - Feature parity analysis
+- [backend/src/gates/services/gate-state-machine.service.ts](file:///Users/tsm/Desktop/Development/FuzzyLlama/backend/src/gates/services/gate-state-machine.service.ts) - Implementation
+- [backend/src/deliverables/deliverables.service.ts](file:///Users/tsm/Desktop/Development/FuzzyLlama/backend/src/deliverables/deliverables.service.ts) - Deliverables API

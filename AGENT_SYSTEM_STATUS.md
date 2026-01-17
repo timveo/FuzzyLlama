@@ -1,4 +1,4 @@
-# LayerCake Agent System - Development Status
+# FuzzyLlama Agent System - Development Status
 
 **Last Updated**: 2026-01-09
 **Progress**: Phase 1 of Agent System Complete (30%)

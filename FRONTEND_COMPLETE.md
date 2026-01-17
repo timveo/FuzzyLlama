@@ -1,6 +1,6 @@
-# LayerCake Frontend - Implementation Complete ✅
+# FuzzyLlama Frontend - Implementation Complete ✅
 
-All core frontend components have been built for the LayerCake MVP. The frontend is now **95% complete** and ready for integration testing.
+All core frontend components have been built for the FuzzyLlama MVP. The frontend is now **95% complete** and ready for integration testing.
 
 ---
 
@@ -656,7 +656,7 @@ frontend/src/
 
 ## 🎯 Conclusion
 
-The LayerCake frontend now has **all core components** needed for a successful MVP launch:
+The FuzzyLlama frontend now has **all core components** needed for a successful MVP launch:
 
 ✅ **Gate Flow Visualization** - Beautiful, interactive state machine
 ✅ **Real-time Agent Output** - Terminal with WebSocket streaming

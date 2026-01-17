@@ -3,7 +3,7 @@
 /**
  * MCP Server CLI
  *
- * Starts the LayerCake MCP server for Claude Code integration
+ * Starts the FuzzyLlama MCP server for Claude Code integration
  *
  * Usage:
  *   node dist/mcp/mcp-cli.js
@@ -11,9 +11,9 @@
  * Claude Code Configuration (~/.config/claude/claude_desktop_config.json):
  * {
  *   "mcpServers": {
- *     "layercake": {
+ *     "fuzzyllama": {
  *       "command": "node",
- *       "args": ["/path/to/layercake/backend/dist/mcp/mcp-cli.js"],
+ *       "args": ["/path/to/fuzzyllama/backend/dist/mcp/mcp-cli.js"],
  *       "env": {
  *         "DATABASE_URL": "postgresql://...",
  *         "JWT_SECRET": "..."
@@ -28,7 +28,7 @@ import { AppModule } from '../app.module';
 import { McpServerService } from './mcp-server.service';
 
 async function bootstrap() {
-  console.error('Starting LayerCake MCP Server...');
+  console.error('Starting FuzzyLlama MCP Server...');
 
   // Create NestJS application context (without HTTP server)
   const app = await NestFactory.createApplicationContext(AppModule, {

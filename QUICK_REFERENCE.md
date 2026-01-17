@@ -1,4 +1,4 @@
-# LayerCake - Quick Reference Card
+# FuzzyLlama - Quick Reference Card
 
 ## 🚀 Start Application (3 commands)
 
@@ -26,7 +26,7 @@ docker-compose exec backend npm run prisma:migrate && npm run prisma:seed
 ## 🗂️ Project Structure
 
 ```
-LayerCake/
+FuzzyLlama/
 ├── backend/          # NestJS API (Port 3000)
 ├── frontend/         # React app (Port 80 via Nginx)
 ├── docker/           # Nginx config
@@ -85,7 +85,7 @@ npm test                        # Run tests
 
 **Access**:
 ```bash
-docker-compose exec postgres psql -U layercake -d layercake
+docker-compose exec postgres psql -U fuzzyllama -d fuzzyllama
 ```
 
 **GUI**:
@@ -154,4 +154,4 @@ npm run prisma:generate
 
 ---
 
-**Test Login**: test@layercake.dev / password123 (after seeding)
+**Test Login**: test@fuzzyllama.dev / password123 (after seeding)

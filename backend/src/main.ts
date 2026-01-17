@@ -74,8 +74,8 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('LayerCake API')
-    .setDescription('LayerCake multi-agent application builder API')
+    .setTitle('FuzzyLlama API')
+    .setDescription('FuzzyLlama multi-agent application builder API')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

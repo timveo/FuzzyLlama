@@ -433,7 +433,7 @@ JWT_SECRET=your-secret-key-here-change-in-production
 JWT_EXPIRATION=7d
 
 # Database (already configured)
-DATABASE_URL=postgresql://layercake:password@postgres:5432/layercake
+DATABASE_URL=postgresql://fuzzyllama:password@postgres:5432/fuzzyllama
 ```
 
 ---

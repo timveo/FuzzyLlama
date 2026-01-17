@@ -1,8 +1,8 @@
-# LayerCake MVP - Complete Workflow Implementation
+# FuzzyLlama MVP - Complete Workflow Implementation
 
 ## Overview
 
-The LayerCake backend now has a **complete end-to-end G0-G9 workflow system** that orchestrates 14 AI agents through a gated software development lifecycle.
+The FuzzyLlama backend now has a **complete end-to-end G0-G9 workflow system** that orchestrates 14 AI agents through a gated software development lifecycle.
 
 ## System Architecture
 
@@ -605,7 +605,7 @@ curl http://localhost:3000/api/documents?projectId=$PROJECT \
 
 ## Conclusion
 
-The LayerCake MVP backend is now **feature-complete** for the core G0-G9 workflow. The system can:
+The FuzzyLlama MVP backend is now **feature-complete** for the core G0-G9 workflow. The system can:
 
 1. ✅ Decompose requirements into agent tasks
 2. ✅ Execute 14 different AI agents

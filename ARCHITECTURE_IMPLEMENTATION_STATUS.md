@@ -1,4 +1,4 @@
-# LayerCake Architecture Implementation Status
+# FuzzyLlama Architecture Implementation Status
 
 **Date**: 2026-01-09
 **Status**: Phase 1 Complete (7 of 17 tasks)
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Successfully implemented the **3 critical architectural changes** plus **vector search** to transform LayerCake into a state-of-the-art AI-powered development platform compatible with Multi-Agent-Product-Creator framework.
+Successfully implemented the **3 critical architectural changes** plus **vector search** to transform FuzzyLlama into a state-of-the-art AI-powered development platform compatible with Multi-Agent-Product-Creator framework.
 
 ### Completed (7 tasks) ✅
 
@@ -134,7 +134,7 @@ const pastState = await eventStore.getStateAtTimestamp(projectId, timestamp);
 ```json
 {
   "mcpServers": {
-    "layercake": {
+    "fuzzyllama": {
       "command": "node",
       "args": ["/path/to/backend/dist/mcp/mcp-cli.js"],
       "env": {
@@ -202,7 +202,7 @@ const context = await embeddingService.getAgentContext(
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     LayerCake Architecture v2.0                 │
+│                     FuzzyLlama Architecture v2.0                 │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -251,7 +251,7 @@ const context = await embeddingService.getAgentContext(
 ┌─────────────────────────────────────────────────────────────────┐
 │                       MCP Integration                           │
 │                                                                 │
-│  Claude Code ──stdio──► MCP Server ──► LayerCake API           │
+│  Claude Code ──stdio──► MCP Server ──► FuzzyLlama API           │
 │                         (160+ tools)                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -302,7 +302,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 5. **McpToolsService** - `backend/src/mcp/mcp-tools.service.ts`
    - 600 lines
    - 160+ tool implementations
-   - Bridge to LayerCake services
+   - Bridge to FuzzyLlama services
 
 6. **EmbeddingService** - `backend/src/embeddings/embedding.service.ts`
    - 350 lines
@@ -349,10 +349,10 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ### From Multi-Agent-Product-Creator
 
-1. **Install LayerCake**:
+1. **Install FuzzyLlama**:
    ```bash
-   git clone https://github.com/your-org/layercake
-   cd layercake/backend
+   git clone https://github.com/your-org/fuzzyllama
+   cd fuzzyllama/backend
    npm install
    npm run build
    ```
@@ -360,7 +360,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 2. **Configure Database**:
    ```bash
    # Create database
-   createdb layercake
+   createdb fuzzyllama
 
    # Run migrations
    npx prisma migrate deploy
@@ -377,11 +377,11 @@ CREATE EXTENSION IF NOT EXISTS vector;
    // ~/.config/claude/claude_desktop_config.json
    {
      "mcpServers": {
-       "layercake": {
+       "fuzzyllama": {
          "command": "node",
-         "args": ["/path/to/layercake/backend/dist/mcp/mcp-cli.js"],
+         "args": ["/path/to/fuzzyllama/backend/dist/mcp/mcp-cli.js"],
          "env": {
-           "DATABASE_URL": "postgresql://localhost/layercake"
+           "DATABASE_URL": "postgresql://localhost/fuzzyllama"
          }
        }
      }
@@ -393,7 +393,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
    # Test MCP connection
    claude-code
 
-   # Should see: ✓ Connected to LayerCake (160+ tools)
+   # Should see: ✓ Connected to FuzzyLlama (160+ tools)
    ```
 
 ---
@@ -540,7 +540,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 **Phase 1 Complete**: 7 of 17 tasks ✅
 
-Successfully implemented the **3 critical architectural changes** that transform LayerCake into a state-of-the-art platform:
+Successfully implemented the **3 critical architectural changes** that transform FuzzyLlama into a state-of-the-art platform:
 
 1. ✅ **Hybrid MCP + Database** - Best of both worlds
 2. ✅ **Event Sourcing** - Complete audit trail + time travel

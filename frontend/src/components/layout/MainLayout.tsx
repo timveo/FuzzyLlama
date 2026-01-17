@@ -34,7 +34,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 <span className="text-lg">🎂</span>
               </div>
               <span className="font-bold text-lg text-light-text-primary dark:text-dark-text-primary">
-                LayerCake
+                FuzzyLlama
               </span>
             </Link>
 

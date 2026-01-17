@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# LayerCake Local Development Stop Script
+# FuzzyLlama Local Development Stop Script
 
-echo "🛑 Stopping LayerCake services..."
+echo "🛑 Stopping FuzzyLlama services..."
 
 # Kill processes by PID files
 if [ -f .backend.pid ]; then

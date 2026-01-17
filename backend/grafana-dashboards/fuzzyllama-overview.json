@@ -1,7 +1,7 @@
 {
   "dashboard": {
-    "title": "LayerCake Overview",
-    "tags": ["layercake", "overview"],
+    "title": "FuzzyLlama Overview",
+    "tags": ["fuzzyllama", "overview"],
     "timezone": "browser",
     "panels": [
       {
@@ -10,7 +10,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "sum(layercake_agent_execution_total)",
+            "expr": "sum(fuzzyllama_agent_execution_total)",
             "refId": "A"
           }
         ],
@@ -22,7 +22,7 @@
         "type": "gauge",
         "targets": [
           {
-            "expr": "sum(layercake_agent_execution_total{status=\"success\"}) / sum(layercake_agent_execution_total) * 100",
+            "expr": "sum(fuzzyllama_agent_execution_total{status=\"success\"}) / sum(fuzzyllama_agent_execution_total) * 100",
             "refId": "A"
           }
         ],
@@ -47,7 +47,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "sum(layercake_agent_cost_usd_total)",
+            "expr": "sum(fuzzyllama_agent_cost_usd_total)",
             "refId": "A"
           }
         ],
@@ -65,7 +65,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "sum(layercake_agent_tokens_used_total)",
+            "expr": "sum(fuzzyllama_agent_tokens_used_total)",
             "refId": "A"
           }
         ],
@@ -77,7 +77,7 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum(rate(layercake_agent_execution_duration_seconds_bucket[5m])) by (le, agent_type))",
+            "expr": "histogram_quantile(0.95, sum(rate(fuzzyllama_agent_execution_duration_seconds_bucket[5m])) by (le, agent_type))",
             "refId": "A",
             "legendFormat": "{{agent_type}}"
           }
@@ -90,7 +90,7 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "layercake_queue_depth",
+            "expr": "fuzzyllama_queue_depth",
             "refId": "A",
             "legendFormat": "{{priority}} - {{status}}"
           }
@@ -103,7 +103,7 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "sum(rate(layercake_agent_execution_total[5m])) by (agent_type)",
+            "expr": "sum(rate(fuzzyllama_agent_execution_total[5m])) by (agent_type)",
             "refId": "A",
             "legendFormat": "{{agent_type}}"
           }
@@ -116,7 +116,7 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "sum(rate(layercake_errors_total[5m])) by (error_type)",
+            "expr": "sum(rate(fuzzyllama_errors_total[5m])) by (error_type)",
             "refId": "A",
             "legendFormat": "{{error_type}}"
           }

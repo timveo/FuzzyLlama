@@ -1,22 +1,22 @@
-# LayerCake Grafana Dashboards
+# FuzzyLlama Grafana Dashboards
 
-This directory contains pre-configured Grafana dashboards for monitoring LayerCake.
+This directory contains pre-configured Grafana dashboards for monitoring FuzzyLlama.
 
 ## Dashboards
 
-1. **layercake-overview.json** - High-level system overview
+1. **fuzzyllama-overview.json** - High-level system overview
    - Agent execution totals and success rates
    - Total cost and token usage
    - Queue depth by priority
    - Error rates
 
-2. **layercake-agents.json** - Detailed agent metrics
+2. **fuzzyllama-agents.json** - Detailed agent metrics
    - Success/failure rates by agent type
    - Execution duration by model
    - Token usage breakdown
    - Cost analysis by agent and model
 
-3. **layercake-gates.json** - Gate workflow metrics
+3. **fuzzyllama-gates.json** - Gate workflow metrics
    - Gate transitions over time
    - Approval duration
    - Build success rates
@@ -59,7 +59,7 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'layercake'
+  - job_name: 'fuzzyllama'
     static_configs:
       - targets: ['backend:3000']
     metrics_path: '/metrics'
@@ -80,34 +80,34 @@ Place dashboard JSONs in Grafana's provisioning directory (already configured in
 ## Metrics Reference
 
 ### Agent Metrics
-- `layercake_agent_execution_total` - Total executions by agent type and status
-- `layercake_agent_execution_duration_seconds` - Execution duration histogram
-- `layercake_agent_tokens_used_total` - Token usage by type (input/output)
-- `layercake_agent_cost_usd_total` - Cost in USD
+- `fuzzyllama_agent_execution_total` - Total executions by agent type and status
+- `fuzzyllama_agent_execution_duration_seconds` - Execution duration histogram
+- `fuzzyllama_agent_tokens_used_total` - Token usage by type (input/output)
+- `fuzzyllama_agent_cost_usd_total` - Cost in USD
 
 ### Gate Metrics
-- `layercake_gate_transitions_total` - Gate transitions
-- `layercake_gate_approval_duration_seconds` - Time to approve gates
-- `layercake_current_gate_status` - Current gate status (0=pending, 1=approved, 2=rejected)
+- `fuzzyllama_gate_transitions_total` - Gate transitions
+- `fuzzyllama_gate_approval_duration_seconds` - Time to approve gates
+- `fuzzyllama_current_gate_status` - Current gate status (0=pending, 1=approved, 2=rejected)
 
 ### Build Metrics
-- `layercake_build_executions_total` - Build executions by status
-- `layercake_build_duration_seconds` - Build duration by stage
-- `layercake_test_coverage_percentage` - Test coverage percentage
+- `fuzzyllama_build_executions_total` - Build executions by status
+- `fuzzyllama_build_duration_seconds` - Build duration by stage
+- `fuzzyllama_test_coverage_percentage` - Test coverage percentage
 
 ### Queue Metrics
-- `layercake_queue_depth` - Queue depth by priority and status
-- `layercake_queue_processing_duration_seconds` - Queue processing time
+- `fuzzyllama_queue_depth` - Queue depth by priority and status
+- `fuzzyllama_queue_processing_duration_seconds` - Queue processing time
 
 ### Code Generation Metrics
-- `layercake_files_generated_total` - Total files generated
-- `layercake_lines_generated_total` - Total lines of code generated
+- `fuzzyllama_files_generated_total` - Total files generated
+- `fuzzyllama_lines_generated_total` - Total lines of code generated
 
 ### Database Metrics
-- `layercake_db_query_duration_seconds` - Database query duration
+- `fuzzyllama_db_query_duration_seconds` - Database query duration
 
 ### Error Metrics
-- `layercake_errors_total` - Total errors by type and severity
+- `fuzzyllama_errors_total` - Total errors by type and severity
 
 ## Alerts (TODO)
 

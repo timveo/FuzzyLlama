@@ -1,5 +1,5 @@
 /**
- * MCP Tool Definitions for LayerCake
+ * MCP Tool Definitions for FuzzyLlama
  * Compatible with Multi-Agent-Product-Creator framework
  *
  * Provides 160+ tools organized by category

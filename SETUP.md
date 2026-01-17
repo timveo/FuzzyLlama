@@ -1,6 +1,6 @@
-# LayerCake MVP - Setup Guide
+# FuzzyLlama MVP - Setup Guide
 
-This guide will help you set up and run the LayerCake web application locally.
+This guide will help you set up and run the FuzzyLlama web application locally.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ This guide will help you set up and run the LayerCake web application locally.
 ## Project Structure
 
 ```
-LayerCake/
+FuzzyLlama/
 ├── backend/              # NestJS API
 │   ├── src/             # Source code
 │   ├── prisma/          # Database schema & migrations
@@ -37,7 +37,7 @@ LayerCake/
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd LayerCake
+cd FuzzyLlama
 
 # Copy environment file
 cp .env.example .env
@@ -52,7 +52,7 @@ At minimum, set these in `.env`:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://layercake:your_password_here@postgres:5432/layercake
+DATABASE_URL=postgresql://fuzzyllama:your_password_here@postgres:5432/fuzzyllama
 POSTGRES_PASSWORD=your_password_here
 
 # JWT
@@ -92,7 +92,7 @@ docker-compose exec backend npm run prisma:seed
 
 ### 5. Test Login
 
-- Email: `test@layercake.dev`
+- Email: `test@fuzzyllama.dev`
 - Password: `password123`
 
 ---
@@ -116,15 +116,15 @@ npm install
 **Option A: Using Docker**
 ```bash
 docker run -d \
-  --name layercake-postgres \
-  -e POSTGRES_DB=layercake \
-  -e POSTGRES_USER=layercake \
+  --name fuzzyllama-postgres \
+  -e POSTGRES_DB=fuzzyllama \
+  -e POSTGRES_USER=fuzzyllama \
   -e POSTGRES_PASSWORD=password \
   -p 5432:5432 \
   postgres:16-alpine
 
 docker run -d \
-  --name layercake-redis \
+  --name fuzzyllama-redis \
   -p 6379:6379 \
   redis:7-alpine
 ```
@@ -149,7 +149,7 @@ sudo systemctl start redis
 cp .env.example .env
 
 # Update database URL for local setup
-DATABASE_URL=postgresql://layercake:password@localhost:5432/layercake
+DATABASE_URL=postgresql://fuzzyllama:password@localhost:5432/fuzzyllama
 REDIS_URL=redis://localhost:6379
 ```
 
@@ -343,10 +343,10 @@ kill -9 <PID>
 docker ps | grep postgres
 
 # Check connection
-psql postgresql://layercake:password@localhost:5432/layercake
+psql postgresql://fuzzyllama:password@localhost:5432/fuzzyllama
 
 # View logs
-docker logs layercake-postgres
+docker logs fuzzyllama-postgres
 ```
 
 ### Prisma Client Not Generated

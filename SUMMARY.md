@@ -1,4 +1,4 @@
-# LayerCake MVP - Build Summary
+# FuzzyLlama MVP - Build Summary
 
 ## 🎉 Phase 1 Foundation Complete (50%)
 
@@ -134,7 +134,7 @@
 - UsageMetric
 
 **Seed File:**
-- Creates test user: `test@layercake.dev` / `password123`
+- Creates test user: `test@fuzzyllama.dev` / `password123`
 
 ### 4. Frontend Application (100% Complete)
 
@@ -184,7 +184,7 @@
 ### A Complete Development Environment
 
 ```
-LayerCake/
+FuzzyLlama/
 ├── backend/              ✅ NestJS API ready
 │   ├── src/             ✅ 17 modules structured
 │   ├── prisma/          ✅ Schema + seed file
@@ -271,7 +271,7 @@ docker-compose exec backend npm run prisma:seed
 
 ### Test Login
 
-- **Email**: test@layercake.dev
+- **Email**: test@fuzzyllama.dev
 - **Password**: password123
 
 ---
@@ -389,7 +389,7 @@ docker-compose exec backend npm run prisma:seed
 
 We're not building from scratch. We're transforming:
 
-**From LayerCake Framework:**
+**From FuzzyLlama Framework:**
 - ✅ 14 agent prompts (38KB each) → API templates
 - ✅ MCP server schema (693 lines) → Prisma schema
 - ✅ 25+ document templates → Auto-generated docs
@@ -525,7 +525,7 @@ These will be addressed in upcoming weeks.
 
 ## 🙏 Acknowledgments
 
-Built using the LayerCake framework's existing:
+Built using the FuzzyLlama framework's existing:
 - 14 agent prompts (`agents/`)
 - MCP server schema (`mcp-server/src/schema.ts`)
 - Document templates (`templates/`)

@@ -23,7 +23,7 @@ export const envValidationSchema = Joi.object({
   // Observability
   SENTRY_DSN: Joi.string().uri().optional().allow(''),
   OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string().uri().optional().allow(''),
-  OTEL_SERVICE_NAME: Joi.string().default('layercake'),
+  OTEL_SERVICE_NAME: Joi.string().default('fuzzyllama'),
 
   // Analytics
   POSTHOG_API_KEY: Joi.string().optional().allow(''),

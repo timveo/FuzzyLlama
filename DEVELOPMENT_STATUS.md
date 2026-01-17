@@ -1,4 +1,4 @@
-# LayerCake MVP - Development Status
+# FuzzyLlama MVP - Development Status
 
 **Last Updated:** 2026-01-09
 **Overall Progress:** 65% Complete
@@ -7,7 +7,7 @@
 
 ## 🎯 Project Overview
 
-LayerCake is an AI-powered software development platform featuring a hub-and-spoke multi-agent system with 14 specialized AI agents (Orchestrator, Product Manager, Architect, Frontend/Backend Devs, QA, DevOps, etc.) that collaborate to build software from requirements to deployment.
+FuzzyLlama is an AI-powered software development platform featuring a hub-and-spoke multi-agent system with 14 specialized AI agents (Orchestrator, Product Manager, Architect, Frontend/Backend Devs, QA, DevOps, etc.) that collaborate to build software from requirements to deployment.
 
 **Tech Stack:**
 - **Backend:** NestJS, Prisma, PostgreSQL, Redis, JWT Auth
@@ -343,7 +343,7 @@ LayerCake is an AI-powered software development platform featuring a hub-and-spo
 ## 📁 Project Structure
 
 ```
-LayerCake/
+FuzzyLlama/
 ├── backend/                    ✅ COMPLETE
 │   ├── src/
 │   │   ├── auth/              ✅ JWT auth module
@@ -411,12 +411,12 @@ npm run dev
 brew services start postgresql@14
 
 # Create database
-createdb layercake
+createdb fuzzyllama
 
 # Create user
-psql postgres -c "CREATE USER layercake WITH PASSWORD 'layercake';"
-psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE layercake TO layercake;"
-psql postgres -c "ALTER USER layercake CREATEDB;"
+psql postgres -c "CREATE USER fuzzyllama WITH PASSWORD 'fuzzyllama';"
+psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE fuzzyllama TO fuzzyllama;"
+psql postgres -c "ALTER USER fuzzyllama CREATEDB;"
 ```
 
 ---

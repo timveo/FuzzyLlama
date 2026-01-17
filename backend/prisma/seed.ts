@@ -18,7 +18,7 @@ async function main() {
   console.log('👤 Creating test user...');
   const testUser = await prisma.user.create({
     data: {
-      email: 'test@layercake.dev',
+      email: 'test@fuzzyllama.dev',
       passwordHash: '$2b$10$XjW8.8E5KXrr7T9B9v5dkOq1V1Z9B4Vj4c3X2Q1R0S9W8X7Y6Z5', // "password123"
       name: 'Test User',
       emailVerified: true,

@@ -310,7 +310,7 @@ export default function DashboardV1MissionControl() {
                 </motion.div>
                 <div>
                   <h1 className="text-lg font-bold tracking-tight">MISSION CONTROL</h1>
-                  <p className="text-xs text-dark-text-muted font-mono">LayerCake Command Center</p>
+                  <p className="text-xs text-dark-text-muted font-mono">FuzzyLlama Command Center</p>
                 </div>
               </div>
             </div>

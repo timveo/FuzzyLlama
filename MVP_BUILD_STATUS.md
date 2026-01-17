@@ -1,4 +1,4 @@
-# LayerCake MVP - Build Status
+# FuzzyLlama MVP - Build Status
 
 **Last Updated**: 2026-01-09
 **Status**: Phase 1 Foundation - Backend Complete, Frontend Pending
@@ -171,7 +171,7 @@
 ## 📦 Services Architecture
 
 ```
-LayerCake MVP
+FuzzyLlama MVP
 ├── Nginx (reverse proxy)
 │   ├── / → frontend (static files)
 │   ├── /api/ → backend (REST API)
@@ -444,7 +444,7 @@ npm run prisma:migrate
 ```bash
 cd backend
 npm run prisma:seed
-# Creates test user: test@layercake.dev / password123
+# Creates test user: test@fuzzyllama.dev / password123
 ```
 
 6. **Start Development Stack**
@@ -470,7 +470,7 @@ npm run dev
 - **Backend API**: http://localhost:3000
 - **API Docs**: http://localhost:3000/api/docs
 - **Health Check**: http://localhost:3000/health
-- **PostgreSQL**: localhost:5432 (user: layercake, db: layercake_dev)
+- **PostgreSQL**: localhost:5432 (user: fuzzyllama, db: fuzzyllama_dev)
 
 ### Production Deployment
 ```bash

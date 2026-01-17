@@ -70,7 +70,7 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
 
     // Resource attributes
     const resource = resourceFromAttributes({
-      [SEMRESATTRS_SERVICE_NAME]: 'layercake-backend',
+      [SEMRESATTRS_SERVICE_NAME]: 'fuzzyllama-backend',
       [SEMRESATTRS_SERVICE_VERSION]: '1.0.0',
       [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: this.config.get('NODE_ENV', 'development'),
     });

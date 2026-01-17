@@ -2,12 +2,12 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    cluster: 'layercake'
+    cluster: 'fuzzyllama'
     environment: 'production'
 
 scrape_configs:
-  # LayerCake Backend
-  - job_name: 'layercake-backend'
+  # FuzzyLlama Backend
+  - job_name: 'fuzzyllama-backend'
     static_configs:
       - targets: ['backend:3000']
     metrics_path: '/metrics'

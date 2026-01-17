@@ -1,6 +1,6 @@
 # Advanced UI Design Concepts
 
-Three dashboard approaches for LayerCake that differentiate from competitors (Lovable, v0, Bolt, Replit) through **process transparency**, **confidence visualization**, and **teaching moments**.
+Three dashboard approaches for FuzzyLlama that differentiate from competitors (Lovable, v0, Bolt, Replit) through **process transparency**, **confidence visualization**, and **teaching moments**.
 
 ## Quick Start
 
@@ -56,7 +56,7 @@ python3 -m http.server 8080
 
 ## Key Differentiators
 
-| Feature | Competitors | LayerCake |
+| Feature | Competitors | FuzzyLlama |
 |---------|-------------|-----------|
 | Progress | "80% complete" | "Ship Ready: 87%" (confidence-based) |
 | Decisions | Hidden in commits | Visible with reasoning ("Chose JWT → better for microservices") |
@@ -70,7 +70,7 @@ python3 -m http.server 8080
 
 **Competitors:** "Here's your code, good luck"
 
-**LayerCake:** "Here's your code, here's *why* we built it this way, here's what you learned, and here's how confident you should feel about shipping it"
+**FuzzyLlama:** "Here's your code, here's *why* we built it this way, here's what you learned, and here's how confident you should feel about shipping it"
 
 The dashboards visualize **process quality**, not just output.
 

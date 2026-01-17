@@ -1,4 +1,4 @@
-# LayerCake Backend API - Endpoint Testing Results
+# FuzzyLlama Backend API - Endpoint Testing Results
 
 **Date:** 2026-01-09
 **Status:** ✅ ALL ENDPOINTS WORKING
@@ -218,7 +218,7 @@ POST /api/auth/register
   "content": {
     "openapi": "3.0.0",
     "info": {
-      "title": "LayerCake API",
+      "title": "FuzzyLlama API",
       "version": "1.0.0"
     },
     "paths": {}

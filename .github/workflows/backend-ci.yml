@@ -20,9 +20,9 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: layercake
-          POSTGRES_PASSWORD: layercake_dev
-          POSTGRES_DB: layercake_test
+          POSTGRES_USER: fuzzyllama
+          POSTGRES_PASSWORD: fuzzyllama_dev
+          POSTGRES_DB: fuzzyllama_test
         ports:
           - 5432:5432
         options: >-
@@ -67,13 +67,13 @@ jobs:
       - name: Run Prisma migrations
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://layercake:layercake_dev@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://fuzzyllama:fuzzyllama_dev@localhost:5432/fuzzyllama_test
         run: npx prisma migrate deploy
 
       - name: Run tests
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://layercake:layercake_dev@localhost:5432/layercake_test
+          DATABASE_URL: postgresql://fuzzyllama:fuzzyllama_dev@localhost:5432/fuzzyllama_test
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           JWT_SECRET: test_secret

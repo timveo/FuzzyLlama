@@ -13,7 +13,7 @@ import { ALL_TOOLS } from './tool-definitions';
 /**
  * McpServerService - MCP Protocol Server
  *
- * Implements Model Context Protocol (MCP) for LayerCake
+ * Implements Model Context Protocol (MCP) for FuzzyLlama
  * Compatible with Claude Code and Multi-Agent-Product-Creator framework
  *
  * Features:
@@ -45,7 +45,7 @@ export class McpServerService implements OnModuleInit {
     // Create MCP server
     this.server = new Server(
       {
-        name: 'layercake',
+        name: 'fuzzyllama',
         version: '1.0.0',
       },
       {
@@ -133,31 +133,31 @@ export class McpServerService implements OnModuleInit {
       return {
         resources: [
           {
-            uri: 'layercake://project/{projectId}/status',
+            uri: 'fuzzyllama://project/{projectId}/status',
             name: 'Project Status',
             description: 'Current project status (STATUS.md)',
             mimeType: 'text/markdown',
           },
           {
-            uri: 'layercake://project/{projectId}/decisions',
+            uri: 'fuzzyllama://project/{projectId}/decisions',
             name: 'Project Decisions',
             description: 'Project decisions log (DECISIONS.md)',
             mimeType: 'text/markdown',
           },
           {
-            uri: 'layercake://project/{projectId}/memory',
+            uri: 'fuzzyllama://project/{projectId}/memory',
             name: 'Project Memory',
             description: 'System memory for agents (MEMORY.md)',
             mimeType: 'text/markdown',
           },
           {
-            uri: 'layercake://project/{projectId}/gates',
+            uri: 'fuzzyllama://project/{projectId}/gates',
             name: 'Gate Status',
             description: 'Gate workflow progress (GATES.md)',
             mimeType: 'text/markdown',
           },
           {
-            uri: 'layercake://project/{projectId}/tasks',
+            uri: 'fuzzyllama://project/{projectId}/tasks',
             name: 'Task Queue',
             description: 'Task queue and execution status (TASKS.md)',
             mimeType: 'text/markdown',
@@ -173,8 +173,8 @@ export class McpServerService implements OnModuleInit {
       this.logger.log(`Reading resource: ${uri}`);
 
       try {
-        // Parse URI: layercake://project/{projectId}/{resource}
-        const match = uri.match(/^layercake:\/\/project\/([^\/]+)\/(.+)$/);
+        // Parse URI: fuzzyllama://project/{projectId}/{resource}
+        const match = uri.match(/^fuzzyllama:\/\/project\/([^\/]+)\/(.+)$/);
 
         if (!match) {
           throw new Error(`Invalid resource URI: ${uri}`);
