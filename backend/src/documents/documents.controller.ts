@@ -9,13 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -37,10 +31,7 @@ export class DocumentsController {
     status: 403,
     description: 'Cannot create document for project you do not own',
   })
-  async create(
-    @Body() createDocumentDto: CreateDocumentDto,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async create(@Body() createDocumentDto: CreateDocumentDto, @CurrentUser() user: RequestUser) {
     return this.documentsService.create(createDocumentDto, user.id);
   }
 
@@ -63,20 +54,14 @@ export class DocumentsController {
   @Get('agent/:agentId')
   @ApiOperation({ summary: 'Get all documents created by an agent' })
   @ApiResponse({ status: 200, description: 'Documents retrieved successfully' })
-  async getDocumentsByAgent(
-    @Param('agentId') agentId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getDocumentsByAgent(@Param('agentId') agentId: string, @CurrentUser() user: RequestUser) {
     return this.documentsService.getDocumentsByAgent(agentId, user.id);
   }
 
   @Get('stats/:projectId')
   @ApiOperation({ summary: 'Get document statistics for a project' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
-  async getDocumentStats(
-    @Param('projectId') projectId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getDocumentStats(@Param('projectId') projectId: string, @CurrentUser() user: RequestUser) {
     return this.documentsService.getDocumentStats(projectId, user.id);
   }
 

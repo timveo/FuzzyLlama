@@ -1,14 +1,8 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { CostTrackingService } from './cost-tracking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller('api/costs')
+@Controller('costs')
 @UseGuards(JwtAuthGuard)
 export class CostTrackingController {
   constructor(private readonly costTrackingService: CostTrackingService) {}

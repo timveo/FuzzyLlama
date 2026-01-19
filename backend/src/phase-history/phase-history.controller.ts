@@ -1,18 +1,10 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  UseGuards,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { PhaseHistoryService } from './phase-history.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { StartPhaseDto } from './dto/start-phase.dto';
 import { CompletePhaseDto } from './dto/complete-phase.dto';
 
-@Controller('api/phase-history')
+@Controller('phase-history')
 @UseGuards(JwtAuthGuard)
 export class PhaseHistoryController {
   constructor(private readonly phaseHistoryService: PhaseHistoryService) {}

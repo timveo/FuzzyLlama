@@ -10,13 +10,7 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { DecisionsService } from './decisions.service';
 import { CreateDecisionDto } from './dto/create-decision.dto';
 import { UpdateDecisionDto } from './dto/update-decision.dto';
@@ -35,10 +29,7 @@ export class DecisionsController {
   @ApiOperation({ summary: 'Create a new decision' })
   @ApiResponse({ status: 201, description: 'Decision created successfully' })
   @ApiResponse({ status: 403, description: 'Cannot create decision for project you do not own' })
-  async create(
-    @Body() createDecisionDto: CreateDecisionDto,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async create(@Body() createDecisionDto: CreateDecisionDto, @CurrentUser() user: RequestUser) {
     return this.decisionsService.create(createDecisionDto, user.id);
   }
 
@@ -69,10 +60,7 @@ export class DecisionsController {
   @Get('stats/:projectId')
   @ApiOperation({ summary: 'Get decision statistics for a project' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
-  async getStats(
-    @Param('projectId') projectId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getStats(@Param('projectId') projectId: string, @CurrentUser() user: RequestUser) {
     return this.decisionsService.getStats(projectId, user.id);
   }
 
@@ -80,10 +68,7 @@ export class DecisionsController {
   @ApiOperation({ summary: 'Get a specific decision by ID' })
   @ApiResponse({ status: 200, description: 'Decision retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Decision not found' })
-  async findOne(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.decisionsService.findOne(id, user.id);
   }
 
@@ -103,10 +88,7 @@ export class DecisionsController {
   @ApiOperation({ summary: 'Delete a decision' })
   @ApiResponse({ status: 200, description: 'Decision deleted successfully' })
   @ApiResponse({ status: 404, description: 'Decision not found' })
-  async delete(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async delete(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.decisionsService.delete(id, user.id);
   }
 }

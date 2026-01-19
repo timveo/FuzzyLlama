@@ -1,24 +1,13 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { SessionContextService } from './session-context.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SaveContextDto } from './dto/save-context.dto';
 import { ExtendTTLDto } from './dto/extend-ttl.dto';
 
-@Controller('api/session-context')
+@Controller('session-context')
 @UseGuards(JwtAuthGuard)
 export class SessionContextController {
-  constructor(
-    private readonly sessionContextService: SessionContextService,
-  ) {}
+  constructor(private readonly sessionContextService: SessionContextService) {}
 
   @Post()
   async saveContext(@Body() saveContextDto: SaveContextDto) {
@@ -59,8 +48,7 @@ export class SessionContextController {
 
   @Post('cleanup/:projectId')
   async cleanupExpired(@Param('projectId') projectId: string) {
-    const deleted =
-      await this.sessionContextService.cleanupProjectExpiredContext(projectId);
+    const deleted = await this.sessionContextService.cleanupProjectExpiredContext(projectId);
     return { deleted };
   }
 

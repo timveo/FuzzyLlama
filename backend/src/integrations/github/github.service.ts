@@ -45,9 +45,7 @@ export class GitHubService {
       const { data } = await octokit.rest.users.getAuthenticated();
       return data;
     } catch (error) {
-      throw new BadRequestException(
-        'Failed to authenticate with GitHub: ' + error.message,
-      );
+      throw new BadRequestException('Failed to authenticate with GitHub: ' + error.message);
     }
   }
 
@@ -78,25 +76,17 @@ export class GitHubService {
       };
     } catch (error) {
       if (error.status === 422 && error.message.includes('already exists')) {
-        throw new BadRequestException(
-          `Repository '${options.name}' already exists on GitHub`,
-        );
+        throw new BadRequestException(`Repository '${options.name}' already exists on GitHub`);
       }
 
-      throw new BadRequestException(
-        'Failed to create GitHub repository: ' + error.message,
-      );
+      throw new BadRequestException('Failed to create GitHub repository: ' + error.message);
     }
   }
 
   /**
    * Check if repository exists
    */
-  async repositoryExists(
-    accessToken: string,
-    owner: string,
-    repo: string,
-  ): Promise<boolean> {
+  async repositoryExists(accessToken: string, owner: string, repo: string): Promise<boolean> {
     try {
       const octokit = this.getOctokit(accessToken);
       await octokit.rest.repos.get({ owner, repo });
@@ -130,9 +120,7 @@ export class GitHubService {
       }
 
       if (project.ownerId !== userId) {
-        throw new BadRequestException(
-          'You can only export your own projects',
-        );
+        throw new BadRequestException('You can only export your own projects');
       }
 
       // Check if project already exported
@@ -147,8 +135,7 @@ export class GitHubService {
       }
 
       // Generate repository name if not provided
-      const finalRepoName =
-        repoName || this.generateRepoName(project.name || project.id);
+      const finalRepoName = repoName || this.generateRepoName(project.name || project.id);
 
       // Get authenticated user
       const githubUser = await this.getAuthenticatedUser(accessToken);
@@ -160,9 +147,7 @@ export class GitHubService {
         private: true,
       });
 
-      console.log(
-        `[GitHub Export] Created repository: ${repoUrl} for project ${projectId}`,
-      );
+      console.log(`[GitHub Export] Created repository: ${repoUrl} for project ${projectId}`);
 
       // Initialize Git in project workspace if not already done
       const initResult = await this.gitIntegration.initRepository(projectId);
@@ -258,8 +243,7 @@ export class GitHubService {
       }
 
       // Check for uncommitted files
-      const uncommittedFiles =
-        await this.gitIntegration.getUncommittedFiles(projectId);
+      const uncommittedFiles = await this.gitIntegration.getUncommittedFiles(projectId);
 
       if (uncommittedFiles.length === 0) {
         // Extract repo name from URL
@@ -288,10 +272,7 @@ export class GitHubService {
       }
 
       // Push to remote
-      const cloneUrl = project.githubRepoUrl.replace(
-        'https://github.com',
-        'https://github.com',
-      );
+      const cloneUrl = project.githubRepoUrl.replace('https://github.com', 'https://github.com');
       const pushResult = await this.gitIntegration.addRemoteAndPush(
         projectId,
         cloneUrl.replace('https://', `https://${accessToken}@`),
@@ -329,11 +310,7 @@ export class GitHubService {
   /**
    * Get repository info
    */
-  async getRepositoryInfo(
-    accessToken: string,
-    owner: string,
-    repo: string,
-  ): Promise<any> {
+  async getRepositoryInfo(accessToken: string, owner: string, repo: string): Promise<any> {
     try {
       const octokit = this.getOctokit(accessToken);
       const { data } = await octokit.rest.repos.get({ owner, repo });
@@ -349,20 +326,14 @@ export class GitHubService {
         updatedAt: data.updated_at,
       };
     } catch (error) {
-      throw new BadRequestException(
-        'Failed to get repository info: ' + error.message,
-      );
+      throw new BadRequestException('Failed to get repository info: ' + error.message);
     }
   }
 
   /**
    * List user's repositories
    */
-  async listUserRepositories(
-    accessToken: string,
-    page = 1,
-    perPage = 30,
-  ): Promise<any[]> {
+  async listUserRepositories(accessToken: string, page = 1, perPage = 30): Promise<any[]> {
     try {
       const octokit = this.getOctokit(accessToken);
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
@@ -381,9 +352,7 @@ export class GitHubService {
         updatedAt: repo.updated_at,
       }));
     } catch (error) {
-      throw new BadRequestException(
-        'Failed to list repositories: ' + error.message,
-      );
+      throw new BadRequestException('Failed to list repositories: ' + error.message);
     }
   }
 

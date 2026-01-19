@@ -1,24 +1,24 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 
-// Gate metadata - static information about each gate
-const GATE_METADATA: Record<number, {
-  name: string;
-  narrative: string;
-  description: string;
-  deliverables: string[];
-  celebration: string;
-  phase: 'plan' | 'dev' | 'ship';
-}> = {
+// Gate metadata - static information about each gate (used as fallback)
+// Project-specific content will override description and deliverables
+const GATE_METADATA: Record<
+  number,
+  {
+    name: string;
+    narrative: string;
+    description: string;
+    deliverables: string[];
+    celebration: string;
+    phase: 'plan' | 'dev' | 'ship';
+  }
+> = {
   0: {
     name: 'The Vision Takes Shape',
     narrative: 'Every great product starts with a clear "why"',
-    description: 'You defined what you\'re building and why it matters. The foundation of every great product.',
-    deliverables: ['Problem statement', 'Target users defined', 'Initial concept validated'],
+    description: 'Project vision and requirements captured through onboarding.',
+    deliverables: ['Project Intake document', 'Success criteria defined', 'Constraints identified'],
     celebration: '🎯 Vision Set!',
     phase: 'plan',
   },
@@ -33,7 +33,8 @@ const GATE_METADATA: Record<number, {
   2: {
     name: 'Architecture Emerges',
     narrative: 'The skeleton that supports everything',
-    description: 'The skeleton of your application took form. Decisions made here echo through every feature.',
+    description:
+      'The skeleton of your application took form. Decisions made here echo through every feature.',
     deliverables: ['System design doc', 'Tech stack decision', 'Database schema', 'API contracts'],
     celebration: '🏗️ Foundations Laid!',
     phase: 'plan',
@@ -49,7 +50,8 @@ const GATE_METADATA: Record<number, {
   4: {
     name: 'Core Features Alive',
     narrative: 'Ideas become reality, one function at a time',
-    description: 'You\'re breathing life into essential functionality. This is where ideas become real.',
+    description:
+      "You're breathing life into essential functionality. This is where ideas become real.",
     deliverables: ['Core features', 'Basic UI', 'Database setup', 'API endpoints'],
     celebration: '⚡ MVP Built!',
     phase: 'dev',
@@ -58,7 +60,12 @@ const GATE_METADATA: Record<number, {
     name: 'Feature Complete',
     narrative: 'All the pieces come together',
     description: 'All planned features implemented. Your product is taking its full shape.',
-    deliverables: ['All features built', 'Integration complete', 'Error handling', 'Edge cases covered'],
+    deliverables: [
+      'All features built',
+      'Integration complete',
+      'Error handling',
+      'Edge cases covered',
+    ],
     celebration: '✨ Features Done!',
     phase: 'dev',
   },
@@ -66,7 +73,12 @@ const GATE_METADATA: Record<number, {
     name: 'Integration Harmony',
     narrative: 'Making all systems sing together',
     description: 'All systems integrated and working together seamlessly.',
-    deliverables: ['Third-party integrations', 'Service connections', 'Data pipelines', 'Auth flow'],
+    deliverables: [
+      'Third-party integrations',
+      'Service connections',
+      'Data pipelines',
+      'Auth flow',
+    ],
     celebration: '🔗 All Connected!',
     phase: 'dev',
   },
@@ -74,7 +86,13 @@ const GATE_METADATA: Record<number, {
     name: 'Quality Assured',
     narrative: 'Confidence through comprehensive testing',
     description: 'Comprehensive testing passed. You can deploy with confidence.',
-    deliverables: ['Unit tests', 'Integration tests', 'E2E tests', 'Performance tests', 'Security audit'],
+    deliverables: [
+      'Unit tests',
+      'Integration tests',
+      'E2E tests',
+      'Performance tests',
+      'Security audit',
+    ],
     celebration: '🧪 Tests Pass!',
     phase: 'ship',
   },
@@ -108,6 +126,12 @@ export interface GateJourneyData {
     celebration: string;
     phase: 'plan' | 'dev' | 'ship';
   };
+  // Project-specific summary that overrides generic metadata
+  projectSummary?: string;
+  keyDecisions?: Array<{
+    title: string;
+    description: string;
+  }>;
   tasks: Array<{
     id: string;
     name: string;
@@ -223,10 +247,11 @@ export class JourneyService {
       const metadata = GATE_METADATA[gateNum];
 
       // Find the actual gate record if it exists
-      const gateRecord = gates.find(g =>
-        g.gateType.startsWith(gateKey) ||
-        g.gateType === `${gateKey}_COMPLETE` ||
-        g.gateType === `${gateKey}_PENDING`
+      const gateRecord = gates.find(
+        (g) =>
+          g.gateType.startsWith(gateKey) ||
+          g.gateType === `${gateKey}_COMPLETE` ||
+          g.gateType === `${gateKey}_PENDING`,
       );
 
       // Determine gate status
@@ -253,18 +278,19 @@ export class JourneyService {
         9: ['launch', 'production', 'release'],
       };
       const relevantPhases = phaseMapping[gateNum] || [];
-      const gateTasks = tasks.filter(t =>
-        relevantPhases.some(p => t.phase.toLowerCase().includes(p))
-      ).slice(0, 5).map(t => ({
-        id: t.id,
-        name: t.name,
-        status: t.status,
-      }));
+      const gateTasks = tasks
+        .filter((t) => relevantPhases.some((p) => t.phase.toLowerCase().includes(p)))
+        .slice(0, 5)
+        .map((t) => ({
+          id: t.id,
+          name: t.name,
+          status: t.status,
+        }));
 
       // Filter decisions for this gate
       const gateDecisions = decisions
-        .filter(d => d.gate === gateKey || d.gate === `G${gateNum}`)
-        .map(d => ({
+        .filter((d) => d.gate === gateKey || d.gate === `G${gateNum}`)
+        .map((d) => ({
           id: d.id,
           choice: d.description,
           reason: d.rationale || '',
@@ -272,28 +298,66 @@ export class JourneyService {
         }));
 
       // Filter documents for this gate
+      // For G0, also include the Project Intake document
       const gateDocuments = documents
-        .filter(d => d.gateId === gateRecord?.id)
-        .map(d => ({
+        .filter((d) => d.gateId === gateRecord?.id)
+        .map((d) => ({
           id: d.id,
           name: d.title,
           path: d.filePath || '',
           type: d.documentType,
         }));
 
+      // For G0, include the intake document even if not linked to gate
+      if (gateNum === 0) {
+        const intakeDoc = documents.find((d) => d.title === 'Project Intake');
+        if (intakeDoc && !gateDocuments.some((d) => d.id === intakeDoc.id)) {
+          gateDocuments.push({
+            id: intakeDoc.id,
+            name: intakeDoc.title,
+            path: intakeDoc.filePath || '',
+            type: intakeDoc.documentType,
+          });
+        }
+      }
+
+      // Extract project-specific summary for G0 from intake document
+      let projectSummary: string | undefined;
+      let keyDecisions: Array<{ title: string; description: string }> | undefined;
+
+      if (gateNum === 0) {
+        // Get the intake document content
+        const intakeDoc = await this.prisma.document.findFirst({
+          where: {
+            projectId,
+            title: 'Project Intake',
+          },
+        });
+
+        if (intakeDoc?.content) {
+          // Extract key information from intake document
+          projectSummary = this.extractProjectSummaryFromIntake(intakeDoc.content, project.name);
+          keyDecisions = this.extractKeyDecisionsFromIntake(intakeDoc.content);
+        }
+      }
+
       gatesData.push({
         gateNumber: gateNum,
         gateType: gateRecord?.gateType || `${gateKey}_PENDING`,
         status,
         metadata,
+        projectSummary,
+        keyDecisions,
         tasks: gateTasks,
         decisions: gateDecisions,
         documents: gateDocuments,
         approvedAt: gateRecord?.approvedAt?.toISOString(),
-        approvedBy: gateRecord?.approvedBy ? {
-          id: gateRecord.approvedBy.id,
-          name: gateRecord.approvedBy.name || 'Unknown',
-        } : undefined,
+        approvedBy: gateRecord?.approvedBy
+          ? {
+              id: gateRecord.approvedBy.id,
+              name: gateRecord.approvedBy.name || 'Unknown',
+            }
+          : undefined,
       });
     }
 
@@ -322,5 +386,91 @@ export class JourneyService {
   private parseGateNumber(gateType: string): number {
     const match = gateType.match(/G(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
+  }
+
+  /**
+   * Extract a project-specific summary from the intake document
+   */
+  private extractProjectSummaryFromIntake(content: string, projectName: string): string {
+    // Try to extract the project description section
+    const descMatch = content.match(/## Project Description\s*\n([\s\S]*?)(?=\n##|$)/i);
+    if (descMatch) {
+      const description = descMatch[1].trim().substring(0, 300);
+      return description + (description.length >= 300 ? '...' : '');
+    }
+
+    // Try to extract success criteria
+    const successMatch = content.match(/### Success Criteria\s*\n([\s\S]*?)(?=\n###|$)/i);
+    if (successMatch) {
+      const success = successMatch[1].trim().substring(0, 300);
+      return `Building ${projectName}: ${success}${success.length >= 300 ? '...' : ''}`;
+    }
+
+    // Fallback to project name
+    return `Captured requirements for ${projectName} through onboarding.`;
+  }
+
+  /**
+   * Extract key decisions from the intake document
+   */
+  private extractKeyDecisionsFromIntake(
+    content: string,
+  ): Array<{ title: string; description: string }> {
+    const decisions: Array<{ title: string; description: string }> = [];
+
+    // Extract Existing Code status
+    const codeMatch = content.match(/### Existing Code[\s\S]*?\*\*Status:\*\*\s*([^\n]+)/i);
+    if (codeMatch) {
+      const status = codeMatch[1].trim();
+      decisions.push({
+        title: status === 'none' ? 'Starting fresh' : `Code status: ${status}`,
+        description:
+          status === 'none'
+            ? 'Building from scratch with no existing codebase'
+            : `Working with ${status} code`,
+      });
+    }
+
+    // Extract Technical Background
+    const techMatch = content.match(/### Technical Background[\s\S]*?\*\*Level:\*\*\s*([^\n]+)/i);
+    if (techMatch) {
+      const level = techMatch[1].trim();
+      decisions.push({
+        title: `Teaching level: ${level}`,
+        description:
+          level === 'NOVICE'
+            ? 'Explanations will be beginner-friendly'
+            : level === 'EXPERT'
+              ? 'Technical discussions can be advanced'
+              : 'Balanced explanations with some technical terms',
+      });
+    }
+
+    // Extract Deployment mode
+    const deployMatch = content.match(/### Deployment[\s\S]*?\*\*Mode:\*\*\s*([^\n]+)/i);
+    if (deployMatch) {
+      const mode = deployMatch[1].trim();
+      decisions.push({
+        title: `Deployment: ${mode.replace('_', ' ').toLowerCase()}`,
+        description:
+          mode === 'LOCAL_ONLY'
+            ? 'Project will run locally without cloud deployment'
+            : mode === 'REQUIRED'
+              ? 'Cloud deployment is required for this project'
+              : 'Cloud deployment is optional',
+      });
+    }
+
+    // Extract Project Type from assessment
+    const typeMatch = content.match(/### Project Type\s*\n([^\n]+)/i);
+    if (typeMatch) {
+      const projectType = typeMatch[1].trim();
+      decisions.push({
+        title: `Project type: ${projectType}`,
+        description: `Workflow optimized for ${projectType} projects`,
+      });
+    }
+
+    return decisions;
   }
 }

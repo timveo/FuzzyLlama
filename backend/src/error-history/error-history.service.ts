@@ -133,10 +133,7 @@ export class ErrorHistoryService {
   /**
    * Mark an error as resolved with resolution details
    */
-  async resolveError(
-    errorId: number,
-    resolution: ErrorResolution,
-  ): Promise<any> {
+  async resolveError(errorId: number, resolution: ErrorResolution): Promise<any> {
     const error = await this.prisma.errorHistory.findUnique({
       where: { id: errorId },
     });

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { QualityGateStatus, TaskStatus } from '@prisma/client';
 
@@ -19,10 +19,7 @@ export interface UpdateMetricsInput {
 export class MetricsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async updateMetrics(
-    projectId: string,
-    input: UpdateMetricsInput,
-  ): Promise<any> {
+  async updateMetrics(projectId: string, input: UpdateMetricsInput): Promise<any> {
     const existing = await this.prisma.metrics.findUnique({
       where: { projectId },
     });
@@ -49,7 +46,17 @@ export class MetricsService {
     });
 
     if (!metrics) {
-      throw new NotFoundException(`Metrics for project ${projectId} not found`);
+      // Return default metrics for new projects instead of throwing
+      return {
+        projectId,
+        storiesTotal: 0,
+        storiesCompleted: 0,
+        bugsOpen: 0,
+        bugsResolved: 0,
+        testCoverage: '0%',
+        qualityGateStatus: 'pending',
+        retryCount: 0,
+      };
     }
 
     return metrics;
@@ -77,9 +84,7 @@ export class MetricsService {
     ]);
 
     const storiesTotal = tasks.length;
-    const storiesCompleted = tasks.filter(
-      (t) => t.status === TaskStatus.complete,
-    ).length;
+    const storiesCompleted = tasks.filter((t) => t.status === TaskStatus.complete).length;
     const bugsOpen = errors.filter((e) => e.resolvedAt === null).length;
     const bugsResolved = errors.filter((e) => e.resolvedAt !== null).length;
     const openBlockers = blockers.filter((b) => b.resolvedAt === null).length;
@@ -120,10 +125,7 @@ export class MetricsService {
     });
   }
 
-  async setQualityGateStatus(
-    projectId: string,
-    status: QualityGateStatus,
-  ): Promise<any> {
+  async setQualityGateStatus(projectId: string, status: QualityGateStatus): Promise<any> {
     return this.updateMetrics(projectId, {
       qualityGateStatus: status,
     });

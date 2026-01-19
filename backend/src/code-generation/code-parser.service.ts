@@ -40,8 +40,7 @@ export class CodeParserService {
   private readonly logger = new Logger(CodeParserService.name);
 
   // Regex to match code blocks with optional file paths
-  private readonly CODE_BLOCK_REGEX =
-    /```(\w+)(?::([^\n]+))?\n([\s\S]*?)```/g;
+  private readonly CODE_BLOCK_REGEX = /```(\w+)(?::([^\n]+))?\n([\s\S]*?)```/g;
 
   // Regex to find file path in comment at start of code block
   private readonly FILE_COMMENT_REGEX =
@@ -109,9 +108,7 @@ export class CodeParserService {
       } else {
         // Code block without file path
         unparsedBlocks.push(block);
-        this.logger.warn(
-          `Code block at line ${block.lineNumber} has no file path`,
-        );
+        this.logger.warn(`Code block at line ${block.lineNumber} has no file path`);
       }
     }
 
@@ -125,10 +122,7 @@ export class CodeParserService {
   /**
    * Extract files for a specific language/extension
    */
-  extractFilesByLanguage(
-    agentOutput: string,
-    languages: string[],
-  ): CodeExtractionResult {
+  extractFilesByLanguage(agentOutput: string, languages: string[]): CodeExtractionResult {
     const allFiles = this.extractFiles(agentOutput);
 
     const filteredFiles = allFiles.files.filter((file) => {
@@ -273,7 +267,7 @@ export class CodeParserService {
 
   private cleanCodeContent(content: string): string {
     // Remove file path comment if present at start
-    let cleaned = content.replace(this.FILE_COMMENT_REGEX, '').trim();
+    const cleaned = content.replace(this.FILE_COMMENT_REGEX, '').trim();
 
     return cleaned;
   }

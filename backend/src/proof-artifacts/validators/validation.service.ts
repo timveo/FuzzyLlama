@@ -18,10 +18,7 @@ export class ValidationService {
   /**
    * Validate proof artifact based on type
    */
-  async validateArtifact(
-    proofType: string,
-    filePath: string,
-  ): Promise<ValidationResult> {
+  async validateArtifact(proofType: string, filePath: string): Promise<ValidationResult> {
     switch (proofType) {
       case 'test_output':
         return this.validateTestOutput(filePath);
@@ -406,9 +403,7 @@ export class ValidationService {
         passed,
         summary: `Lighthouse: Performance ${(performance * 100).toFixed(0)}%, Accessibility ${(accessibility * 100).toFixed(0)}%, Best Practices ${(bestPractices * 100).toFixed(0)}%, SEO ${(seo * 100).toFixed(0)}%`,
         details: { performance, accessibility, bestPractices, seo, threshold },
-        errors: passed
-          ? undefined
-          : ['One or more Lighthouse scores below 80% threshold'],
+        errors: passed ? undefined : ['One or more Lighthouse scores below 80% threshold'],
       };
     } catch (error) {
       return {

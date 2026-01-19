@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { FileSystemService, CommandResult } from './filesystem.service';
-import * as path from 'path';
-import * as fs from 'fs-extra';
+import { FileSystemService } from './filesystem.service';
 
 export interface BuildResult {
   success: boolean;
@@ -239,10 +237,7 @@ export class BuildExecutorService {
     );
 
     const duration = Date.now() - startTime;
-    const vulnerabilities = await this.parseSecurityScan(
-      projectId,
-      result.stdout,
-    );
+    const vulnerabilities = await this.parseSecurityScan(projectId, result.stdout);
 
     return {
       success: vulnerabilities.critical === 0 && vulnerabilities.high === 0,
@@ -252,9 +247,7 @@ export class BuildExecutorService {
           ? [`${vulnerabilities.critical} critical vulnerabilities found`]
           : [],
       warnings:
-        vulnerabilities.high > 0
-          ? [`${vulnerabilities.high} high vulnerabilities found`]
-          : [],
+        vulnerabilities.high > 0 ? [`${vulnerabilities.high} high vulnerabilities found`] : [],
       duration,
       vulnerabilities,
       totalVulnerabilities:
@@ -331,15 +324,9 @@ export class BuildExecutorService {
     return this.hasScript(projectId, 'test');
   }
 
-  private async hasScript(
-    projectId: string,
-    scriptName: string,
-  ): Promise<boolean> {
+  private async hasScript(projectId: string, scriptName: string): Promise<boolean> {
     try {
-      const packageJson = await this.filesystem.readFile(
-        projectId,
-        'package.json',
-      );
+      const packageJson = await this.filesystem.readFile(projectId, 'package.json');
       const pkg = JSON.parse(packageJson);
       return !!pkg.scripts?.[scriptName];
     } catch {
@@ -352,11 +339,7 @@ export class BuildExecutorService {
     const lines = output.split('\n');
 
     for (const line of lines) {
-      if (
-        line.includes('ERR!') ||
-        line.includes('error') ||
-        line.includes('Error')
-      ) {
+      if (line.includes('ERR!') || line.includes('error') || line.includes('Error')) {
         errors.push(line.trim());
       }
     }
@@ -437,19 +420,19 @@ export class BuildExecutorService {
     return { passed, failed, total: passed + failed };
   }
 
-  private async parseCoverageReport(projectId: string): Promise<{
-    lines: number;
-    statements: number;
-    functions: number;
-    branches: number;
-  } | undefined> {
+  private async parseCoverageReport(projectId: string): Promise<
+    | {
+        lines: number;
+        statements: number;
+        functions: number;
+        branches: number;
+      }
+    | undefined
+  > {
     try {
       const coveragePath = 'coverage/coverage-summary.json';
       if (await this.filesystem.fileExists(projectId, coveragePath)) {
-        const coverage = await this.filesystem.readFile(
-          projectId,
-          coveragePath,
-        );
+        const coverage = await this.filesystem.readFile(projectId, coveragePath);
         const json = JSON.parse(coverage);
         const total = json.total;
 
@@ -491,14 +474,10 @@ export class BuildExecutorService {
     // Parse summary line (e.g., "5 errors, 3 warnings")
     const summaryMatch = output.match(/(\d+) errors?, (\d+) warnings?/);
     const errorCount = summaryMatch ? parseInt(summaryMatch[1]) : errors.length;
-    const warningCount = summaryMatch
-      ? parseInt(summaryMatch[2])
-      : warnings.length;
+    const warningCount = summaryMatch ? parseInt(summaryMatch[2]) : warnings.length;
 
     // Parse fixable counts
-    const fixableMatch = output.match(
-      /(\d+) errors? and (\d+) warnings? potentially fixable/,
-    );
+    const fixableMatch = output.match(/(\d+) errors? and (\d+) warnings? potentially fixable/);
     const fixableErrors = fixableMatch ? parseInt(fixableMatch[1]) : 0;
     const fixableWarnings = fixableMatch ? parseInt(fixableMatch[2]) : 0;
 

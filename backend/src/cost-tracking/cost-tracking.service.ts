@@ -35,11 +35,7 @@ export class CostTrackingService {
   /**
    * Calculate cost for a single agent execution
    */
-  calculateAgentCost(
-    model: string,
-    inputTokens: number,
-    outputTokens: number,
-  ): number {
+  calculateAgentCost(model: string, inputTokens: number, outputTokens: number): number {
     const pricing = this.MODEL_PRICING[model] || {
       input: 3,
       output: 15,
@@ -87,27 +83,14 @@ export class CostTrackingService {
       const agents = allAgents;
 
       // Calculate totals
-      const totalInputTokens = agents.reduce(
-        (sum, a) => sum + a.inputTokens,
-        0,
-      );
-      const totalOutputTokens = agents.reduce(
-        (sum, a) => sum + a.outputTokens,
-        0,
-      );
+      const totalInputTokens = agents.reduce((sum, a) => sum + a.inputTokens, 0);
+      const totalOutputTokens = agents.reduce((sum, a) => sum + a.outputTokens, 0);
 
       // Calculate cost per agent type
-      const agentTypeCosts: Record<
-        string,
-        { executions: number; cost: number }
-      > = {};
+      const agentTypeCosts: Record<string, { executions: number; cost: number }> = {};
 
       agents.forEach((agent) => {
-        const cost = this.calculateAgentCost(
-          agent.model,
-          agent.inputTokens,
-          agent.outputTokens,
-        );
+        const cost = this.calculateAgentCost(agent.model, agent.inputTokens, agent.outputTokens);
 
         if (!agentTypeCosts[agent.agentType]) {
           agentTypeCosts[agent.agentType] = { executions: 0, cost: 0 };
@@ -117,10 +100,7 @@ export class CostTrackingService {
         agentTypeCosts[agent.agentType].cost += cost;
       });
 
-      const totalCost = Object.values(agentTypeCosts).reduce(
-        (sum, a) => sum + a.cost,
-        0,
-      );
+      const totalCost = Object.values(agentTypeCosts).reduce((sum, a) => sum + a.cost, 0);
 
       costsByGate.push({
         gateType: gate.gateType,
@@ -164,17 +144,11 @@ export class CostTrackingService {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
-    const costsByModel: Record<string, { cost: number; executions: number }> =
-      {};
-    const costsByAgent: Record<string, { cost: number; executions: number }> =
-      {};
+    const costsByModel: Record<string, { cost: number; executions: number }> = {};
+    const costsByAgent: Record<string, { cost: number; executions: number }> = {};
 
     agents.forEach((agent) => {
-      const cost = this.calculateAgentCost(
-        agent.model,
-        agent.inputTokens,
-        agent.outputTokens,
-      );
+      const cost = this.calculateAgentCost(agent.model, agent.inputTokens, agent.outputTokens);
 
       totalCost += cost;
       totalInputTokens += agent.inputTokens;
@@ -259,24 +233,12 @@ export class CostTrackingService {
       where,
     });
 
-    const totalAgentExecutions = metrics.reduce(
-      (sum, m) => sum + m.agentExecutions,
-      0,
-    );
-    const totalTokensUsed = metrics.reduce(
-      (sum, m) => sum + m.apiTokensUsed,
-      0,
-    );
-    const totalCost = metrics.reduce(
-      (sum, m) => sum + parseFloat(m.cost.toString()),
-      0,
-    );
+    const totalAgentExecutions = metrics.reduce((sum, m) => sum + m.agentExecutions, 0);
+    const totalTokensUsed = metrics.reduce((sum, m) => sum + m.apiTokensUsed, 0);
+    const totalCost = metrics.reduce((sum, m) => sum + parseFloat(m.cost.toString()), 0);
 
     // Group by project
-    const projectCosts: Record<
-      string,
-      { agentExecutions: number; cost: number }
-    > = {};
+    const projectCosts: Record<string, { agentExecutions: number; cost: number }> = {};
 
     metrics.forEach((m) => {
       if (m.projectId) {
@@ -297,14 +259,12 @@ export class CostTrackingService {
 
     const projectMap = new Map(projects.map((p) => [p.id, p.name]));
 
-    const byProject = Object.entries(projectCosts).map(
-      ([projectId, data]) => ({
-        projectId,
-        projectName: projectMap.get(projectId) || 'Unknown',
-        agentExecutions: data.agentExecutions,
-        cost: data.cost,
-      }),
-    );
+    const byProject = Object.entries(projectCosts).map(([projectId, data]) => ({
+      projectId,
+      projectName: projectMap.get(projectId) || 'Unknown',
+      agentExecutions: data.agentExecutions,
+      cost: data.cost,
+    }));
 
     return {
       totalAgentExecutions,
@@ -341,14 +301,7 @@ export class CostTrackingService {
       const agents = allAgents.filter((a) => a.projectId === gate.projectId);
 
       const gateCost = agents.reduce((sum, agent) => {
-        return (
-          sum +
-          this.calculateAgentCost(
-            agent.model,
-            agent.inputTokens,
-            agent.outputTokens,
-          )
-        );
+        return sum + this.calculateAgentCost(agent.model, agent.inputTokens, agent.outputTokens);
       }, 0);
 
       costs.push(gateCost);

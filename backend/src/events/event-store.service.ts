@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ProjectionService } from './projection.service';
 import { DomainEvent, EventMetadata } from './domain-event.interface';
-import { ProjectState } from '@prisma/client';
 
 /**
  * EventStoreService - Event Sourcing Implementation
@@ -68,10 +67,7 @@ export class EventStoreService {
   /**
    * Append multiple events atomically
    */
-  async appendEvents(
-    projectId: string,
-    events: DomainEvent[],
-  ): Promise<string[]> {
+  async appendEvents(projectId: string, events: DomainEvent[]): Promise<string[]> {
     this.logger.log(`Appending ${events.length} events for project ${projectId}`);
 
     const eventIds: string[] = [];
@@ -135,11 +131,7 @@ export class EventStoreService {
   /**
    * Get events in a time range
    */
-  async getEventsInRange(
-    projectId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<any[]> {
+  async getEventsInRange(projectId: string, startDate: Date, endDate: Date): Promise<any[]> {
     return this.prisma.projectEvent.findMany({
       where: {
         projectId,
@@ -335,7 +327,7 @@ export class EventStoreService {
           agents: state.agents.map((a) =>
             a.agentId === eventData.agentId
               ? { ...a, status: 'COMPLETED', completedAt: event.createdAt }
-              : a
+              : a,
           ),
         };
 
@@ -345,7 +337,7 @@ export class EventStoreService {
           agents: state.agents.map((a) =>
             a.agentId === eventData.agentId
               ? { ...a, status: 'FAILED', error: eventData.error }
-              : a
+              : a,
           ),
         };
 

@@ -223,7 +223,7 @@ export class McpToolsService {
   // Project Management Tools
   // ===========================
 
-  private async createProject(args: {
+  private async createProject(_args: {
     name: string;
     type: string;
     description?: string;
@@ -237,7 +237,7 @@ export class McpToolsService {
     return project;
   }
 
-  private async listProjects(args: any): Promise<any> {
+  private async listProjects(_args: any): Promise<any> {
     // Note: This would need userId from context
     throw new Error('list_projects requires authentication context');
   }
@@ -254,7 +254,7 @@ export class McpToolsService {
   // Agent Execution Tools
   // ===========================
 
-  private async executeAgent(args: {
+  private async executeAgent(_args: {
     projectId: string;
     agentType: string;
     userPrompt: string;
@@ -292,12 +292,12 @@ export class McpToolsService {
     return gates;
   }
 
-  private async approveGate(args: { gateId: string; reviewNotes?: string }): Promise<any> {
+  private async approveGate(_args: { gateId: string; reviewNotes?: string }): Promise<any> {
     // Note: This would need userId from context
     throw new Error('approve_gate requires authentication context');
   }
 
-  private async rejectGate(args: { gateId: string; reviewNotes: string }): Promise<any> {
+  private async rejectGate(_args: { gateId: string; reviewNotes: string }): Promise<any> {
     // Note: This would need userId from context
     throw new Error('reject_gate requires authentication context');
   }
@@ -313,7 +313,7 @@ export class McpToolsService {
   // Document Tools
   // ===========================
 
-  private async createDocument(args: {
+  private async createDocument(_args: {
     projectId: string;
     title: string;
     content: string;
@@ -370,7 +370,7 @@ export class McpToolsService {
     return { files: tree };
   }
 
-  private async deleteFile(args: { projectId: string; filePath: string }): Promise<string> {
+  private async deleteFile(_args: { projectId: string; filePath: string }): Promise<string> {
     // Implement delete functionality
     throw new Error('delete_file not yet implemented');
   }
@@ -436,12 +436,12 @@ export class McpToolsService {
   // GitHub Tools
   // ===========================
 
-  private async githubExport(args: { projectId: string; repoName?: string }): Promise<any> {
+  private async githubExport(_args: { projectId: string; repoName?: string }): Promise<any> {
     // Note: This would need authentication context
     throw new Error('github_export requires authentication context');
   }
 
-  private async githubPush(args: { projectId: string; message?: string }): Promise<any> {
+  private async githubPush(_args: { projectId: string; message?: string }): Promise<any> {
     // Note: This would need authentication context
     throw new Error('github_push requires authentication context');
   }
@@ -450,7 +450,7 @@ export class McpToolsService {
   // Railway Tools
   // ===========================
 
-  private async railwayDeploy(args: { projectId: string }): Promise<any> {
+  private async railwayDeploy(_args: { projectId: string }): Promise<any> {
     // Note: This would need authentication context
     throw new Error('railway_deploy requires authentication context');
   }

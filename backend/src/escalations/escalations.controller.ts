@@ -1,18 +1,10 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { EscalationsService } from './escalations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateEscalationDto } from './dto/create-escalation.dto';
 import { ResolveEscalationDto } from './dto/resolve-escalation.dto';
 
-@Controller('api/escalations')
+@Controller('escalations')
 @UseGuards(JwtAuthGuard)
 export class EscalationsController {
   constructor(private readonly escalationsService: EscalationsService) {}

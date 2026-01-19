@@ -9,17 +9,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
 @Module({
   imports: [PrismaModule],
   controllers: [CodeGenerationController],
-  providers: [
-    FileSystemService,
-    CodeParserService,
-    BuildExecutorService,
-    GitIntegrationService,
-  ],
-  exports: [
-    FileSystemService,
-    CodeParserService,
-    BuildExecutorService,
-    GitIntegrationService,
-  ],
+  providers: [FileSystemService, CodeParserService, BuildExecutorService, GitIntegrationService],
+  exports: [FileSystemService, CodeParserService, BuildExecutorService, GitIntegrationService],
 })
 export class CodeGenerationModule {}

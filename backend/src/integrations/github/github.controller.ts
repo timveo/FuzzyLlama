@@ -9,13 +9,7 @@ import {
   Headers,
   BadRequestException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiHeader,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { GitHubService } from './github.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -62,11 +56,7 @@ export class GitHubController {
       throw new BadRequestException('GitHub token is required in x-github-token header');
     }
 
-    return this.githubService.listUserRepositories(
-      githubToken,
-      page || 1,
-      perPage || 30,
-    );
+    return this.githubService.listUserRepositories(githubToken, page || 1, perPage || 30);
   }
 
   @Post('projects/:id/export')
@@ -91,12 +81,7 @@ export class GitHubController {
       throw new BadRequestException('GitHub token is required in x-github-token header');
     }
 
-    return this.githubService.exportProjectToGitHub(
-      projectId,
-      user.id,
-      githubToken,
-      body.repoName,
-    );
+    return this.githubService.exportProjectToGitHub(projectId, user.id, githubToken, body.repoName);
   }
 
   @Post('projects/:id/push')
@@ -149,7 +134,7 @@ export class GitHubController {
   @Post('projects/:id/readme')
   @ApiOperation({ summary: 'Generate and write README.md for project' })
   @ApiResponse({ status: 200, description: 'README created successfully' })
-  async createReadme(@Param('id') projectId: string, @CurrentUser() user: RequestUser) {
+  async createReadme(@Param('id') projectId: string, @CurrentUser() _user: RequestUser) {
     const readme = await this.githubService.createReadme(projectId);
 
     return {

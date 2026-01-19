@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { GateStateMachineService } from './services/gate-state-machine.service';
-import { CreateGateDto, GateType } from './dto/create-gate.dto';
-import { UpdateGateDto, GateStatus } from './dto/update-gate.dto';
+import { CreateGateDto } from './dto/create-gate.dto';
+import { UpdateGateDto } from './dto/update-gate.dto';
 import { ApproveGateDto } from './dto/approve-gate.dto';
 
 @Injectable()
@@ -146,9 +146,7 @@ export class GatesService {
       );
 
       if (approvedArtifacts.length === 0) {
-        throw new BadRequestException(
-          'Cannot approve gate: No approved proof artifacts found',
-        );
+        throw new BadRequestException('Cannot approve gate: No approved proof artifacts found');
       }
     }
 
@@ -224,15 +222,14 @@ export class GatesService {
       throw new ForbiddenException('You can only view stats for your own projects');
     }
 
-    const [total, pending, inReview, approved, rejected, blocked] =
-      await Promise.all([
-        this.prisma.gate.count({ where: { projectId } }),
-        this.prisma.gate.count({ where: { projectId, status: 'PENDING' } }),
-        this.prisma.gate.count({ where: { projectId, status: 'IN_REVIEW' } }),
-        this.prisma.gate.count({ where: { projectId, status: 'APPROVED' } }),
-        this.prisma.gate.count({ where: { projectId, status: 'REJECTED' } }),
-        this.prisma.gate.count({ where: { projectId, status: 'BLOCKED' } }),
-      ]);
+    const [total, pending, inReview, approved, rejected, blocked] = await Promise.all([
+      this.prisma.gate.count({ where: { projectId } }),
+      this.prisma.gate.count({ where: { projectId, status: 'PENDING' } }),
+      this.prisma.gate.count({ where: { projectId, status: 'IN_REVIEW' } }),
+      this.prisma.gate.count({ where: { projectId, status: 'APPROVED' } }),
+      this.prisma.gate.count({ where: { projectId, status: 'REJECTED' } }),
+      this.prisma.gate.count({ where: { projectId, status: 'BLOCKED' } }),
+    ]);
 
     return {
       total,
@@ -279,5 +276,4 @@ export class GatesService {
       },
     });
   }
-
 }

@@ -1,18 +1,10 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  UseGuards,
-  Delete,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Delete } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileSystemService } from './filesystem.service';
 import { CodeParserService } from './code-parser.service';
 import { BuildExecutorService } from './build-executor.service';
 
-@Controller('api/code-generation')
+@Controller('code-generation')
 @UseGuards(JwtAuthGuard)
 export class CodeGenerationController {
   constructor(
@@ -33,10 +25,7 @@ export class CodeGenerationController {
     const projectPath = await this.filesystem.createProjectWorkspace(projectId);
 
     if (body.projectType) {
-      await this.filesystem.initializeProjectStructure(
-        projectId,
-        body.projectType as any,
-      );
+      await this.filesystem.initializeProjectStructure(projectId, body.projectType as any);
     }
 
     return {

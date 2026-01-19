@@ -136,11 +136,7 @@ def run_ab_test(model_a, model_b, test_cases):
 
   handoffFormat: {
     phase: 'G6_COMPLETE',
-    deliverables: [
-      'evaluation results',
-      'docs/MODEL_EVALUATION.md',
-      'model recommendation',
-    ],
+    deliverables: ['evaluation results', 'docs/MODEL_EVALUATION.md', 'model recommendation'],
     nextAgent: ['AIOPS_ENGINEER'],
     nextAction: 'Deploy selected model',
   },

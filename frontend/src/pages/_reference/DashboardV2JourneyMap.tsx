@@ -261,7 +261,8 @@ const BuilderQuote = () => {
     { text: "The best architectures tell a story.", author: "The Craft" }
   ];
 
-  const [currentQuote] = useState(quotes[Math.floor(Math.random() * quotes.length)]);
+  // Use lazy initial state to generate random quote only once on mount
+  const [currentQuote] = useState(() => quotes[Math.floor(Math.random() * quotes.length)]);
 
   return (
     <div className="text-center py-6">

@@ -197,11 +197,7 @@ CMD ["npm", "start"]
 
   handoffFormat: {
     phase: 'G9_COMPLETE',
-    deliverables: [
-      '.github/workflows/',
-      'docs/DEPLOYMENT.md',
-      'production URL',
-    ],
+    deliverables: ['.github/workflows/', 'docs/DEPLOYMENT.md', 'production URL'],
     nextAgent: null,
     nextAction: 'Project complete and deployed',
   },

@@ -1,12 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CodeBracketIcon,
   ComputerDesktopIcon,
-  PaperAirplaneIcon,
-  StopIcon,
-  CpuChipIcon,
   FolderIcon,
   FolderOpenIcon,
   DocumentIcon,
@@ -19,21 +17,18 @@ import { projectsApi } from '../api/projects';
 import { metricsApi, type ProjectProgress, type WorkflowStatus, type ProjectCosts, type ProjectMetrics } from '../api/metrics';
 import { gatesApi } from '../api/gates';
 import { journeyApi } from '../api/journey';
+import { workflowApi } from '../api/workflow';
+import { documentsApi } from '../api/documents';
+import type { Document } from '../types';
 import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
+import { useWebSocket } from '../hooks/useWebSocket';
 import FuzzyLlamaLogoSvg from '../assets/Llamalogo.png';
 import FuzzyLlamaLogoTransparent from '../assets/Llamalogo-transparent.png';
 import { SettingsModal } from '../components/SettingsModal';
+import { OrchestratorChat } from '../components/chat/OrchestratorChat';
 
 // Types
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-}
-
-
 interface FileTreeNode {
   name: string;
   type: 'file' | 'folder';
@@ -263,14 +258,6 @@ const GATE_INFO: Record<number, {
   },
 };
 
-// Mock data
-const mockMessages: ChatMessage[] = [
-  { id: '1', role: 'system', content: 'Agent Orchestrator online. Ready to coordinate your build.', timestamp: new Date(Date.now() - 300000) },
-  { id: '2', role: 'user', content: 'What agents are currently active?', timestamp: new Date(Date.now() - 240000) },
-  { id: '3', role: 'assistant', content: 'Currently running: Architect (designing system), Backend Dev (API scaffolding), and Orchestrator (coordinating). The Product Manager completed the PRD. Want me to activate more agents?', timestamp: new Date(Date.now() - 180000) },
-];
-
-
 // Mock file tree for Code tab
 const mockFileTree: FileTreeNode[] = [
   {
@@ -311,53 +298,12 @@ const mockFileTree: FileTreeNode[] = [
   { name: 'CONTRIBUTING.md', type: 'file', path: '/CONTRIBUTING.md', content: '# Contributing Guide\n\n## Development Setup\n\n1. Clone the repository\n2. Install dependencies: `npm install`\n3. Start dev server: `npm run dev`\n\n## Code Style\n\n- Use TypeScript for all new code\n- Follow the existing patterns\n- Add tests for new features\n\n## Pull Requests\n\n- Create feature branches\n- Write clear commit messages\n- Request review from maintainers' },
 ];
 
-// Mock gate approval data
-const mockGateApproval: GateApprovalData = {
-  gateNumber: 3,
-  title: 'Architecture Review',
-  description: 'The system architecture has been designed and is ready for approval. This gate ensures the technical foundation is solid before development begins.',
-  checklist: [
-    { item: 'Database schema reviewed', completed: true },
-    { item: 'API contracts defined', completed: true },
-    { item: 'Security considerations documented', completed: true },
-    { item: 'Scalability plan approved', completed: false },
-  ],
-  artifacts: ['architecture-diagram.png', 'api-spec.yaml', 'database-schema.sql'],
-  agentRecommendation: 'The Architect recommends approval. All critical components have been designed with scalability in mind. One minor item (scalability plan documentation) is pending but non-blocking.',
-};
-
 // GitHub Icon SVG Component
 const GitHubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
   </svg>
 );
-
-// Breathing orb indicator
-const BreathingOrb = ({ color, size = 'md' }: { color: string; size?: 'sm' | 'md' | 'lg' }) => {
-  const sizes = { sm: 'w-2 h-2', md: 'w-3 h-3', lg: 'w-4 h-4' };
-  return (
-    <motion.div
-      className={`${sizes[size]} rounded-full ${color}`}
-      animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
-      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-    />
-  );
-};
-
-// Panel wrapper component with consistent styling
-const Panel = ({ children, className = '', theme }: { children: React.ReactNode; className?: string; theme?: ThemeMode }) => {
-  const isDark = theme === 'dark';
-  return (
-    <div className={`backdrop-blur-sm rounded-2xl border ${
-      isDark
-        ? 'bg-slate-800/60 border-slate-700/50'
-        : 'bg-white border-slate-200 shadow-sm'
-    } ${className}`}>
-      {children}
-    </div>
-  );
-};
 
 // ============ GATE APPROVAL POPUP ============
 
@@ -707,130 +653,14 @@ const GitHubPopup = ({ isOpen, onClose, theme }: { isOpen: boolean; onClose: () 
 };
 
 
-// ============ LEFT PANEL COMPONENTS ============
-
-const AgentOrchestratorPanel = ({ theme }: { theme: ThemeMode }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
-  const [input, setInput] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const isDark = theme === 'dark';
-
-  const handleSend = () => {
-    if (!input.trim()) return;
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      timestamp: new Date(),
-    };
-    setMessages([...messages, newMessage]);
-    setInput('');
-    setIsStreaming(true);
-
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Acknowledged. Coordinating agents to handle your request.',
-        timestamp: new Date(),
-      }]);
-      setIsStreaming(false);
-    }, 1500);
-  };
-
-  return (
-    <Panel theme={theme} className="flex flex-col h-full">
-      {/* Header - compact */}
-      <div className={`flex items-center gap-2 px-3 py-1.5 border-b ${isDark ? 'border-slate-700/50' : 'border-teal-200'}`}>
-        <div className="relative">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}>
-            <CpuChipIcon className="w-4 h-4 text-white" />
-          </div>
-          <motion.div
-            className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ${isDark ? 'border border-slate-800' : 'border border-teal-50'}`}
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        </div>
-        <span className={`font-semibold text-xs flex-1 ${isDark ? 'text-white' : 'text-teal-800'}`}>Product Orchestrator</span>
-        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
-          <BreathingOrb color="bg-emerald-400" size="sm" />
-          <span className={`text-[9px] font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>3</span>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
-        {messages.map((msg, i) => (
-          <motion.div
-            key={msg.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[90%] px-3 py-2 text-xs leading-relaxed rounded-2xl ${
-              msg.role === 'user'
-                ? isDark ? 'bg-teal-950 text-white rounded-br-md' : 'bg-teal-600 text-white rounded-br-md'
-                : msg.role === 'system'
-                ? isDark ? 'bg-slate-700/50 text-teal-200 rounded-bl-md italic' : 'bg-teal-200/50 text-teal-800 rounded-bl-md italic'
-                : isDark ? 'bg-slate-700 text-white rounded-bl-md' : 'bg-white text-teal-900 rounded-bl-md border border-teal-100'
-            }`}>
-              {msg.content}
-            </div>
-          </motion.div>
-        ))}
-        {isStreaming && (
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl rounded-bl-md max-w-[90%] ${isDark ? 'bg-slate-700/50' : 'bg-teal-200/50'}`}>
-            <div className="flex gap-1">
-              {[0, 1, 2].map((i) => (
-                <motion.span
-                  key={i}
-                  className={`w-1.5 h-1.5 rounded-full ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ duration: 0.5, delay: i * 0.1, repeat: Infinity }}
-                />
-              ))}
-            </div>
-            <span className={`text-[10px] ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>Processing...</span>
-          </div>
-        )}
-      </div>
-
-      {/* Input */}
-      <div className={`p-3 border-t ${isDark ? 'border-slate-700/50' : 'border-teal-200'}`}>
-        <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${isDark ? 'bg-slate-700/50' : 'bg-white border border-teal-200'}`}>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Command your agents..."
-            className={`flex-1 bg-transparent text-xs focus:outline-none ${isDark ? 'text-white placeholder-teal-300/50' : 'text-teal-900 placeholder-teal-400'}`}
-          />
-          {isStreaming ? (
-            <button onClick={() => setIsStreaming(false)} className="w-7 h-7 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center">
-              <StopIcon className="w-3 h-3" />
-            </button>
-          ) : (
-            <button onClick={handleSend} className={`w-7 h-7 rounded-full text-white flex items-center justify-center ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}>
-              <PaperAirplaneIcon className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      </div>
-    </Panel>
-  );
-};
-
-
 // ============ CENTER PANEL COMPONENTS ============
 
-const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId }: {
+const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId, autoSelectDocumentKey }: {
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
   theme: ThemeMode;
   projectId: string | null;
+  autoSelectDocumentKey?: string | null;
 }) => {
   const isDark = theme === 'dark';
   const tabs: { id: WorkspaceTab; label: string }[] = [
@@ -874,7 +704,7 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId }: {
               className="h-full"
             >
               {activeTab === 'ui' && <UIPreviewContent theme={theme} />}
-              {activeTab === 'docs' && <DocsContent theme={theme} />}
+              {activeTab === 'docs' && <DocsContent theme={theme} projectId={projectId} autoSelectDocumentKey={autoSelectDocumentKey} />}
               {activeTab === 'code' && <CodeContent theme={theme} />}
               {activeTab === 'map' && <JourneyContent theme={theme} projectId={projectId} onViewDocument={() => onTabChange('docs')} />}
             </motion.div>
@@ -928,56 +758,140 @@ const UIPreviewContent = ({ theme }: { theme: ThemeMode }) => {
   );
 };
 
-const DocsContent = ({ theme }: { theme: ThemeMode }) => {
+const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: ThemeMode; projectId: string | null; autoSelectDocumentKey?: string | null }) => {
   const isDark = theme === 'dark';
-  const docTypes = [
-    { id: 'prd', name: 'PRD', status: 'complete' },
-    { id: 'architecture', name: 'Architecture', status: 'complete' },
-    { id: 'tech-stack', name: 'Tech Stack', status: 'complete' },
-    { id: 'api', name: 'API Docs', status: 'in-progress' },
-    { id: 'design', name: 'Design System', status: 'pending' },
-    { id: 'testing', name: 'Test Plan', status: 'pending' },
-    { id: 'deployment', name: 'Deployment', status: 'pending' },
-  ];
-  const [selectedDoc, setSelectedDoc] = useState('prd');
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
 
-  const getStatusBadge = (status: string) => {
-    const baseClasses = "text-[8px] w-12 text-center py-0.5 rounded-full font-medium";
-    switch (status) {
-      case 'complete': return <span className={`${baseClasses} ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>Done</span>;
-      case 'in-progress': return <span className={`${baseClasses} ${isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>WIP</span>;
-      default: return <span className={`${baseClasses} ${isDark ? 'bg-slate-500/20 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>Pending</span>;
+  // Fetch real documents from API
+  const { data: apiDocuments, isLoading } = useQuery({
+    queryKey: ['documents', projectId],
+    queryFn: () => projectId ? documentsApi.list(projectId) : Promise.resolve([]),
+    enabled: !!projectId,
+  });
+
+  // Auto-select document when prop changes (from gate approval)
+  useEffect(() => {
+    if (autoSelectDocumentKey === 'intake' && apiDocuments?.length) {
+      const intakeDoc = apiDocuments.find((d: Document) =>
+        d.title === 'Project Intake' || d.documentType === 'REQUIREMENTS'
+      );
+      if (intakeDoc) {
+        const docId = intakeDoc.id;
+        const timer = setTimeout(() => setSelectedDocId(docId), 0);
+        return () => clearTimeout(timer);
+      }
     }
+  }, [autoSelectDocumentKey, apiDocuments]);
+
+  // Auto-select first document when loaded
+  useEffect(() => {
+    if (apiDocuments?.length && !selectedDocId) {
+      const docId = apiDocuments[0].id;
+      const timer = setTimeout(() => {
+        setSelectedDocId(docId);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [apiDocuments, selectedDocId]);
+
+  const selectedDoc = apiDocuments?.find((d: Document) => d.id === selectedDocId);
+
+  // Map document type to gate number
+  const getGateForDoc = (doc: Document): number => {
+    const typeToGate: Record<string, number> = {
+      'REQUIREMENTS': 0,
+      'PRD': 1,
+      'ARCHITECTURE': 2,
+      'DESIGN': 3,
+      'TECHNICAL': 4,
+      'TEST': 5,
+      'SECURITY': 6,
+      'DEPLOYMENT': 7,
+      'OTHER': 0,
+    };
+    return typeToGate[doc.documentType] ?? 0;
   };
+
+  // Group documents by gate
+  const groupedDocs = (apiDocuments || []).reduce((acc: Record<number, Document[]>, doc: Document) => {
+    const gate = getGateForDoc(doc);
+    if (!acc[gate]) acc[gate] = [];
+    acc[gate].push(doc);
+    return acc;
+  }, {});
+
+  if (!projectId) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Select a project to view documents</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!apiDocuments?.length) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No documents yet</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex gap-3">
-      <div className="w-36 space-y-0.5">
-        <div className={`text-[9px] font-semibold uppercase tracking-wider px-2 mb-1.5 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Documents</div>
-        {docTypes.map((doc) => (
-          <button
-            key={doc.id}
-            onClick={() => setSelectedDoc(doc.id)}
-            className={`w-full flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-lg text-left transition-all ${
-              selectedDoc === doc.id
-                ? isDark ? 'bg-teal-500/20 border border-teal-500/30' : 'bg-teal-50 border border-teal-200'
-                : isDark ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'
-            }`}
-          >
-            <span className={`text-[10px] truncate ${selectedDoc === doc.id ? (isDark ? 'text-white font-medium' : 'text-teal-700 font-medium') : (isDark ? 'text-teal-200' : 'text-slate-600')}`}>
-              {doc.name}
-            </span>
-            {getStatusBadge(doc.status)}
-          </button>
+      {/* Document List - Simple & Clean */}
+      <div className={`w-44 overflow-y-auto py-1 ${isDark ? '' : ''}`}>
+        {Object.entries(groupedDocs)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([gate, docs]) => (
+          <div key={gate} className="mb-2">
+            <div className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {gate === '0' ? 'Intake' : `Gate ${gate}`}
+            </div>
+            {(docs as Document[]).map((doc) => (
+              <button
+                key={doc.id}
+                onClick={() => setSelectedDocId(doc.id)}
+                className={`w-full text-left px-2 py-1.5 text-xs transition-colors ${
+                  selectedDocId === doc.id
+                    ? isDark ? 'text-teal-300 bg-teal-500/10' : 'text-teal-700 bg-teal-50'
+                    : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-700/30' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                {doc.title}
+              </button>
+            ))}
+          </div>
         ))}
       </div>
-      <div className={`flex-1 rounded-2xl p-5 overflow-auto ${isDark ? 'bg-slate-900/50' : 'bg-white border border-slate-200'}`}>
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>{docTypes.find(d => d.id === selectedDoc)?.name}</h2>
-        </div>
-        <p className={`text-sm leading-relaxed ${isDark ? 'text-teal-200' : 'text-slate-600'}`}>
-          Document content for {docTypes.find(d => d.id === selectedDoc)?.name} will appear here.
-        </p>
+
+      {/* Document Content */}
+      <div className={`flex-1 rounded-xl p-4 overflow-auto ${isDark ? 'bg-slate-800/50' : 'bg-white border border-slate-200'}`}>
+        {selectedDoc ? (
+          <>
+            <div className="mb-3">
+              <h2 className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>{selectedDoc.title}</h2>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {selectedDoc.documentType} • {new Date(selectedDoc.updatedAt).toLocaleDateString()}
+              </p>
+            </div>
+            <div className={`text-xs leading-relaxed whitespace-pre-wrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+              {selectedDoc.content || 'No content.'}
+            </div>
+          </>
+        ) : (
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Select a document</p>
+        )}
       </div>
     </div>
   );
@@ -1144,19 +1058,6 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
   const currentGate = journeyData?.currentGate ?? 3;
   const progress = journeyData?.progressPercentage ?? Math.round((currentGate / 10) * 100);
 
-  // Phase colors for timeline
-  const phaseColors: Record<Phase, { bg: string; border: string; text: string; glow: string; gradient: string; light: string }> = {
-    plan: { bg: 'bg-amber-500', border: 'border-amber-500/40', text: 'text-amber-300', glow: 'shadow-amber-500/30', gradient: 'from-amber-500/20 to-yellow-500/10', light: 'bg-amber-500/10' },
-    dev: { bg: 'bg-cyan-500', border: 'border-cyan-500/40', text: 'text-cyan-300', glow: 'shadow-cyan-500/30', gradient: 'from-cyan-500/20 to-blue-500/10', light: 'bg-cyan-500/10' },
-    ship: { bg: 'bg-orange-500', border: 'border-orange-500/40', text: 'text-orange-300', glow: 'shadow-orange-500/30', gradient: 'from-orange-500/20 to-amber-500/10', light: 'bg-orange-500/10' },
-  };
-
-  const getPhaseForGate = (gate: number): Phase => {
-    if (gate <= 3) return 'plan';
-    if (gate <= 6) return 'dev';
-    return 'ship';
-  };
-
   // Helper to get gate data - prefer API data, fall back to mock
   const getGateData = (gateNum: number) => {
     const apiGate = journeyData?.gates?.find(g => g.gateNumber === gateNum);
@@ -1170,8 +1071,11 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
         status: t.status === 'complete' ? 'done' as const : t.status === 'in_progress' ? 'in-progress' as const : 'pending' as const,
       }));
 
-      // Map API decisions to display format
-      const decisions = apiGate.decisions.map(d => ({
+      // Map API decisions to display format - prefer keyDecisions from API
+      const decisions = apiGate.keyDecisions?.map(d => ({
+        choice: d.title,
+        reason: d.description,
+      })) || apiGate.decisions.map(d => ({
         choice: d.choice,
         reason: d.reason,
       }));
@@ -1188,9 +1092,11 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
       return {
         name: apiGate.metadata.name,
         narrative: apiGate.metadata.narrative,
-        description: apiGate.metadata.description,
+        // Use project-specific summary if available, otherwise fall back to metadata description
+        description: apiGate.projectSummary || apiGate.metadata.description,
         celebration: apiGate.metadata.celebration,
-        summary: mockGateInfo.summary, // Keep mock summary as API doesn't provide it yet
+        // Use project-specific summary for the summary field too
+        summary: apiGate.projectSummary || mockGateInfo.summary,
         decisions: decisions.length > 0 ? decisions : mockGateInfo.decisions,
         documents: documents.length > 0 ? documents : mockGateInfo.documents,
         tasks: tasks.length > 0 ? tasks : mockTasks,
@@ -1255,8 +1161,6 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
         <div className="space-y-6">
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((gateNum) => {
             const gateData = getGateData(gateNum);
-            const phase = getPhaseForGate(gateNum);
-            const colors = phaseColors[phase];
             const isCompleted = gateNum < currentGate;
             const isCurrent = gateNum === currentGate;
             const isUpcoming = gateNum > currentGate;
@@ -1268,7 +1172,10 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                 <div className="absolute left-1/2 transform -translate-x-1/2 z-10">
                   <motion.div
                     initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
+                    animate={isCurrent ? {
+                      scale: [1, 1.05, 1],
+                      transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' }
+                    } : { scale: 1 }}
                     transition={{ delay: gateNum * 0.05, type: 'spring' }}
                     className={`
                       w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all
@@ -1276,8 +1183,8 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                         ? 'bg-emerald-500 border-emerald-400/50 text-white shadow-md shadow-emerald-500/30'
                         : isCurrent
                           ? isDark
-                            ? `${colors.bg} border-white/30 text-white ring-2 ring-offset-1 ring-offset-slate-900 ring-white/20 shadow-lg ${colors.glow}`
-                            : `bg-teal-950 border-teal-400 text-white ring-2 ring-offset-1 ring-offset-white ring-teal-300 shadow-lg shadow-teal-300/50`
+                            ? 'bg-gradient-to-br from-cyan-400 to-teal-500 border-cyan-300 text-white ring-4 ring-cyan-400/40 shadow-xl shadow-cyan-500/50'
+                            : 'bg-gradient-to-br from-cyan-500 to-teal-600 border-cyan-300 text-white ring-4 ring-cyan-400/50 shadow-xl shadow-cyan-400/60'
                           : isDark
                             ? 'bg-slate-800 border-slate-600 text-slate-500'
                             : 'bg-slate-100 border-slate-300 text-slate-400'
@@ -1304,8 +1211,8 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                         : `bg-gradient-to-br ${isLeft ? 'from-emerald-50 to-white' : 'from-white to-emerald-50'} border-emerald-300`
                       : isCurrent
                         ? isDark
-                          ? `bg-gradient-to-br ${colors.gradient} ${colors.border} shadow-lg ${colors.glow}`
-                          : `bg-white border-teal-300 shadow-lg shadow-teal-200/50`
+                          ? 'bg-gradient-to-br from-cyan-500/20 to-teal-500/10 border-cyan-500/40 shadow-lg shadow-cyan-500/30'
+                          : 'bg-gradient-to-br from-cyan-50 to-teal-50 border-cyan-300 shadow-lg shadow-cyan-200/50'
                         : isDark
                           ? `bg-slate-800/30 border-slate-700/30 ${isUpcoming ? 'opacity-50' : ''}`
                           : `bg-white/50 border-slate-200 ${isUpcoming ? 'opacity-50' : ''}`
@@ -1322,7 +1229,7 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                             </span>
                           )}
                           <h4 className={`text-base font-bold ${
-                            isCompleted ? 'text-emerald-500' : isCurrent ? isDark ? colors.text : 'text-teal-700' : isDark ? 'text-slate-400' : 'text-slate-500'
+                            isCompleted ? 'text-emerald-500' : isCurrent ? isDark ? 'text-cyan-400' : 'text-cyan-700' : isDark ? 'text-slate-400' : 'text-slate-500'
                           }`}>
                             {gateData.name}
                           </h4>
@@ -1489,7 +1396,7 @@ const useAnimatedCounter = (target: number, duration: number = 1000) => {
 type MetricType = 'team' | 'gate' | 'tokens' | 'momentum' | 'loc';
 
 // Shared state for LOC tracking across carousel rotations
-let locTotalAccumulator = { total: 0, added: 0, removed: 0 };
+const locTotalAccumulator = { total: 0, added: 0, removed: 0 };
 
 // Custom hook for fetching all metrics data
 const useMetricsData = (projectId: string | null) => {
@@ -1571,9 +1478,26 @@ const FloatingMetricsCard = ({
   // Fetch real metrics data
   const metricsData = useMetricsData(projectId);
 
+  // Parse gate number from string like "G1_PENDING" or just use the number
+  const parseGateNumber = (gate: string | number | undefined): number => {
+    if (typeof gate === 'number') return gate;
+    if (!gate) return 1;
+    const match = String(gate).match(/G?(\d+)/i);
+    return match ? parseInt(match[1], 10) : 1;
+  };
+
+  // Map phase strings to our Phase type
+  const mapPhase = (phase: string | undefined): Phase => {
+    if (!phase) return 'plan';
+    const p = phase.toLowerCase();
+    if (p.includes('dev') || p.includes('architecture') || p.includes('design')) return 'dev';
+    if (p.includes('ship') || p.includes('deploy') || p.includes('test') || p.includes('security') || p.includes('production')) return 'ship';
+    return 'plan';
+  };
+
   // Derive current gate and phase from API data
-  const currentGate = metricsData.progress?.currentGate ?? 3;
-  const selectedPhase = metricsData.progress?.currentPhase ?? 'plan';
+  const currentGate = parseGateNumber(metricsData.progress?.currentGate);
+  const selectedPhase = mapPhase(metricsData.progress?.currentPhase);
 
   const metrics: MetricType[] = ['team', 'gate', 'tokens', 'momentum', 'loc'];
   const metricLabels: Record<MetricType, string> = {
@@ -1960,7 +1884,9 @@ const FloatingGateContent = ({ currentGate, selectedPhase, theme, onGateClick, p
             G{currentGate}
           </div>
           <div>
-            <p className={`text-sm font-semibold leading-tight ${isDark ? 'text-white' : 'text-slate-700'}`}>{GATE_INFO[currentGate]?.name}</p>
+            <p className={`text-sm font-semibold leading-tight ${isDark ? 'text-white' : 'text-slate-700'}`}>
+              {GATE_INFO[currentGate]?.name || `Gate ${currentGate}`}
+            </p>
             <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Gate {currentGate} of {totalGates}</p>
           </div>
         </div>
@@ -2142,13 +2068,15 @@ const FloatingLOCContent = ({ theme, isActive }: { theme: ThemeMode; isActive: b
       return;
     }
 
-    // Reset delta when becoming active
-    setDeltaData({ added: 0, removed: 0 });
-    setTotals({
-      total: locTotalAccumulator.total,
-      sessionAdded: locTotalAccumulator.added,
-      sessionRemoved: locTotalAccumulator.removed,
-    });
+    // Reset delta when becoming active - use setTimeout to avoid synchronous setState in effect
+    const resetTimer = setTimeout(() => {
+      setDeltaData({ added: 0, removed: 0 });
+      setTotals({
+        total: locTotalAccumulator.total,
+        sessionAdded: locTotalAccumulator.added,
+        sessionRemoved: locTotalAccumulator.removed,
+      });
+    }, 0);
 
     const interval = setInterval(() => {
       const newAdded = Math.floor(Math.random() * 15) + 5;
@@ -2159,7 +2087,11 @@ const FloatingLOCContent = ({ theme, isActive }: { theme: ThemeMode; isActive: b
       }));
     }, 1500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(resetTimer);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
 
   const currentTotal = totals.total + deltaData.added - deltaData.removed;
@@ -2563,6 +2495,8 @@ const ProjectsView = ({ theme, onSelectProject }: { theme: ThemeMode; onSelectPr
 // ============ MAIN DASHBOARD ============
 
 export default function UnifiedDashboard() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const [showSplash, setShowSplash] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('docs');
   const [mainView, setMainView] = useState<MainView>('dashboard');
@@ -2572,28 +2506,279 @@ export default function UnifiedDashboard() {
   const [showGitHub, setShowGitHub] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showGateApproval, setShowGateApproval] = useState(false);
+  const [currentGateData, setCurrentGateData] = useState<GateApprovalData | null>(null);
+  const [autoSelectDocumentKey, setAutoSelectDocumentKey] = useState<string | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const [currentProjectName, setCurrentProjectName] = useState('E-Commerce Platform');
+  const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
+  const [isNewProject, setIsNewProject] = useState(false);
   const isDark = theme === 'dark';
 
-  // Prefetch projects for future use
-  useQuery({
-    queryKey: ['projects'],
-    queryFn: () => projectsApi.list(),
+  // Agent streaming state
+  const [activeAgent, setActiveAgent] = useState<{ agentType: string; taskDescription?: string } | null>(null);
+  const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
+  const [isAgentWorking, setIsAgentWorking] = useState(false);
+
+  // WebSocket event handlers
+  const handleAgentStarted = useCallback((event: { agentType?: string; taskDescription?: string }) => {
+    console.log('Agent started:', event);
+    setActiveAgent({
+      agentType: event.agentType || 'UNKNOWN',
+      taskDescription: event.taskDescription,
+    });
+    setStreamingChunks([]);
+    setIsAgentWorking(true);
+  }, []);
+
+  const handleAgentChunk = useCallback((event: { chunk?: string }) => {
+    if (event.chunk) {
+      setStreamingChunks(prev => [...prev, event.chunk!]);
+    }
+  }, []);
+
+  const handleAgentCompleted = useCallback((event: { agentType?: string; result?: unknown }) => {
+    console.log('Agent completed:', event);
+    setIsAgentWorking(false);
+
+    // Refresh documents when an agent completes (it may have created documents)
+    const projectId = currentProjectId || searchParams.get('project');
+    if (projectId) {
+      console.log('Agent completed - refreshing documents for project:', projectId);
+      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+    }
+
+    // Keep the agent visible briefly to show completion
+    setTimeout(() => {
+      setActiveAgent(null);
+      setStreamingChunks([]);
+      // Gate approvals happen via chat conversation, not modal popup
+    }, 2000);
+  }, [currentProjectId, searchParams, queryClient]);
+
+  const handleAgentFailed = useCallback((event: { error?: string }) => {
+    console.error('Agent failed:', event);
+    setIsAgentWorking(false);
+    setActiveAgent(null);
+    setStreamingChunks([]);
+  }, []);
+
+  const handleGateReady = useCallback(() => {
+    console.log('Gate ready for approval - handled via chat conversation');
+    // Gate approvals happen via chat conversation, not modal popup
+  }, []);
+
+  const handleDocumentCreated = useCallback((event: { document?: { id: string; title?: string } }) => {
+    console.log('Document created event received:', event, 'currentProjectId:', currentProjectId);
+    // Invalidate documents query to refetch the list
+    // Use both currentProjectId and urlProjectId to ensure we catch it
+    const projectId = currentProjectId || searchParams.get('project');
+    if (projectId) {
+      console.log('Invalidating documents query for project:', projectId);
+      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+    }
+  }, [currentProjectId, queryClient, searchParams]);
+
+  // Connect to WebSocket when we have a project
+  useWebSocket(currentProjectId || undefined, {
+    onAgentStarted: handleAgentStarted,
+    onAgentChunk: handleAgentChunk,
+    onAgentCompleted: handleAgentCompleted,
+    onAgentFailed: handleAgentFailed,
+    onGateReady: handleGateReady,
+    onDocumentCreated: handleDocumentCreated,
   });
+
+  // Handle URL parameters for project selection
+  const urlProjectId = searchParams.get('project');
+  const urlIsNew = searchParams.get('new') === 'true';
+
+  // Fetch the specific project when we have a projectId
+  const { data: currentProject } = useQuery({
+    queryKey: ['project', urlProjectId],
+    queryFn: () => urlProjectId ? projectsApi.get(urlProjectId) : null,
+    enabled: !!urlProjectId,
+  });
+
+  // Effect to handle URL-based project selection
+  useEffect(() => {
+    if (urlProjectId && urlProjectId !== currentProjectId) {
+      // Use setTimeout to avoid synchronous setState in effect
+      const timer = setTimeout(() => {
+        setCurrentProjectId(urlProjectId);
+        setIsNewProject(urlIsNew);
+
+        // Clear the URL params after reading them
+        if (urlIsNew) {
+          setSearchParams({}, { replace: true });
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [urlProjectId, urlIsNew, currentProjectId, setSearchParams]);
+
+  // Update project name when project data loads
+  useEffect(() => {
+    if (currentProject?.name) {
+      // Use setTimeout to avoid synchronous setState in effect
+      const timer = setTimeout(() => {
+        setCurrentProjectName(currentProject.name);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [currentProject]);
 
   if (showSplash) {
     return <SplashPage onGetStarted={() => setShowSplash(false)} />;
   }
 
-  const handleGateApprove = () => {
-    setShowGateApproval(false);
-    // Handle approval logic
+  const handleGateApprove = async () => {
+    if (!currentProjectId) return;
+
+    try {
+      // Get current gate and approve it
+      const currentGate = await gatesApi.getCurrent(currentProjectId);
+      if (currentGate) {
+        await gatesApi.approve(currentGate.id, { approved: true });
+
+        // Trigger next agent to start working
+        try {
+          const result = await workflowApi.getStatus(currentProjectId);
+          console.log('Workflow status after approval:', result);
+
+          // Execute next task in the workflow
+          const nextTaskResult = await fetch(`/api/agents/workflow/execute-next/${currentProjectId}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          const nextTask = await nextTaskResult.json();
+          console.log('Next task started:', nextTask);
+        } catch (workflowError) {
+          console.log('Workflow continuation:', workflowError);
+        }
+      }
+      setShowGateApproval(false);
+      setCurrentGateData(null);
+    } catch (error) {
+      console.error('Failed to approve gate:', error);
+    }
   };
 
-  const handleGateDeny = () => {
-    setShowGateApproval(false);
-    // Handle denial - would send message to orchestrator
+  const handleGateDeny = async () => {
+    if (!currentProjectId) return;
+
+    try {
+      const currentGate = await gatesApi.getCurrent(currentProjectId);
+      if (currentGate) {
+        await gatesApi.approve(currentGate.id, { approved: false, reviewNotes: 'Changes requested' });
+      }
+      setShowGateApproval(false);
+      setCurrentGateData(null);
+    } catch (error) {
+      console.error('Failed to reject gate:', error);
+    }
+  };
+
+  // Helper to get document key for a gate number
+  const getDocumentKeyForGate = (gateNumber: number): string => {
+    // G0/G1 = intake document
+    if (gateNumber <= 1) return 'intake';
+    // Other gates use first document from that gate
+    return `g${gateNumber}-0`;
+  };
+
+  // Helper to fetch and show gate approval
+  const showGateApprovalPopup = async () => {
+    if (!currentProjectId) return;
+
+    try {
+      const currentGate = await gatesApi.getCurrent(currentProjectId);
+      if (currentGate) {
+        // Map gate data to GateApprovalData format
+        const gateNumber = parseInt(currentGate.gateType.replace(/[^\d]/g, '')) || 1;
+        const gateData: GateApprovalData = {
+          gateNumber,
+          title: getGateTitle(currentGate.gateType),
+          description: currentGate.description || getGateDescription(currentGate.gateType),
+          checklist: getGateChecklist(currentGate.gateType),
+          artifacts: [],
+          agentRecommendation: getGateRecommendation(currentGate.gateType),
+        };
+        setCurrentGateData(gateData);
+        setShowGateApproval(true);
+
+        // Auto-switch to docs tab and select relevant document
+        setActiveTab('docs');
+        setAutoSelectDocumentKey(getDocumentKeyForGate(gateNumber));
+      }
+    } catch (error) {
+      console.error('Failed to fetch gate:', error);
+    }
+  };
+
+  // Helper functions for gate display
+  const getGateTitle = (gateType: string): string => {
+    const titles: Record<string, string> = {
+      'G1_PENDING': 'Scope Approval',
+      'G2_PENDING': 'PRD Approval',
+      'G3_PENDING': 'Architecture Approval',
+      'G4_PENDING': 'Design Approval',
+      'G5_PENDING': 'Feature Acceptance',
+      'G6_PENDING': 'Quality Sign-off',
+      'G7_PENDING': 'Security Acceptance',
+      'G8_PENDING': 'Go/No-Go Decision',
+      'G9_PENDING': 'Production Release',
+    };
+    return titles[gateType] || 'Gate Approval';
+  };
+
+  const getGateDescription = (gateType: string): string => {
+    const descriptions: Record<string, string> = {
+      'G1_PENDING': 'Your project has been analyzed and scoped. Review the project classification and initial assumptions before proceeding.',
+      'G2_PENDING': 'The Product Manager has completed the PRD. Review user stories, success metrics, and scope boundaries.',
+      'G3_PENDING': 'The Architect has designed the system. Review tech stack, API contracts, and database schema.',
+      'G4_PENDING': 'The Designer has created the UI/UX. Review design system and component layouts.',
+      'G5_PENDING': 'Development is complete. Review implemented features and spec compliance.',
+      'G6_PENDING': 'QA has completed testing. Review test results, coverage, and accessibility audit.',
+      'G7_PENDING': 'Security review is complete. Review security scan results and threat model.',
+      'G8_PENDING': 'Pre-deployment checks are complete. Review performance metrics and deployment guide.',
+      'G9_PENDING': 'Ready for production release. Final review before go-live.',
+    };
+    return descriptions[gateType] || 'Review and approve to proceed to the next phase.';
+  };
+
+  const getGateChecklist = (gateType: string): { item: string; completed: boolean }[] => {
+    const checklists: Record<string, { item: string; completed: boolean }[]> = {
+      'G1_PENDING': [
+        { item: 'Project type identified', completed: true },
+        { item: 'Success criteria captured', completed: true },
+        { item: 'Constraints documented', completed: true },
+        { item: 'Initial scope defined', completed: true },
+      ],
+      'G2_PENDING': [
+        { item: 'User stories defined', completed: true },
+        { item: 'Success metrics established', completed: true },
+        { item: 'Scope boundaries set', completed: true },
+        { item: 'PRD document created', completed: true },
+      ],
+      'G3_PENDING': [
+        { item: 'Tech stack selected', completed: true },
+        { item: 'API contracts defined', completed: true },
+        { item: 'Database schema designed', completed: true },
+        { item: 'Architecture document created', completed: true },
+      ],
+    };
+    return checklists[gateType] || [{ item: 'Requirements reviewed', completed: true }];
+  };
+
+  const getGateRecommendation = (gateType: string): string => {
+    const recommendations: Record<string, string> = {
+      'G1_PENDING': 'The Orchestrator has completed the initial project analysis. Ready to proceed to PRD creation.',
+      'G2_PENDING': 'The Product Manager recommends approval. All user stories and requirements are documented.',
+      'G3_PENDING': 'The Architect recommends approval. System design is complete and scalable.',
+    };
+    return recommendations[gateType] || 'Ready for approval.';
   };
 
   const handleSelectProject = (id: string, name: string) => {
@@ -2611,14 +2796,16 @@ export default function UnifiedDashboard() {
       {/* Popups */}
       <GitHubPopup isOpen={showGitHub} onClose={() => setShowGitHub(false)} theme={theme} />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
-      <GateApprovalPopup
-        isOpen={showGateApproval}
-        onClose={() => setShowGateApproval(false)}
-        onApprove={handleGateApprove}
-        onDeny={handleGateDeny}
-        gateData={mockGateApproval}
-        theme={theme}
-      />
+      {currentGateData && (
+        <GateApprovalPopup
+          isOpen={showGateApproval}
+          onClose={() => { setShowGateApproval(false); setCurrentGateData(null); }}
+          onApprove={handleGateApprove}
+          onDeny={handleGateDeny}
+          gateData={currentGateData}
+          theme={theme}
+        />
+      )}
 
       {/* Header */}
       <header className={`relative h-14 border-b flex items-center px-4 z-10 ${
@@ -2700,7 +2887,52 @@ export default function UnifiedDashboard() {
         <div className="flex-1 flex overflow-hidden relative z-10 gap-0 p-1.5">
           {/* Left Panel - Product Orchestrator (Always visible) */}
           <div className={`w-[340px] min-w-[320px] pr-1 ${isDark ? 'bg-slate-900/30' : ''}`}>
-            <AgentOrchestratorPanel theme={theme} />
+            <OrchestratorChat
+              theme={theme}
+              isNewProject={isNewProject}
+              projectName={currentProjectName || undefined}
+              projectId={currentProjectId}
+              activeAgent={activeAgent}
+              streamingChunks={streamingChunks}
+              isAgentWorking={isAgentWorking}
+              pendingGateApproval={showGateApproval && currentGateData ? {
+                gateNumber: currentGateData.gateNumber,
+                title: currentGateData.title,
+                description: currentGateData.description,
+                documentName: currentGateData.gateNumber === 1 ? 'Project Intake' : undefined,
+              } : null}
+              onApproveGate={handleGateApprove}
+              onDenyGate={handleGateDeny}
+              onViewDocument={() => {
+                setActiveTab('docs');
+              }}
+              onIntakeComplete={async (answers) => {
+                console.log('Intake complete:', answers);
+                setIsNewProject(false);
+
+                // Submit intake answers to backend
+                if (currentProjectId) {
+                  try {
+                    const intakeAnswers = Object.entries(answers).map(([questionId, answer]) => ({
+                      questionId,
+                      answer,
+                    }));
+                    const result = await workflowApi.submitIntake({
+                      projectId: currentProjectId,
+                      answers: intakeAnswers,
+                    });
+                    console.log('Intake submitted successfully:', result);
+
+                    // Trigger gate approval in chat after a short delay
+                    setTimeout(() => {
+                      showGateApprovalPopup();
+                    }, 1500);
+                  } catch (error) {
+                    console.error('Failed to submit intake:', error);
+                  }
+                }
+              }}
+            />
           </div>
 
           {/* Center Panel - Now takes full remaining width */}
@@ -2710,6 +2942,7 @@ export default function UnifiedDashboard() {
               onTabChange={setActiveTab}
               theme={theme}
               projectId={currentProjectId}
+              autoSelectDocumentKey={autoSelectDocumentKey}
             />
           </div>
 
@@ -2717,7 +2950,7 @@ export default function UnifiedDashboard() {
           <FloatingMetricsCard
             theme={theme}
             projectId={currentProjectId}
-            onGateClick={() => setShowGateApproval(true)}
+            onGateClick={() => showGateApprovalPopup()}
           />
         </div>
       )}

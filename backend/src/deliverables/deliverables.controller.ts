@@ -15,7 +15,7 @@ import { CreateDeliverableDto } from './dto/create-deliverable.dto';
 import { UpdateDeliverableDto } from './dto/update-deliverable.dto';
 import { DeliverableStatus } from '@prisma/client';
 
-@Controller('api/deliverables')
+@Controller('deliverables')
 @UseGuards(JwtAuthGuard)
 export class DeliverablesController {
   constructor(private readonly deliverablesService: DeliverablesService) {}

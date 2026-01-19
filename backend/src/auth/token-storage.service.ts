@@ -14,11 +14,7 @@ export class TokenStorageService {
   /**
    * Store refresh token with user ID mapping
    */
-  async storeRefreshToken(
-    userId: string,
-    tokenId: string,
-    refreshToken: string,
-  ): Promise<void> {
+  async storeRefreshToken(userId: string, tokenId: string, refreshToken: string): Promise<void> {
     const key = `${userId}:${tokenId}`;
     this.tokens.set(key, {
       token: refreshToken,

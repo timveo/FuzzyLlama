@@ -156,9 +156,7 @@ export class PrometheusMetricsService {
       .labels(agentType, model, success.toString())
       .observe(durationSeconds);
 
-    this.agentExecutionTotal
-      .labels(agentType, success ? 'success' : 'failed')
-      .inc();
+    this.agentExecutionTotal.labels(agentType, success ? 'success' : 'failed').inc();
 
     this.agentTokensUsed.labels(agentType, model, 'input').inc(inputTokens);
     this.agentTokensUsed.labels(agentType, model, 'output').inc(outputTokens);
@@ -176,7 +174,12 @@ export class PrometheusMetricsService {
   /**
    * Track build execution
    */
-  trackBuild(projectType: string, status: 'success' | 'failed', durationSeconds: number, stage: string) {
+  trackBuild(
+    projectType: string,
+    status: 'success' | 'failed',
+    durationSeconds: number,
+    stage: string,
+  ) {
     this.buildExecutions.labels(projectType, status).inc();
     this.buildDuration.labels(projectType, stage).observe(durationSeconds);
   }

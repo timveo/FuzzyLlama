@@ -243,11 +243,7 @@ Upcoming:
 
   handoffFormat: {
     phase: 'G1_COMPLETE',
-    deliverables: [
-      'project plan',
-      'task breakdown',
-      'agent assignments',
-    ],
+    deliverables: ['project plan', 'task breakdown', 'agent assignments'],
     nextAgent: ['PRODUCT_MANAGER'],
     nextAction: 'Begin requirements gathering',
   },

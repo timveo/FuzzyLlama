@@ -229,15 +229,14 @@ export class TasksService {
       throw new ForbiddenException('You can only view stats for your own projects');
     }
 
-    const [total, pending, inProgress, blocked, completed, cancelled] =
-      await Promise.all([
-        this.prisma.task.count({ where: { projectId } }),
-        this.prisma.task.count({ where: { projectId, status: 'not_started' } }),
-        this.prisma.task.count({ where: { projectId, status: 'in_progress' } }),
-        this.prisma.task.count({ where: { projectId, status: 'blocked' } }),
-        this.prisma.task.count({ where: { projectId, status: 'complete' } }),
-        this.prisma.task.count({ where: { projectId, status: 'skipped' } }),
-      ]);
+    const [total, pending, inProgress, blocked, completed, cancelled] = await Promise.all([
+      this.prisma.task.count({ where: { projectId } }),
+      this.prisma.task.count({ where: { projectId, status: 'not_started' } }),
+      this.prisma.task.count({ where: { projectId, status: 'in_progress' } }),
+      this.prisma.task.count({ where: { projectId, status: 'blocked' } }),
+      this.prisma.task.count({ where: { projectId, status: 'complete' } }),
+      this.prisma.task.count({ where: { projectId, status: 'skipped' } }),
+    ]);
 
     return {
       total,

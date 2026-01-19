@@ -68,7 +68,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
-        } catch (error) {
+        } catch {
           // Token invalid, clear auth
           tokenStorage.clearTokens();
           set({

@@ -74,9 +74,7 @@ export class AgentWorkerService implements OnModuleInit {
 
       const duration = Date.now() - startTime;
 
-      this.logger.log(
-        `[${priority}] Job ${job.id} completed in ${(duration / 1000).toFixed(2)}s`,
-      );
+      this.logger.log(`[${priority}] Job ${job.id} completed in ${(duration / 1000).toFixed(2)}s`);
 
       // Update job progress
       await job.progress(100);

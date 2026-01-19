@@ -1,11 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
-import {
-  EscalationLevel,
-  EscalationType,
-  EscalationStatus,
-  Severity,
-} from '@prisma/client';
+import { EscalationLevel, EscalationType, EscalationStatus, Severity } from '@prisma/client';
 
 export interface CreateEscalationInput {
   projectId: string;
@@ -117,9 +112,7 @@ export class EscalationsService {
     });
 
     if (!escalation) {
-      throw new NotFoundException(
-        `Escalation with ID ${escalationId} not found`,
-      );
+      throw new NotFoundException(`Escalation with ID ${escalationId} not found`);
     }
 
     return escalation;
@@ -128,18 +121,13 @@ export class EscalationsService {
   /**
    * Resolve an escalation
    */
-  async resolveEscalation(
-    escalationId: string,
-    input: ResolveEscalationInput,
-  ): Promise<any> {
+  async resolveEscalation(escalationId: string, input: ResolveEscalationInput): Promise<any> {
     const escalation = await this.prisma.escalation.findUnique({
       where: { id: escalationId },
     });
 
     if (!escalation) {
-      throw new NotFoundException(
-        `Escalation with ID ${escalationId} not found`,
-      );
+      throw new NotFoundException(`Escalation with ID ${escalationId} not found`);
     }
 
     return this.prisma.escalation.update({
@@ -158,18 +146,13 @@ export class EscalationsService {
   /**
    * Auto-resolve an escalation (by system/agent)
    */
-  async autoResolveEscalation(
-    escalationId: string,
-    resolution: string,
-  ): Promise<any> {
+  async autoResolveEscalation(escalationId: string, resolution: string): Promise<any> {
     const escalation = await this.prisma.escalation.findUnique({
       where: { id: escalationId },
     });
 
     if (!escalation) {
-      throw new NotFoundException(
-        `Escalation with ID ${escalationId} not found`,
-      );
+      throw new NotFoundException(`Escalation with ID ${escalationId} not found`);
     }
 
     return this.prisma.escalation.update({
@@ -224,8 +207,7 @@ export class EscalationsService {
     // Group by severity
     const escalationsBySeverity: Record<string, number> = {};
     escalations.forEach((e) => {
-      escalationsBySeverity[e.severity] =
-        (escalationsBySeverity[e.severity] || 0) + 1;
+      escalationsBySeverity[e.severity] = (escalationsBySeverity[e.severity] || 0) + 1;
     });
 
     // Group by type
@@ -243,8 +225,7 @@ export class EscalationsService {
     // Calculate average resolution time (in hours)
     const resolvedWithTimes = escalations.filter(
       (e) =>
-        (e.status === EscalationStatus.resolved ||
-          e.status === EscalationStatus.auto_resolved) &&
+        (e.status === EscalationStatus.resolved || e.status === EscalationStatus.auto_resolved) &&
         e.resolvedAt,
     );
     let averageResolutionTime: number | null = null;
@@ -256,8 +237,7 @@ export class EscalationsService {
         return sum + (resolved - created);
       }, 0);
 
-      averageResolutionTime =
-        totalTime / resolvedWithTimes.length / (1000 * 60 * 60); // Convert to hours
+      averageResolutionTime = totalTime / resolvedWithTimes.length / (1000 * 60 * 60); // Convert to hours
     }
 
     return {

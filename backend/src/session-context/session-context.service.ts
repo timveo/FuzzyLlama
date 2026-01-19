@@ -86,9 +86,7 @@ export class SessionContextService {
     });
 
     if (!context) {
-      throw new NotFoundException(
-        `Session context with key '${key}' not found or expired`,
-      );
+      throw new NotFoundException(`Session context with key '${key}' not found or expired`);
     }
 
     return {
@@ -100,10 +98,7 @@ export class SessionContextService {
   /**
    * Get all context for a project (not expired)
    */
-  async getAllContext(
-    projectId: string,
-    contextType?: string,
-  ): Promise<any[]> {
+  async getAllContext(projectId: string, contextType?: string): Promise<any[]> {
     const where: any = {
       projectId,
       expiresAt: { gte: new Date() },
@@ -178,9 +173,7 @@ export class SessionContextService {
     });
 
     if (deleted.count === 0) {
-      throw new NotFoundException(
-        `Session context with key '${key}' not found`,
-      );
+      throw new NotFoundException(`Session context with key '${key}' not found`);
     }
   }
 
@@ -256,25 +249,19 @@ export class SessionContextService {
 
     const contextsByType: Record<string, number> = {};
     all.forEach((ctx) => {
-      contextsByType[ctx.contextType] =
-        (contextsByType[ctx.contextType] || 0) + 1;
+      contextsByType[ctx.contextType] = (contextsByType[ctx.contextType] || 0) + 1;
     });
 
-    const sortedByDate = all.sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-    );
+    const sortedByDate = all.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     return {
       totalContexts: all.length,
       expiredContexts: expired,
       activeContexts: active,
       contextsByType,
-      oldestContext:
-        sortedByDate.length > 0 ? sortedByDate[0].createdAt : null,
+      oldestContext: sortedByDate.length > 0 ? sortedByDate[0].createdAt : null,
       newestContext:
-        sortedByDate.length > 0
-          ? sortedByDate[sortedByDate.length - 1].createdAt
-          : null,
+        sortedByDate.length > 0 ? sortedByDate[sortedByDate.length - 1].createdAt : null,
     };
   }
 
@@ -292,9 +279,7 @@ export class SessionContextService {
     });
 
     if (!context) {
-      throw new NotFoundException(
-        `Session context with key '${key}' not found`,
-      );
+      throw new NotFoundException(`Session context with key '${key}' not found`);
     }
 
     const newExpiresAt = context.expiresAt

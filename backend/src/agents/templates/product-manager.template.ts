@@ -122,10 +122,7 @@ so that I can securely access the platform.
 
   handoffFormat: {
     phase: 'G2_COMPLETE',
-    deliverables: [
-      'docs/PRD.md',
-      'user stories',
-    ],
+    deliverables: ['docs/PRD.md', 'user stories'],
     nextAgent: ['ARCHITECT'],
     nextAction: 'Begin architecture and spec generation',
   },

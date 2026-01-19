@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateSpecificationDto } from './dto/create-specification.dto';
 import { UpdateSpecificationDto } from './dto/update-specification.dto';
@@ -22,9 +18,7 @@ export class SpecificationsService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only create specifications for your own projects',
-      );
+      throw new ForbiddenException('You can only create specifications for your own projects');
     }
 
     const specification = await this.prisma.specification.create({
@@ -55,9 +49,7 @@ export class SpecificationsService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view specifications for your own projects',
-      );
+      throw new ForbiddenException('You can only view specifications for your own projects');
     }
 
     const where: any = { projectId };
@@ -94,19 +86,13 @@ export class SpecificationsService {
     }
 
     if (specification.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view specifications for your own projects',
-      );
+      throw new ForbiddenException('You can only view specifications for your own projects');
     }
 
     return specification;
   }
 
-  async update(
-    id: string,
-    updateSpecificationDto: UpdateSpecificationDto,
-    userId: string,
-  ) {
+  async update(id: string, updateSpecificationDto: UpdateSpecificationDto, userId: string) {
     const specification = await this.prisma.specification.findUnique({
       where: { id },
       include: { project: true },
@@ -117,17 +103,14 @@ export class SpecificationsService {
     }
 
     if (specification.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only update specifications for your own projects',
-      );
+      throw new ForbiddenException('You can only update specifications for your own projects');
     }
 
     // If content is being updated, increment version
     const updateData: any = { ...updateSpecificationDto };
     if (
       updateSpecificationDto.content &&
-      JSON.stringify(updateSpecificationDto.content) !==
-        JSON.stringify(specification.content)
+      JSON.stringify(updateSpecificationDto.content) !== JSON.stringify(specification.content)
     ) {
       updateData.version = specification.version + 1;
     }
@@ -155,9 +138,7 @@ export class SpecificationsService {
     }
 
     if (specification.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only delete specifications for your own projects',
-      );
+      throw new ForbiddenException('You can only delete specifications for your own projects');
     }
 
     await this.prisma.specification.delete({
@@ -167,11 +148,7 @@ export class SpecificationsService {
     return { message: 'Specification deleted successfully' };
   }
 
-  async getSpecificationsByType(
-    projectId: string,
-    specificationType: string,
-    userId: string,
-  ) {
+  async getSpecificationsByType(projectId: string, specificationType: string, userId: string) {
     return this.findAll(projectId, userId, specificationType);
   }
 
@@ -186,9 +163,7 @@ export class SpecificationsService {
     }
 
     if (agent.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view specifications for your own projects',
-      );
+      throw new ForbiddenException('You can only view specifications for your own projects');
     }
 
     return await this.prisma.specification.findMany({
@@ -214,33 +189,30 @@ export class SpecificationsService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view stats for your own projects',
-      );
+      throw new ForbiddenException('You can only view stats for your own projects');
     }
 
-    const [total, openapi, prisma, zod, graphql, protobuf, other] =
-      await Promise.all([
-        this.prisma.specification.count({ where: { projectId } }),
-        this.prisma.specification.count({
-          where: { projectId, specificationType: 'OPENAPI' },
-        }),
-        this.prisma.specification.count({
-          where: { projectId, specificationType: 'PRISMA' },
-        }),
-        this.prisma.specification.count({
-          where: { projectId, specificationType: 'ZOD' },
-        }),
-        this.prisma.specification.count({
-          where: { projectId, specificationType: 'GRAPHQL' },
-        }),
-        this.prisma.specification.count({
-          where: { projectId, specificationType: 'PROTOBUF' },
-        }),
-        this.prisma.specification.count({
-          where: { projectId, specificationType: 'OTHER' },
-        }),
-      ]);
+    const [total, openapi, prisma, zod, graphql, protobuf, other] = await Promise.all([
+      this.prisma.specification.count({ where: { projectId } }),
+      this.prisma.specification.count({
+        where: { projectId, specificationType: 'OPENAPI' },
+      }),
+      this.prisma.specification.count({
+        where: { projectId, specificationType: 'PRISMA' },
+      }),
+      this.prisma.specification.count({
+        where: { projectId, specificationType: 'ZOD' },
+      }),
+      this.prisma.specification.count({
+        where: { projectId, specificationType: 'GRAPHQL' },
+      }),
+      this.prisma.specification.count({
+        where: { projectId, specificationType: 'PROTOBUF' },
+      }),
+      this.prisma.specification.count({
+        where: { projectId, specificationType: 'OTHER' },
+      }),
+    ]);
 
     return {
       total,

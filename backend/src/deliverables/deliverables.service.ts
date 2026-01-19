@@ -67,26 +67,19 @@ export class DeliverablesService {
     });
 
     if (!deliverable) {
-      throw new NotFoundException(
-        `Deliverable with ID ${deliverableId} not found`,
-      );
+      throw new NotFoundException(`Deliverable with ID ${deliverableId} not found`);
     }
 
     return deliverable;
   }
 
-  async updateDeliverable(
-    deliverableId: string,
-    updates: UpdateDeliverableInput,
-  ): Promise<any> {
+  async updateDeliverable(deliverableId: string, updates: UpdateDeliverableInput): Promise<any> {
     const deliverable = await this.prisma.deliverable.findUnique({
       where: { id: deliverableId },
     });
 
     if (!deliverable) {
-      throw new NotFoundException(
-        `Deliverable with ID ${deliverableId} not found`,
-      );
+      throw new NotFoundException(`Deliverable with ID ${deliverableId} not found`);
     }
 
     return this.prisma.deliverable.update({
@@ -98,18 +91,13 @@ export class DeliverablesService {
     });
   }
 
-  async updateDeliverableStatus(
-    deliverableId: string,
-    status: DeliverableStatus,
-  ): Promise<any> {
+  async updateDeliverableStatus(deliverableId: string, status: DeliverableStatus): Promise<any> {
     const deliverable = await this.prisma.deliverable.findUnique({
       where: { id: deliverableId },
     });
 
     if (!deliverable) {
-      throw new NotFoundException(
-        `Deliverable with ID ${deliverableId} not found`,
-      );
+      throw new NotFoundException(`Deliverable with ID ${deliverableId} not found`);
     }
 
     return this.prisma.deliverable.update({
@@ -122,31 +110,19 @@ export class DeliverablesService {
   }
 
   async markComplete(deliverableId: string): Promise<any> {
-    return this.updateDeliverableStatus(
-      deliverableId,
-      DeliverableStatus.complete,
-    );
+    return this.updateDeliverableStatus(deliverableId, DeliverableStatus.complete);
   }
 
   async markInProgress(deliverableId: string): Promise<any> {
-    return this.updateDeliverableStatus(
-      deliverableId,
-      DeliverableStatus.in_progress,
-    );
+    return this.updateDeliverableStatus(deliverableId, DeliverableStatus.in_progress);
   }
 
   async markInReview(deliverableId: string): Promise<any> {
-    return this.updateDeliverableStatus(
-      deliverableId,
-      DeliverableStatus.in_review,
-    );
+    return this.updateDeliverableStatus(deliverableId, DeliverableStatus.in_review);
   }
 
   async markBlocked(deliverableId: string): Promise<any> {
-    return this.updateDeliverableStatus(
-      deliverableId,
-      DeliverableStatus.blocked,
-    );
+    return this.updateDeliverableStatus(deliverableId, DeliverableStatus.blocked);
   }
 
   async deleteDeliverable(deliverableId: string): Promise<void> {
@@ -155,9 +131,7 @@ export class DeliverablesService {
     });
 
     if (!deliverable) {
-      throw new NotFoundException(
-        `Deliverable with ID ${deliverableId} not found`,
-      );
+      throw new NotFoundException(`Deliverable with ID ${deliverableId} not found`);
     }
 
     await this.prisma.deliverable.delete({ where: { id: deliverableId } });

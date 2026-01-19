@@ -121,11 +121,7 @@ def predict(input_data):
 
   handoffFormat: {
     phase: 'G5_COMPLETE',
-    deliverables: [
-      'models/',
-      'training logs',
-      'evaluation results',
-    ],
+    deliverables: ['models/', 'training logs', 'evaluation results'],
     nextAgent: ['MODEL_EVALUATOR'],
     nextAction: 'Evaluate model performance and quality',
   },

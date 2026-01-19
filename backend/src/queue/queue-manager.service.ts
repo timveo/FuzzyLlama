@@ -49,24 +49,18 @@ export class QueueManagerService {
     const priority = await this.calculatePriority(job);
     const queue = this.getQueueForPriority(priority);
 
-    this.logger.log(
-      `Adding job ${job.id} (${job.agentType}) to ${priority} priority queue`,
-    );
+    this.logger.log(`Adding job ${job.id} (${job.agentType}) to ${priority} priority queue`);
 
     // Add to appropriate queue
-    const bullJob = await queue.add(
-      job.agentType,
-      job,
-      {
-        jobId: job.id,
-        priority: this.getPriorityScore(priority),
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
-        },
+    const bullJob = await queue.add(job.agentType, job, {
+      jobId: job.id,
+      priority: this.getPriorityScore(priority),
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
       },
-    );
+    });
 
     // Track in database
     await this.prisma.agent.update({
@@ -106,9 +100,7 @@ export class QueueManagerService {
   /**
    * Calculate priority based on agent type and context
    */
-  private async calculatePriority(
-    job: AgentJob,
-  ): Promise<'critical' | 'high' | 'medium' | 'low'> {
+  private async calculatePriority(job: AgentJob): Promise<'critical' | 'high' | 'medium' | 'low'> {
     // 1. Orchestrator is always critical
     if (job.agentType === 'orchestrator') {
       return 'critical';
@@ -155,9 +147,7 @@ export class QueueManagerService {
   /**
    * Get queue for priority level
    */
-  private getQueueForPriority(
-    priority: 'critical' | 'high' | 'medium' | 'low',
-  ): Queue {
+  private getQueueForPriority(priority: 'critical' | 'high' | 'medium' | 'low'): Queue {
     switch (priority) {
       case 'critical':
         return this.criticalQueue;

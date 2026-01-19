@@ -1,20 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProofArtifactsService } from './proof-artifacts.service';
 import { CreateProofArtifactDto } from './dto/create-proof-artifact.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,9 +11,7 @@ import { RequestUser } from '../common/types/user.types';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ProofArtifactsController {
-  constructor(
-    private readonly proofArtifactsService: ProofArtifactsService,
-  ) {}
+  constructor(private readonly proofArtifactsService: ProofArtifactsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new proof artifact' })
@@ -40,10 +23,7 @@ export class ProofArtifactsController {
     status: 403,
     description: 'Cannot create proof artifact for project you do not own',
   })
-  async create(
-    @Body() createDto: CreateProofArtifactDto,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async create(@Body() createDto: CreateProofArtifactDto, @CurrentUser() user: RequestUser) {
     return this.proofArtifactsService.create(createDto, user.id);
   }
 
@@ -68,10 +48,7 @@ export class ProofArtifactsController {
     status: 200,
     description: 'Proof artifacts retrieved successfully',
   })
-  async getArtifactsForGate(
-    @Param('gateId') gateId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getArtifactsForGate(@Param('gateId') gateId: string, @CurrentUser() user: RequestUser) {
     return this.proofArtifactsService.getArtifactsForGate(gateId, user.id);
   }
 
@@ -81,10 +58,7 @@ export class ProofArtifactsController {
     status: 200,
     description: 'All artifacts validated successfully',
   })
-  async validateGateArtifacts(
-    @Param('gateId') gateId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async validateGateArtifacts(@Param('gateId') gateId: string, @CurrentUser() user: RequestUser) {
     return this.proofArtifactsService.validateGateArtifacts(gateId, user.id);
   }
 

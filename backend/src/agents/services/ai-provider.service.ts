@@ -227,8 +227,8 @@ export class AIProviderService {
       });
 
       let fullContent = '';
-      let inputTokens = 0;
-      let outputTokens = 0;
+      const inputTokens = 0;
+      const outputTokens = 0;
       let finishReason = 'stop';
 
       for await (const chunk of stream) {

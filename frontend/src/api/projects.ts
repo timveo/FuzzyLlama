@@ -2,8 +2,9 @@ import apiClient from '../lib/api-client';
 import type { Project, ProjectState } from '../types';
 
 export interface CreateProjectData {
-  name: string;
-  type: 'traditional' | 'ai_ml' | 'hybrid' | 'enhancement';
+  name?: string;
+  type?: 'traditional' | 'ai_ml' | 'hybrid' | 'enhancement';
+  description: string;
   repository?: string;
   githubRepoUrl?: string;
 }

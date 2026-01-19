@@ -111,7 +111,7 @@ export class ProjectionService {
    * Project handlers - update read models based on events
    */
 
-  private async handleProjectCreated(projectId: string, data: any): Promise<void> {
+  private async handleProjectCreated(projectId: string, _data: any): Promise<void> {
     // Project is already created, just ensure state exists
     await this.prisma.projectState.upsert({
       where: { projectId },
@@ -233,12 +233,12 @@ export class ProjectionService {
     }
   }
 
-  private async handleTaskCreated(projectId: string, data: any): Promise<void> {
+  private async handleTaskCreated(_projectId: string, _data: any): Promise<void> {
     // Task is already created in the database
     // This projection just ensures consistency
   }
 
-  private async handleTaskCompleted(projectId: string, data: any): Promise<void> {
+  private async handleTaskCompleted(_projectId: string, data: any): Promise<void> {
     if (data.taskId) {
       await this.prisma.task.update({
         where: { id: data.taskId },
@@ -250,7 +250,7 @@ export class ProjectionService {
     }
   }
 
-  private async handleDocumentCreated(projectId: string, data: any): Promise<void> {
+  private async handleDocumentCreated(_projectId: string, _data: any): Promise<void> {
     // Document is already created
     // This ensures consistency
   }
@@ -266,7 +266,9 @@ export class ProjectionService {
       },
       update: {},
     });
-    this.logger.debug(`Code generated event processed for project ${projectId}: ${data.filesCount || 0} files`);
+    this.logger.debug(
+      `Code generated event processed for project ${projectId}: ${data.filesCount || 0} files`,
+    );
   }
 
   private async handleBuildResult(projectId: string, data: any): Promise<void> {
@@ -286,17 +288,17 @@ export class ProjectionService {
     });
   }
 
-  private async handleDecisionMade(projectId: string, data: any): Promise<void> {
+  private async handleDecisionMade(_projectId: string, _data: any): Promise<void> {
     // Decision is already created
     // This ensures consistency
   }
 
-  private async handleErrorOccurred(projectId: string, data: any): Promise<void> {
+  private async handleErrorOccurred(_projectId: string, _data: any): Promise<void> {
     // ErrorHistory is already created
     // This ensures consistency
   }
 
-  private async handleBlockerCreated(projectId: string, data: any): Promise<void> {
+  private async handleBlockerCreated(_projectId: string, _data: any): Promise<void> {
     // Blocker is already created
     // This ensures consistency
   }

@@ -151,14 +151,10 @@ export class GateStateMachineService {
 
     if (deliverables.length > 0) {
       // Check if all deliverables are complete
-      const incompleteDeliverables = deliverables.filter(
-        (d) => d.status !== 'complete',
-      );
+      const incompleteDeliverables = deliverables.filter((d) => d.status !== 'complete');
 
       if (incompleteDeliverables.length > 0) {
-        const deliverableNames = incompleteDeliverables
-          .map((d) => d.name)
-          .join(', ');
+        const deliverableNames = incompleteDeliverables.map((d) => d.name).join(', ');
         return {
           canTransition: false,
           reason: `Gate has incomplete deliverables: ${deliverableNames}. All deliverables must be complete before gate approval.`,
@@ -356,7 +352,10 @@ export class GateStateMachineService {
    */
   private async createNextGate(projectId: string, gateType: string): Promise<void> {
     // Gate descriptions and criteria
-    const gateConfig: Record<string, { description: string; passingCriteria: string; requiresProof: boolean }> = {
+    const gateConfig: Record<
+      string,
+      { description: string; passingCriteria: string; requiresProof: boolean }
+    > = {
       G1_COMPLETE: {
         description: 'Intake complete, requirements gathered',
         passingCriteria: 'User has reviewed and approved the intake summary',
@@ -465,7 +464,7 @@ export class GateStateMachineService {
   /**
    * Lock documents when gate is approved (for future implementation)
    */
-  private async lockDocumentsForGate(projectId: string, gateType: string): Promise<void> {
+  private async lockDocumentsForGate(_projectId: string, _gateType: string): Promise<void> {
     // TODO: Add document locking when schema supports it
     // Documents and specifications will be locked after gate approval
     // to prevent modifications without re-approval
