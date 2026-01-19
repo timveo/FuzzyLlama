@@ -8,13 +8,7 @@ import {
   Headers,
   BadRequestException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiHeader,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { RailwayService } from './railway.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -65,9 +59,7 @@ export class RailwayController {
     @CurrentUser() user: RequestUser,
   ) {
     if (!railwayToken) {
-      throw new BadRequestException(
-        'Railway token is required in x-railway-token header',
-      );
+      throw new BadRequestException('Railway token is required in x-railway-token header');
     }
 
     return this.railwayService.deployProject(projectId, user.id, railwayToken, {
@@ -91,9 +83,7 @@ export class RailwayController {
     @CurrentUser() user: RequestUser,
   ) {
     if (!railwayToken) {
-      throw new BadRequestException(
-        'Railway token is required in x-railway-token header',
-      );
+      throw new BadRequestException('Railway token is required in x-railway-token header');
     }
 
     return this.railwayService.redeployProject(projectId, user.id, railwayToken);
@@ -130,9 +120,7 @@ export class RailwayController {
     @CurrentUser() user: RequestUser,
   ) {
     if (!railwayToken) {
-      throw new BadRequestException(
-        'Railway token is required in x-railway-token header',
-      );
+      throw new BadRequestException('Railway token is required in x-railway-token header');
     }
 
     // Get FuzzyLlama project to find Railway project ID
@@ -145,18 +133,13 @@ export class RailwayController {
     }
 
     if (project.ownerId !== user.id) {
-      throw new BadRequestException(
-        'You can only view deployment status for your own projects',
-      );
+      throw new BadRequestException('You can only view deployment status for your own projects');
     }
 
     if (!project.railwayProjectId) {
       throw new BadRequestException('Project not yet deployed to Railway');
     }
 
-    return this.railwayService.getDeploymentStatus(
-      railwayToken,
-      project.railwayProjectId,
-    );
+    return this.railwayService.getDeploymentStatus(railwayToken, project.railwayProjectId);
   }
 }

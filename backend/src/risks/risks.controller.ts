@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { RisksService } from './risks.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateRiskDto } from './dto/create-risk.dto';
@@ -41,10 +33,7 @@ export class RisksController {
   }
 
   @Post(':id/mitigate')
-  async mitigateRisk(
-    @Param('id') id: string,
-    @Body() mitigateRiskDto: MitigateRiskDto,
-  ) {
+  async mitigateRisk(@Param('id') id: string, @Body() mitigateRiskDto: MitigateRiskDto) {
     return this.risksService.mitigateRisk(id, mitigateRiskDto);
   }
 

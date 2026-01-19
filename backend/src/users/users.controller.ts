@@ -9,12 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -86,10 +81,7 @@ export class UsersController {
   @Patch('me/teaching-level')
   @ApiOperation({ summary: 'Update current user teaching level preference' })
   @ApiResponse({ status: 200, description: 'Teaching level updated' })
-  async updateTeachingLevel(
-    @Body() dto: UpdateTeachingLevelDto,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async updateTeachingLevel(@Body() dto: UpdateTeachingLevelDto, @CurrentUser() user: RequestUser) {
     return this.usersService.updateTeachingLevel(user.id, dto.teachingLevel);
   }
 }

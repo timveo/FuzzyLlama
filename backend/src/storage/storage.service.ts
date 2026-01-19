@@ -236,11 +236,7 @@ export class StorageService {
   /**
    * Upload generated code file
    */
-  async uploadGeneratedCode(
-    projectId: string,
-    filePath: string,
-    code: string,
-  ): Promise<string> {
+  async uploadGeneratedCode(projectId: string, filePath: string, code: string): Promise<string> {
     const key = `generated/${projectId}/${filePath}`;
 
     return this.upload(key, code, {

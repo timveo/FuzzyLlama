@@ -149,16 +149,12 @@ if (resource.userId !== req.user.id) {
 **Ready to secure the application. Share the codebase for audit.**
 `,
 
-  defaultModel: 'claude-3-opus-20240229',  // Security requires best model
+  defaultModel: 'claude-3-opus-20240229', // Security requires best model
   maxTokens: 8000,
 
   handoffFormat: {
     phase: 'G7_COMPLETE',
-    deliverables: [
-      'docs/SECURITY.md',
-      'npm audit results',
-      'security fixes',
-    ],
+    deliverables: ['docs/SECURITY.md', 'npm audit results', 'security fixes'],
     nextAgent: ['DEVOPS_ENGINEER'],
     nextAction: 'Begin deployment preparation',
   },

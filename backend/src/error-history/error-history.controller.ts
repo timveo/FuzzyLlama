@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ErrorHistoryService } from './error-history.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LogErrorDto } from './dto/log-error.dto';
@@ -89,11 +80,7 @@ export class ErrorHistoryController {
       options.limit = parseInt(limit, 10);
     }
 
-    return this.errorHistoryService.findSimilarErrors(
-      message,
-      projectId,
-      options,
-    );
+    return this.errorHistoryService.findSimilarErrors(message, projectId, options);
   }
 
   /**

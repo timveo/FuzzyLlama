@@ -97,9 +97,7 @@ export class AuthService {
 
     // Check if user used OAuth (no password)
     if (!user.passwordHash) {
-      throw new UnauthorizedException(
-        'This account uses OAuth. Please sign in with GitHub.',
-      );
+      throw new UnauthorizedException('This account uses OAuth. Please sign in with GitHub.');
     }
 
     // Verify password
@@ -134,10 +132,7 @@ export class AuthService {
       }
 
       // Validate token exists in Redis and is not blacklisted
-      const isValid = await this.tokenStorage.validateRefreshToken(
-        payload.sub,
-        payload.jti,
-      );
+      const isValid = await this.tokenStorage.validateRefreshToken(payload.sub, payload.jti);
 
       if (!isValid) {
         throw new UnauthorizedException('Token has been revoked');
@@ -226,9 +221,7 @@ export class AuthService {
     await this.tokenStorage.invalidateAllUserTokens(userId);
   }
 
-  async forgotPassword(
-    forgotPasswordDto: ForgotPasswordDto,
-  ): Promise<{ message: string }> {
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
     const { email } = forgotPasswordDto;
 
     const user = await this.prisma.user.findUnique({
@@ -238,8 +231,7 @@ export class AuthService {
     // Always return success to prevent email enumeration
     if (!user) {
       return {
-        message:
-          'If an account with that email exists, a password reset link has been sent.',
+        message: 'If an account with that email exists, a password reset link has been sent.',
       };
     }
 
@@ -260,14 +252,11 @@ export class AuthService {
     // Example: await this.emailService.sendPasswordReset(email, resetToken);
 
     return {
-      message:
-        'If an account with that email exists, a password reset link has been sent.',
+      message: 'If an account with that email exists, a password reset link has been sent.',
     };
   }
 
-  async resetPassword(
-    resetPasswordDto: ResetPasswordDto,
-  ): Promise<{ message: string }> {
+  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
     const { token, newPassword } = resetPasswordDto;
 
     const user = await this.prisma.user.findFirst({

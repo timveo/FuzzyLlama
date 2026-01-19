@@ -297,11 +297,7 @@ export class EmbeddingService {
    * Get agent context with relevant code examples
    * Use this to provide better context to AI agents
    */
-  async getAgentContext(
-    projectId: string,
-    agentTask: string,
-    maxFiles = 5,
-  ): Promise<string> {
+  async getAgentContext(projectId: string, agentTask: string, maxFiles = 5): Promise<string> {
     const similarCode = await this.searchByDescription(projectId, agentTask, maxFiles);
 
     if (similarCode.length === 0) {

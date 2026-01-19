@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { FileSystemService } from './filesystem.service';
-import * as path from 'path';
 
 export interface GitInitResult {
   success: boolean;
@@ -30,7 +29,8 @@ export class GitIntegrationService {
    */
   async initRepository(projectId: string, defaultBranch = 'main'): Promise<GitInitResult> {
     try {
-      const projectPath = this.filesystem.getProjectPath(projectId);
+      // Get project path for reference (used by executeCommand internally)
+      this.filesystem.getProjectPath(projectId);
 
       // Check if git repo already exists
       const gitCheckResult = await this.filesystem.executeCommand(
@@ -51,16 +51,10 @@ export class GitIntegrationService {
       await this.filesystem.executeCommand(projectId, 'git init');
 
       // Set default branch name
-      await this.filesystem.executeCommand(
-        projectId,
-        `git branch -M ${defaultBranch}`,
-      );
+      await this.filesystem.executeCommand(projectId, `git branch -M ${defaultBranch}`);
 
       // Configure user (required for commits)
-      await this.filesystem.executeCommand(
-        projectId,
-        'git config user.name "FuzzyLlama Agent"',
-      );
+      await this.filesystem.executeCommand(projectId, 'git config user.name "FuzzyLlama Agent"');
 
       await this.filesystem.executeCommand(
         projectId,
@@ -117,14 +111,8 @@ export class GitIntegrationService {
 
       // Configure author if provided
       if (author) {
-        await this.filesystem.executeCommand(
-          projectId,
-          `git config user.name "${author.name}"`,
-        );
-        await this.filesystem.executeCommand(
-          projectId,
-          `git config user.email "${author.email}"`,
-        );
+        await this.filesystem.executeCommand(projectId, `git config user.name "${author.name}"`);
+        await this.filesystem.executeCommand(projectId, `git config user.email "${author.email}"`);
       }
 
       // Create commit
@@ -134,16 +122,11 @@ export class GitIntegrationService {
       );
 
       // Get commit hash
-      const hashResult = await this.filesystem.executeCommand(
-        projectId,
-        'git rev-parse HEAD',
-      );
+      const hashResult = await this.filesystem.executeCommand(projectId, 'git rev-parse HEAD');
 
       const commitHash = hashResult.stdout.trim();
 
-      console.log(
-        `[Git] Created commit ${commitHash} with ${stagedFiles.length} files`,
-      );
+      console.log(`[Git] Created commit ${commitHash} with ${stagedFiles.length} files`);
 
       return {
         success: true,
@@ -178,16 +161,10 @@ export class GitIntegrationService {
       );
 
       if (!remoteCheckResult.success) {
-        await this.filesystem.executeCommand(
-          projectId,
-          `git remote add origin ${remoteUrl}`,
-        );
+        await this.filesystem.executeCommand(projectId, `git remote add origin ${remoteUrl}`);
       } else {
         // Update remote URL
-        await this.filesystem.executeCommand(
-          projectId,
-          `git remote set-url origin ${remoteUrl}`,
-        );
+        await this.filesystem.executeCommand(projectId, `git remote set-url origin ${remoteUrl}`);
       }
 
       // Push to remote
@@ -222,10 +199,7 @@ export class GitIntegrationService {
    */
   async getCurrentCommit(projectId: string): Promise<string | null> {
     try {
-      const result = await this.filesystem.executeCommand(
-        projectId,
-        'git rev-parse HEAD',
-      );
+      const result = await this.filesystem.executeCommand(projectId, 'git rev-parse HEAD');
 
       return result.success ? result.stdout.trim() : null;
     } catch (error) {
@@ -238,10 +212,7 @@ export class GitIntegrationService {
    */
   async getUncommittedFiles(projectId: string): Promise<string[]> {
     try {
-      const result = await this.filesystem.executeCommand(
-        projectId,
-        'git status --porcelain',
-      );
+      const result = await this.filesystem.executeCommand(projectId, 'git status --porcelain');
 
       if (!result.success) {
         return [];
@@ -261,10 +232,7 @@ export class GitIntegrationService {
    */
   async createBranch(projectId: string, branchName: string): Promise<boolean> {
     try {
-      await this.filesystem.executeCommand(
-        projectId,
-        `git checkout -b ${branchName}`,
-      );
+      await this.filesystem.executeCommand(projectId, `git checkout -b ${branchName}`);
 
       return true;
     } catch (error) {
@@ -278,10 +246,7 @@ export class GitIntegrationService {
    */
   async switchBranch(projectId: string, branchName: string): Promise<boolean> {
     try {
-      await this.filesystem.executeCommand(
-        projectId,
-        `git checkout ${branchName}`,
-      );
+      await this.filesystem.executeCommand(projectId, `git checkout ${branchName}`);
 
       return true;
     } catch (error) {

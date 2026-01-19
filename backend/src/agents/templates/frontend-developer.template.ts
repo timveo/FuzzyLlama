@@ -168,12 +168,7 @@ export const useAuth = () => {
 
   handoffFormat: {
     phase: 'G5_COMPLETE',
-    deliverables: [
-      'src/',
-      'package.json',
-      'vite.config.ts',
-      'test results',
-    ],
+    deliverables: ['src/', 'package.json', 'vite.config.ts', 'test results'],
     nextAgent: ['QA_ENGINEER'],
     nextAction: 'Begin testing frontend functionality',
   },

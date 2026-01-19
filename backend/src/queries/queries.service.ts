@@ -94,10 +94,7 @@ export class QueriesService {
   /**
    * Get pending queries for a specific agent (inbox)
    */
-  async getPendingQueries(
-    projectId: string,
-    toAgent: string,
-  ): Promise<any[]> {
+  async getPendingQueries(projectId: string, toAgent: string): Promise<any[]> {
     return this.getQueries(projectId, {
       status: QueryStatus.pending,
       toAgent,
@@ -125,10 +122,7 @@ export class QueriesService {
   /**
    * Answer a pending query
    */
-  async answerQuery(
-    queryId: string,
-    input: AnswerQueryInput,
-  ): Promise<any> {
+  async answerQuery(queryId: string, input: AnswerQueryInput): Promise<any> {
     const query = await this.prisma.query.findUnique({
       where: { id: queryId },
     });
@@ -240,8 +234,7 @@ export class QueriesService {
         return sum + (answered - created);
       }, 0);
 
-      averageResponseTime =
-        totalTime / answeredWithTimes.length / (1000 * 60); // Convert to minutes
+      averageResponseTime = totalTime / answeredWithTimes.length / (1000 * 60); // Convert to minutes
     }
 
     return {
@@ -258,11 +251,7 @@ export class QueriesService {
   /**
    * Get query thread (related queries between same agents)
    */
-  async getQueryThread(
-    projectId: string,
-    agent1: string,
-    agent2: string,
-  ): Promise<any[]> {
+  async getQueryThread(projectId: string, agent1: string, agent2: string): Promise<any[]> {
     return this.prisma.query.findMany({
       where: {
         projectId,

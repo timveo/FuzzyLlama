@@ -14,7 +14,7 @@ import {
   CheckIcon,
   PencilIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { projectsApi } from '../api/projects';
 import { tasksApi } from '../api/tasks';
 
@@ -261,7 +261,9 @@ const BuilderQuote = () => {
     { text: "The best architectures tell a story.", author: "The Craft" }
   ];
 
-  const [currentQuote] = useState(quotes[Math.floor(Math.random() * quotes.length)]);
+  // Use useMemo with empty deps to generate random index only once on mount
+  const randomIndex = useMemo(() => Math.floor(Math.random() * quotes.length), []);
+  const [currentQuote] = useState(quotes[randomIndex]);
 
   return (
     <div className="text-center py-6">

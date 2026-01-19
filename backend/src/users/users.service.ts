@@ -117,11 +117,7 @@ export class UsersService {
     return updatedUser;
   }
 
-  async changePassword(
-    id: string,
-    changePasswordDto: ChangePasswordDto,
-    currentUserId: string,
-  ) {
+  async changePassword(id: string, changePasswordDto: ChangePasswordDto, currentUserId: string) {
     // Check if user is changing their own password
     if (id !== currentUserId) {
       throw new ForbiddenException('You can only change your own password');
@@ -141,9 +137,7 @@ export class UsersService {
 
     // Check if user has a password (OAuth users don't)
     if (!user.passwordHash) {
-      throw new BadRequestException(
-        'This account uses OAuth and does not have a password',
-      );
+      throw new BadRequestException('This account uses OAuth and does not have a password');
     }
 
     // Verify current password

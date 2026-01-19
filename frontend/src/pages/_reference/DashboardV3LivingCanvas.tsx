@@ -170,21 +170,22 @@ const ConnectionLine = ({
 };
 
 const FloatingParticles = () => {
-  const [particles, setParticles] = useState<Particle[]>([]);
+  const createParticle = (): Particle => ({
+    id: Math.random(),
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    vx: (Math.random() - 0.5) * 0.1,
+    vy: (Math.random() - 0.5) * 0.1,
+    life: 1,
+    color: ['#14b8a6', '#8b5cf6', '#10b981', '#f59e0b'][Math.floor(Math.random() * 4)]
+  });
+
+  // Initialize particles outside of effect to avoid synchronous setState
+  const [particles, setParticles] = useState<Particle[]>(() =>
+    Array.from({ length: 30 }, createParticle)
+  );
 
   useEffect(() => {
-    const createParticle = (): Particle => ({
-      id: Math.random(),
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      vx: (Math.random() - 0.5) * 0.1,
-      vy: (Math.random() - 0.5) * 0.1,
-      life: 1,
-      color: ['#14b8a6', '#8b5cf6', '#10b981', '#f59e0b'][Math.floor(Math.random() * 4)]
-    });
-
-    setParticles(Array.from({ length: 30 }, createParticle));
-
     const interval = setInterval(() => {
       setParticles(prev => prev.map(p => ({
         ...p,

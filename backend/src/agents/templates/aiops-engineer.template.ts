@@ -163,12 +163,7 @@ def route_prediction(user_id, model_a, model_b):
 
   handoffFormat: {
     phase: 'G9_COMPLETE',
-    deliverables: [
-      'model serving API',
-      'monitoring dashboard',
-      'docs/MLOPS.md',
-      'production URL',
-    ],
+    deliverables: ['model serving API', 'monitoring dashboard', 'docs/MLOPS.md', 'production URL'],
     nextAgent: null,
     nextAction: 'ML project complete and deployed',
   },

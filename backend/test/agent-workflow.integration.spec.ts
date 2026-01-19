@@ -230,9 +230,7 @@ export const App = () => {
         .set('Authorization', `Bearer ${user.token}`)
         .expect(200);
 
-      const g1Gate = updatedGatesResponse.body.find(
-        (g: any) => g.gateType === 'G1_PENDING',
-      );
+      const g1Gate = updatedGatesResponse.body.find((g: any) => g.gateType === 'G1_PENDING');
       expect(g1Gate).toBeDefined();
     });
 
@@ -251,7 +249,7 @@ export const App = () => {
         .set('Authorization', `Bearer ${user.token}`)
         .send({
           approved: true,
-          reviewNotes: 'ok',  // Invalid keyword
+          reviewNotes: 'ok', // Invalid keyword
         });
 
       expect(response.status).toBe(403);

@@ -116,10 +116,7 @@ export class BlockersService {
   /**
    * Resolve a blocker
    */
-  async resolveBlocker(
-    blockerId: string,
-    input: ResolveBlockerInput,
-  ): Promise<any> {
+  async resolveBlocker(blockerId: string, input: ResolveBlockerInput): Promise<any> {
     const blocker = await this.prisma.blocker.findUnique({
       where: { id: blockerId },
     });
@@ -144,10 +141,7 @@ export class BlockersService {
   /**
    * Escalate a blocker to higher level (L1, L2, L3)
    */
-  async escalateBlocker(
-    blockerId: string,
-    input: EscalateBlockerInput,
-  ): Promise<any> {
+  async escalateBlocker(blockerId: string, input: EscalateBlockerInput): Promise<any> {
     const blocker = await this.prisma.blocker.findUnique({
       where: { id: blockerId },
     });
@@ -172,10 +166,7 @@ export class BlockersService {
   /**
    * Update a blocker
    */
-  async updateBlocker(
-    blockerId: string,
-    updates: Partial<CreateBlockerInput>,
-  ): Promise<any> {
+  async updateBlocker(blockerId: string, updates: Partial<CreateBlockerInput>): Promise<any> {
     const blocker = await this.prisma.blocker.findUnique({
       where: { id: blockerId },
     });
@@ -243,8 +234,7 @@ export class BlockersService {
         return sum + (resolved - created);
       }, 0);
 
-      averageResolutionTime =
-        totalTime / resolvedWithTimes.length / (1000 * 60 * 60); // Convert to hours
+      averageResolutionTime = totalTime / resolvedWithTimes.length / (1000 * 60 * 60); // Convert to hours
     }
 
     return {

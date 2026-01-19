@@ -116,11 +116,7 @@ describe('TokenStorageService', () => {
       await service.invalidateRefreshToken(userId, tokenId);
 
       expect(redis.del).toHaveBeenCalledWith('refresh_token:user-123:token-abc');
-      expect(redis.setex).toHaveBeenCalledWith(
-        'blacklist:token-abc',
-        30 * 24 * 60 * 60,
-        '1',
-      );
+      expect(redis.setex).toHaveBeenCalledWith('blacklist:token-abc', 30 * 24 * 60 * 60, '1');
     });
   });
 
@@ -165,10 +161,7 @@ describe('TokenStorageService', () => {
   describe('getUserTokens', () => {
     it('should return list of user tokens with metadata', async () => {
       const userId = 'user-123';
-      const tokenKeys = [
-        'refresh_token:user-123:token-1',
-        'refresh_token:user-123:token-2',
-      ];
+      const tokenKeys = ['refresh_token:user-123:token-1', 'refresh_token:user-123:token-2'];
 
       redis.keys.mockResolvedValue(tokenKeys as any);
       redis.ttl.mockResolvedValueOnce(2592000); // 30 days
@@ -186,11 +179,7 @@ describe('TokenStorageService', () => {
 
   describe('cleanupExpiredTokens', () => {
     it('should delete expired blacklist entries', async () => {
-      const blacklistKeys = [
-        'blacklist:token-1',
-        'blacklist:token-2',
-        'blacklist:token-3',
-      ];
+      const blacklistKeys = ['blacklist:token-1', 'blacklist:token-2', 'blacklist:token-3'];
 
       redis.keys.mockResolvedValue(blacklistKeys as any);
       redis.ttl.mockResolvedValueOnce(-1); // Expired

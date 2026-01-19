@@ -33,7 +33,8 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   async handleConnection(client: Socket) {
     try {
       // Get token from handshake auth
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+      const token =
+        client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
 
       if (!token) {
         this.logger.warn(`Client ${client.id} attempted connection without token`);

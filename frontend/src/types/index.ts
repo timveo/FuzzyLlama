@@ -180,7 +180,7 @@ export interface Specification {
   projectId: string;
   name: string;
   specificationType: SpecificationType;
-  content: Record<string, any>;
+  content: Record<string, unknown>;
   description?: string | null;
   version: number;
   agentId?: string | null;
@@ -208,7 +208,7 @@ export interface AgentTemplate {
     context: string;
     protocols?: string[];
     capabilities?: string[];
-    handoffProtocol?: Record<string, any>;
+    handoffProtocol?: Record<string, unknown>;
   };
 }
 
@@ -224,7 +224,7 @@ export interface AgentExecution {
   model: string;
   inputTokens: number;
   outputTokens: number;
-  contextData?: Record<string, any> | null;
+  contextData?: Record<string, unknown> | null;
   completedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;

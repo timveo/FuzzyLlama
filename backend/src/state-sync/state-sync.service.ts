@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { FileSystemService } from '../code-generation/filesystem.service';
 import { GitIntegrationService } from '../code-generation/git-integration.service';
-import { Project, ProjectState, Gate, Task, Document, Specification, Phase } from '@prisma/client';
+import { ProjectState, Phase } from '@prisma/client';
 
 /**
  * StateSyncService - Hybrid MCP + Database Architecture
@@ -159,10 +159,14 @@ export class StateSyncService {
 **Overall Progress**: ${this.calculateProgress(project)}%
 
 **Current Gate Details**:
-${currentGate ? `- Type: ${currentGate.gateType}
+${
+  currentGate
+    ? `- Type: ${currentGate.gateType}
 - Status: ${currentGate.status}
 - Created: ${currentGate.createdAt.toISOString()}
-- Proof Artifacts: ${currentGate.proofArtifacts?.length || 0}` : 'No active gate'}
+- Proof Artifacts: ${currentGate.proofArtifacts?.length || 0}`
+    : 'No active gate'
+}
 
 ---
 
@@ -185,30 +189,38 @@ ${this.formatRecentActivity(project)}
 
 ## Blockers
 
-${project.blockers?.length > 0
-  ? project.blockers.map((b) => `- **${b.title}**: ${b.description} (${b.severity})`).join('\n')
-  : 'No active blockers'}
+${
+  project.blockers?.length > 0
+    ? project.blockers.map((b) => `- **${b.title}**: ${b.description} (${b.severity})`).join('\n')
+    : 'No active blockers'
+}
 
 ---
 
 ## Queries
 
-${project.queries?.length > 0
-  ? project.queries.map((q) => `- **${q.question}** (${q.importance})`).join('\n')
-  : 'No unresolved queries'}
+${
+  project.queries?.length > 0
+    ? project.queries.map((q) => `- **${q.question}** (${q.importance})`).join('\n')
+    : 'No unresolved queries'
+}
 
 ---
 
 ## Metadata
 
 \`\`\`json
-${JSON.stringify({
-  projectId: project.id,
-  currentGate: state.currentGate,
-  currentPhase: state.currentPhase,
-  status: state.status,
-  lastUpdated: new Date().toISOString(),
-}, null, 2)}
+${JSON.stringify(
+  {
+    projectId: project.id,
+    currentGate: state.currentGate,
+    currentPhase: state.currentPhase,
+    status: state.status,
+    lastUpdated: new Date().toISOString(),
+  },
+  null,
+  2,
+)}
 \`\`\`
 
 ---
@@ -229,8 +241,11 @@ All architectural and implementation decisions for this project.
 
 ---
 
-${decisions.length > 0
-  ? decisions.map((d, i) => `## Decision ${i + 1}: ${d.title}
+${
+  decisions.length > 0
+    ? decisions
+        .map(
+          (d, i) => `## Decision ${i + 1}: ${d.title}
 
 **Date**: ${d.createdAt.toISOString()}
 **Type**: ${d.decisionType}
@@ -249,17 +264,28 @@ ${d.decision}
 
 ${d.rationale}
 
-${d.alternatives ? `### Alternatives Considered
+${
+  d.alternatives
+    ? `### Alternatives Considered
 
-${d.alternatives}` : ''}
+${d.alternatives}`
+    : ''
+}
 
-${d.consequences ? `### Consequences
+${
+  d.consequences
+    ? `### Consequences
 
-${d.consequences}` : ''}
+${d.consequences}`
+    : ''
+}
 
 ---
-`).join('\n')
-  : 'No decisions recorded yet.'}
+`,
+        )
+        .join('\n')
+    : 'No decisions recorded yet.'
+}
 
 ---
 
@@ -291,35 +317,53 @@ Long-term memory and context for AI agents.
 
 ## Key Decisions
 
-${decisions.slice(0, 10).map((d) => `- **${d.title}**: ${d.decision}`).join('\n') || 'No decisions yet'}
+${
+  decisions
+    .slice(0, 10)
+    .map((d) => `- **${d.title}**: ${d.decision}`)
+    .join('\n') || 'No decisions yet'
+}
 
 ---
 
 ## Tech Stack
 
-${project.specifications?.find((s) => s.specType === 'TECH_STACK')
-  ? project.specifications.find((s) => s.specType === 'TECH_STACK').content
-  : 'Tech stack not defined yet'}
+${
+  project.specifications?.find((s) => s.specType === 'TECH_STACK')
+    ? project.specifications.find((s) => s.specType === 'TECH_STACK').content
+    : 'Tech stack not defined yet'
+}
 
 ---
 
 ## Recent Agent Executions
 
-${agents.slice(0, 5).map((a) => `- **${a.agentType}** (${a.status}): ${a.createdAt.toISOString()}`).join('\n') || 'No agents executed yet'}
+${
+  agents
+    .slice(0, 5)
+    .map((a) => `- **${a.agentType}** (${a.status}): ${a.createdAt.toISOString()}`)
+    .join('\n') || 'No agents executed yet'
+}
 
 ---
 
 ## Important Context
 
-${memories.length > 0
-  ? memories.map((m) => `### ${m.title}
+${
+  memories.length > 0
+    ? memories
+        .map(
+          (m) => `### ${m.title}
 
 ${m.content}
 
 *Tags*: ${m.tags?.join(', ') || 'none'}
 *Relevance*: ${m.relevanceScore || 'N/A'}
-`).join('\n\n')
-  : 'No system memory entries yet.'}
+`,
+        )
+        .join('\n\n')
+    : 'No system memory entries yet.'
+}
 
 ---
 
@@ -339,23 +383,35 @@ Gate workflow progress (G0 → G9 → COMPLETE)
 
 ---
 
-${gates.map((g) => `## ${g.gateType}
+${gates
+  .map(
+    (g) => `## ${g.gateType}
 
 **Status**: ${g.status}
 **Created**: ${g.createdAt.toISOString()}
 ${g.approvedAt ? `**Approved**: ${g.approvedAt.toISOString()}` : ''}
 ${g.approvedBy ? `**Approved By**: ${g.approvedBy}` : ''}
 
-${g.reviewNotes ? `### Review Notes
+${
+  g.reviewNotes
+    ? `### Review Notes
 
-${g.reviewNotes}` : ''}
+${g.reviewNotes}`
+    : ''
+}
 
-${g.proofArtifacts?.length > 0 ? `### Proof Artifacts
+${
+  g.proofArtifacts?.length > 0
+    ? `### Proof Artifacts
 
-${g.proofArtifacts.map((a) => `- ${a.artifactType}: ${a.filePath}`).join('\n')}` : ''}
+${g.proofArtifacts.map((a) => `- ${a.artifactType}: ${a.filePath}`).join('\n')}`
+    : ''
+}
 
 ---
-`).join('\n')}
+`,
+  )
+  .join('\n')}
 
 ---
 
@@ -380,25 +436,44 @@ Task queue and execution status.
 
 ## In Progress (${inProgress.length})
 
-${inProgress.map((t) => `- [ ] **${t.title}** (${t.agentType})
+${
+  inProgress
+    .map(
+      (t) => `- [ ] **${t.title}** (${t.agentType})
   - ${t.description}
   - Priority: ${t.priority}
-  - Assigned: ${t.createdAt.toISOString()}`).join('\n\n') || 'No tasks in progress'}
+  - Assigned: ${t.createdAt.toISOString()}`,
+    )
+    .join('\n\n') || 'No tasks in progress'
+}
 
 ---
 
 ## Pending (${pending.length})
 
-${pending.map((t) => `- [ ] **${t.title}** (${t.agentType})
+${
+  pending
+    .map(
+      (t) => `- [ ] **${t.title}** (${t.agentType})
   - ${t.description}
-  - Priority: ${t.priority}`).join('\n\n') || 'No pending tasks'}
+  - Priority: ${t.priority}`,
+    )
+    .join('\n\n') || 'No pending tasks'
+}
 
 ---
 
 ## Completed (${completed.length})
 
-${completed.slice(0, 20).map((t) => `- [x] **${t.title}** (${t.agentType})
-  - Completed: ${t.completedAt?.toISOString() || 'N/A'}`).join('\n') || 'No completed tasks'}
+${
+  completed
+    .slice(0, 20)
+    .map(
+      (t) => `- [x] **${t.title}** (${t.agentType})
+  - Completed: ${t.completedAt?.toISOString() || 'N/A'}`,
+    )
+    .join('\n') || 'No completed tasks'
+}
 
 ---
 
@@ -409,7 +484,9 @@ ${completed.slice(0, 20).map((t) => `- [x] **${t.title}** (${t.agentType})
   /**
    * Parse STATUS.md back to database updates
    */
-  private parseStatusMarkdown(statusMd: string): Partial<Omit<ProjectState, 'projectId' | 'project' | 'updatedAt'>> {
+  private parseStatusMarkdown(
+    statusMd: string,
+  ): Partial<Omit<ProjectState, 'projectId' | 'project' | 'updatedAt'>> {
     const updates: Partial<Omit<ProjectState, 'projectId' | 'project' | 'updatedAt'>> = {};
 
     // Extract phase
@@ -474,10 +551,12 @@ ${completed.slice(0, 20).map((t) => `- [x] **${t.title}** (${t.agentType})
     // Sort by date descending
     activities.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-    return activities
-      .slice(0, 10)
-      .map((a) => `- ${a.text} (${a.date.toISOString().split('T')[0]})`)
-      .join('\n') || 'No recent activity';
+    return (
+      activities
+        .slice(0, 10)
+        .map((a) => `- ${a.text} (${a.date.toISOString().split('T')[0]})`)
+        .join('\n') || 'No recent activity'
+    );
   }
 
   /**

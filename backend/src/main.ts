@@ -26,12 +26,9 @@ async function bootstrap() {
           ],
           styleSrc: ["'self'", "'unsafe-inline'"], // Required for Swagger UI
           imgSrc: ["'self'", 'data:', 'https:'],
-          connectSrc: [
-            "'self'",
-            process.env.FRONTEND_URL,
-            'ws://localhost:*',
-            'wss://*',
-          ].filter(Boolean) as string[],
+          connectSrc: ["'self'", process.env.FRONTEND_URL, 'ws://localhost:*', 'wss://*'].filter(
+            Boolean,
+          ) as string[],
           fontSrc: ["'self'", 'data:'],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],

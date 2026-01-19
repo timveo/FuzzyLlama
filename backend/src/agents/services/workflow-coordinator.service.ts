@@ -170,9 +170,17 @@ Begin by warmly acknowledging their project idea, then ask your FIRST question a
     }
 
     // Check if this is an approval message and if we're in a state where approval is expected
-    const approvalKeywords = ['approved', 'approve', 'looks good', 'lgtm', 'yes', 'confirm', 'accept'];
-    const isApprovalMessage = approvalKeywords.some(keyword =>
-      message.toLowerCase().includes(keyword)
+    const approvalKeywords = [
+      'approved',
+      'approve',
+      'looks good',
+      'lgtm',
+      'yes',
+      'confirm',
+      'accept',
+    ];
+    const isApprovalMessage = approvalKeywords.some((keyword) =>
+      message.toLowerCase().includes(keyword),
     );
 
     // Check if intake document exists (meaning onboarding questions are complete)
@@ -196,8 +204,8 @@ Begin by warmly acknowledging their project idea, then ask your FIRST question a
         projectId,
         currentGate.gateType,
         userId,
-        'approved',  // approvalResponse
-        'User approved via chat',  // reviewNotes
+        'approved', // approvalResponse
+        'User approved via chat', // reviewNotes
       );
 
       // For G1 approval, we need to decompose requirements and create tasks for all agents
@@ -205,10 +213,14 @@ Begin by warmly acknowledging their project idea, then ask your FIRST question a
         console.log('G1 approved - decomposing requirements and creating tasks for all agents');
 
         // Get requirements from the intake document
-        const requirements = intakeDocument.content || 'Build the project as specified in the intake document';
+        const requirements =
+          intakeDocument.content || 'Build the project as specified in the intake document';
 
         // Decompose into agent tasks
-        const decomposition = await this.orchestrator.decomposeRequirements(projectId, requirements);
+        const decomposition = await this.orchestrator.decomposeRequirements(
+          projectId,
+          requirements,
+        );
         console.log('Created decomposition with', decomposition.tasks.length, 'tasks');
 
         // Create tasks in database
@@ -376,19 +388,14 @@ DO NOT skip any questions. DO NOT output the intake document until ALL 5 questio
     // Transition gate to IN_REVIEW for user approval
     const currentGate = await this.gateStateMachine.getCurrentGate(projectId);
     if (currentGate) {
-      await this.gateStateMachine.transitionToReview(
-        projectId,
-        currentGate.gateType,
-        { description: 'Project intake complete - ready for scope approval' },
-      );
+      await this.gateStateMachine.transitionToReview(projectId, currentGate.gateType, {
+        description: 'Project intake complete - ready for scope approval',
+      });
 
       // Notify frontend that gate is ready for approval
-      this.wsGateway.emitGateReady(
-        projectId,
-        currentGate.id,
-        currentGate.gateType,
-        [{ type: 'document', id: document.id, title: 'Project Intake' }],
-      );
+      this.wsGateway.emitGateReady(projectId, currentGate.id, currentGate.gateType, [
+        { type: 'document', id: document.id, title: 'Project Intake' },
+      ]);
     }
   }
 
@@ -496,10 +503,7 @@ DO NOT skip any questions. DO NOT output the intake document until ALL 5 questio
   /**
    * Check if current gate is ready for user approval
    */
-  private async checkGateReadiness(
-    projectId: string,
-    userId: string,
-  ): Promise<void> {
+  private async checkGateReadiness(projectId: string, _userId: string): Promise<void> {
     const currentGate = await this.gateStateMachine.getCurrentGate(projectId);
 
     if (!currentGate || currentGate.status !== 'PENDING') {
@@ -540,11 +544,7 @@ DO NOT skip any questions. DO NOT output the intake document until ALL 5 questio
   /**
    * Handle gate approval - triggers next phase
    */
-  async onGateApproved(
-    projectId: string,
-    gateType: string,
-    userId: string,
-  ): Promise<void> {
+  async onGateApproved(projectId: string, gateType: string, userId: string): Promise<void> {
     // Gate was approved, update project phase
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -579,7 +579,7 @@ DO NOT skip any questions. DO NOT output the intake document until ALL 5 questio
    */
   async getWorkflowStatus(
     projectId: string,
-    userId: string,
+    _userId: string,
   ): Promise<{
     currentGate: string;
     currentPhase: string;
@@ -633,9 +633,7 @@ DO NOT skip any questions. DO NOT output the intake document until ALL 5 questio
     }
 
     // Store intake answers as a document
-    const intakeContent = answers
-      .map((a) => `## ${a.questionId}\n${a.answer}`)
-      .join('\n\n');
+    const intakeContent = answers.map((a) => `## ${a.questionId}\n${a.answer}`).join('\n\n');
 
     // Check if intake document already exists
     const existingDoc = await this.prisma.document.findFirst({
@@ -666,9 +664,7 @@ DO NOT skip any questions. DO NOT output the intake document until ALL 5 questio
     }
 
     // Update user's teaching level if provided
-    const technicalBackground = answers.find(
-      (a) => a.questionId === 'technical_background',
-    );
+    const technicalBackground = answers.find((a) => a.questionId === 'technical_background');
     if (technicalBackground) {
       const levelMap: Record<string, string> = {
         NOVICE: 'NOVICE',
@@ -688,22 +684,13 @@ DO NOT skip any questions. DO NOT output the intake document until ALL 5 questio
     await this.orchestrator.initializeProject(projectId, userId);
 
     // Get initial requirements from project description or intake
-    const successCriteria = answers.find(
-      (a) => a.questionId === 'success_criteria',
-    );
+    const successCriteria = answers.find((a) => a.questionId === 'success_criteria');
     const requirements = successCriteria?.answer || 'Project requirements from intake';
 
     // Decompose requirements and create initial tasks
-    const decomposition = await this.orchestrator.decomposeRequirements(
-      projectId,
-      requirements,
-    );
+    const decomposition = await this.orchestrator.decomposeRequirements(projectId, requirements);
 
-    await this.orchestrator.createTasksFromDecomposition(
-      projectId,
-      userId,
-      decomposition,
-    );
+    await this.orchestrator.createTasksFromDecomposition(projectId, userId, decomposition);
 
     // Get current gate status
     const currentGate = await this.gateStateMachine.getCurrentGate(projectId);

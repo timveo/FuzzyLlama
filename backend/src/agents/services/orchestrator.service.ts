@@ -2,7 +2,6 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GateStateMachineService } from '../../gates/services/gate-state-machine.service';
 import { AgentExecutionService } from './agent-execution.service';
-import { getAgentTemplate } from '../templates';
 
 export interface TaskDecompositionResult {
   tasks: Array<{
@@ -26,7 +25,7 @@ export class OrchestratorService {
   /**
    * Initialize project workflow and create initial tasks
    */
-  async initializeProject(projectId: string, userId: string): Promise<void> {
+  async initializeProject(projectId: string, _userId: string): Promise<void> {
     // Initialize gates
     await this.gateStateMachine.initializeProjectGates(projectId);
 
@@ -72,7 +71,7 @@ export class OrchestratorService {
    */
   async decomposeRequirements(
     projectId: string,
-    requirements: string,
+    _requirements: string,
   ): Promise<TaskDecompositionResult> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -223,7 +222,10 @@ export class OrchestratorService {
   /**
    * Route task to appropriate agent based on current gate
    */
-  async routeTaskToAgent(projectId: string, userId: string): Promise<{
+  async routeTaskToAgent(
+    projectId: string,
+    _userId: string,
+  ): Promise<{
     agentType: string;
     taskDescription: string;
   } | null> {
@@ -327,9 +329,7 @@ export class OrchestratorService {
       include: {
         parentTask: true,
       },
-      orderBy: [
-        { createdAt: 'asc' },
-      ],
+      orderBy: [{ createdAt: 'asc' }],
     });
 
     // Find first task where parent is complete (or no parent)
@@ -538,15 +538,17 @@ export class OrchestratorService {
         taskDescription: 'Perform security audit',
       },
       G8_PENDING: {
-        agentType: projectType === 'ai_ml' || projectType === 'hybrid'
-          ? 'AIOPS_ENGINEER'
-          : 'DEVOPS_ENGINEER',
+        agentType:
+          projectType === 'ai_ml' || projectType === 'hybrid'
+            ? 'AIOPS_ENGINEER'
+            : 'DEVOPS_ENGINEER',
         taskDescription: 'Deploy to staging environment',
       },
       G9_PENDING: {
-        agentType: projectType === 'ai_ml' || projectType === 'hybrid'
-          ? 'AIOPS_ENGINEER'
-          : 'DEVOPS_ENGINEER',
+        agentType:
+          projectType === 'ai_ml' || projectType === 'hybrid'
+            ? 'AIOPS_ENGINEER'
+            : 'DEVOPS_ENGINEER',
         taskDescription: 'Deploy to production environment',
       },
     };

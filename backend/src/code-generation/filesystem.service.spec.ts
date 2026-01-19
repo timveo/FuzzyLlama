@@ -98,9 +98,9 @@ describe('FileSystemService', () => {
       const filePath = '../../../etc/passwd';
       const content = 'malicious';
 
-      await expect(
-        service.writeFile(testProjectId, filePath, content),
-      ).rejects.toThrow('path traversal detected');
+      await expect(service.writeFile(testProjectId, filePath, content)).rejects.toThrow(
+        'path traversal detected',
+      );
     });
   });
 
@@ -120,9 +120,7 @@ describe('FileSystemService', () => {
     });
 
     it('should throw error for non-existent file', async () => {
-      await expect(
-        service.readFile(testProjectId, 'nonexistent.ts'),
-      ).rejects.toThrow();
+      await expect(service.readFile(testProjectId, 'nonexistent.ts')).rejects.toThrow();
     });
   });
 
@@ -156,21 +154,14 @@ describe('FileSystemService', () => {
     });
 
     it('should handle command errors', async () => {
-      const result = await service.executeCommand(
-        testProjectId,
-        'nonexistent-command',
-      );
+      const result = await service.executeCommand(testProjectId, 'nonexistent-command');
 
       expect(result.success).toBe(false);
       expect(result.stderr).toBeDefined();
     });
 
     it('should respect timeout', async () => {
-      const result = await service.executeCommand(
-        testProjectId,
-        'sleep 10',
-        { timeout: 1000 },
-      );
+      const result = await service.executeCommand(testProjectId, 'sleep 10', { timeout: 1000 });
 
       expect(result.success).toBe(false);
       expect(result.stderr).toContain('timeout');

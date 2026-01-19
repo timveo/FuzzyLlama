@@ -5,7 +5,11 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION, SEMRESATTRS_DEPLOYMENT_ENVIRONMENT } from '@opentelemetry/semantic-conventions';
+import {
+  SEMRESATTRS_SERVICE_NAME,
+  SEMRESATTRS_SERVICE_VERSION,
+  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
+} from '@opentelemetry/semantic-conventions';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 
 /**
@@ -48,10 +52,7 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async initializeSDK() {
-    const endpoint = this.config.get(
-      'OTEL_EXPORTER_OTLP_ENDPOINT',
-      'http://localhost:4318',
-    );
+    const endpoint = this.config.get('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4318');
 
     // Trace exporter
     const traceExporter = new OTLPTraceExporter({

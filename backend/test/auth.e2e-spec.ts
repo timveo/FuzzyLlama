@@ -156,12 +156,10 @@ describe('Auth API (e2e)', () => {
     let refreshToken: string;
 
     beforeAll(async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({
-          email: 'test@example.com',
-          password: 'Password123!',
-        });
+      const response = await request(app.getHttpServer()).post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123!',
+      });
 
       refreshToken = response.body.refreshToken;
     });
@@ -186,12 +184,10 @@ describe('Auth API (e2e)', () => {
     });
 
     it('should reject refresh with access token', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({
-          email: 'test@example.com',
-          password: 'Password123!',
-        });
+      const response = await request(app.getHttpServer()).post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123!',
+      });
 
       const accessToken = response.body.accessToken;
 
@@ -206,12 +202,10 @@ describe('Auth API (e2e)', () => {
     let accessToken: string;
 
     beforeAll(async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({
-          email: 'test@example.com',
-          password: 'Password123!',
-        });
+      const response = await request(app.getHttpServer()).post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123!',
+      });
 
       accessToken = response.body.accessToken;
     });
@@ -250,12 +244,10 @@ describe('Auth API (e2e)', () => {
     let refreshToken: string;
 
     beforeEach(async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({
-          email: 'test@example.com',
-          password: 'Password123!',
-        });
+      const response = await request(app.getHttpServer()).post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123!',
+      });
 
       accessToken = response.body.accessToken;
       refreshToken = response.body.refreshToken;
@@ -263,9 +255,7 @@ describe('Auth API (e2e)', () => {
 
     it('should logout successfully', async () => {
       // Decode JWT to get tokenId (in production, client would extract this)
-      const payload = JSON.parse(
-        Buffer.from(refreshToken.split('.')[1], 'base64').toString(),
-      );
+      const payload = JSON.parse(Buffer.from(refreshToken.split('.')[1], 'base64').toString());
 
       await request(app.getHttpServer())
         .post('/api/auth/logout')
@@ -292,12 +282,10 @@ describe('Auth API (e2e)', () => {
     let accessToken: string;
 
     beforeEach(async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({
-          email: 'test@example.com',
-          password: 'Password123!',
-        });
+      const response = await request(app.getHttpServer()).post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123!',
+      });
 
       accessToken = response.body.accessToken;
     });
@@ -320,12 +308,10 @@ describe('Auth API (e2e)', () => {
   describe('Token Rotation Security', () => {
     it('should invalidate old refresh token after rotation', async () => {
       // Login to get initial tokens
-      const loginResponse = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({
-          email: 'test@example.com',
-          password: 'Password123!',
-        });
+      const loginResponse = await request(app.getHttpServer()).post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123!',
+      });
 
       const oldRefreshToken = loginResponse.body.refreshToken;
 

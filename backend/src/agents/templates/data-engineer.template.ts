@@ -153,11 +153,7 @@ def validate_data(df):
 
   handoffFormat: {
     phase: 'G5_COMPLETE',
-    deliverables: [
-      'pipelines/',
-      'docs/DATA_ARCHITECTURE.md',
-      'pipeline execution logs',
-    ],
+    deliverables: ['pipelines/', 'docs/DATA_ARCHITECTURE.md', 'pipeline execution logs'],
     nextAgent: ['ML_ENGINEER'],
     nextAction: 'Use cleaned data for model training',
   },

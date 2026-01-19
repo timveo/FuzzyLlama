@@ -33,10 +33,7 @@ export class AgentExecutionService {
     private retryService: AgentRetryService,
   ) {}
 
-  async executeAgent(
-    executeDto: ExecuteAgentDto,
-    userId: string,
-  ): Promise<AgentExecutionResult> {
+  async executeAgent(executeDto: ExecuteAgentDto, userId: string): Promise<AgentExecutionResult> {
     // Verify project ownership
     const project = await this.prisma.project.findUnique({
       where: { id: executeDto.projectId },
@@ -133,11 +130,7 @@ export class AgentExecutionService {
       );
 
       // Parse AI response to extract actions
-      const result = await this.parseAgentOutput(
-        aiResponse.content,
-        executeDto.projectId,
-        userId,
-      );
+      const result = await this.parseAgentOutput(aiResponse.content, executeDto.projectId, userId);
 
       // Update agent execution record
       await this.prisma.agent.update({
@@ -259,63 +252,65 @@ export class AgentExecutionService {
 
     // Execute AI prompt with streaming (fire-and-forget, don't await)
     // This allows us to return the execution ID immediately while streaming continues
-    this.aiProvider.executePromptStream(
-      systemPrompt,
-      executeDto.userPrompt,
-      {
-        onChunk: (chunk: string) => {
-          // Forward chunk to callback
-          streamCallback.onChunk(chunk);
-        },
-        onComplete: async (response) => {
-          // Update agent execution record
-          await this.prisma.agent.update({
-            where: { id: executionId },
-            data: {
-              status: 'COMPLETED',
-              outputResult: response.content,
-              inputTokens: response.usage.inputTokens,
-              outputTokens: response.usage.outputTokens,
-              completedAt: new Date(),
-            },
-          });
+    this.aiProvider
+      .executePromptStream(
+        systemPrompt,
+        executeDto.userPrompt,
+        {
+          onChunk: (chunk: string) => {
+            // Forward chunk to callback
+            streamCallback.onChunk(chunk);
+          },
+          onComplete: async (response) => {
+            // Update agent execution record
+            await this.prisma.agent.update({
+              where: { id: executionId },
+              data: {
+                status: 'COMPLETED',
+                outputResult: response.content,
+                inputTokens: response.usage.inputTokens,
+                outputTokens: response.usage.outputTokens,
+                completedAt: new Date(),
+              },
+            });
 
-          // Post-processing: Generate documents and handle handoffs
-          try {
-            await this.postProcessAgentCompletion(
-              executionId,
-              executeDto.projectId,
-              executeDto.agentType,
-              response.content,
-              userId,
-            );
-          } catch (error) {
-            console.error('Post-processing error:', error);
-            // Don't fail the entire execution if post-processing fails
-          }
+            // Post-processing: Generate documents and handle handoffs
+            try {
+              await this.postProcessAgentCompletion(
+                executionId,
+                executeDto.projectId,
+                executeDto.agentType,
+                response.content,
+                userId,
+              );
+            } catch (error) {
+              console.error('Post-processing error:', error);
+              // Don't fail the entire execution if post-processing fails
+            }
 
-          streamCallback.onComplete(response);
-        },
-        onError: async (error) => {
-          // Update agent execution with error
-          await this.prisma.agent.update({
-            where: { id: executionId },
-            data: {
-              status: 'FAILED',
-              outputResult: error.message,
-              completedAt: new Date(),
-            },
-          });
+            streamCallback.onComplete(response);
+          },
+          onError: async (error) => {
+            // Update agent execution with error
+            await this.prisma.agent.update({
+              where: { id: executionId },
+              data: {
+                status: 'FAILED',
+                outputResult: error.message,
+                completedAt: new Date(),
+              },
+            });
 
-          streamCallback.onError(error);
+            streamCallback.onError(error);
+          },
         },
-      },
-      executeDto.model || template.defaultModel,
-      template.maxTokens,
-    ).catch((error) => {
-      console.error('Streaming execution error:', error);
-      streamCallback.onError(error);
-    });
+        executeDto.model || template.defaultModel,
+        template.maxTokens,
+      )
+      .catch((error) => {
+        console.error('Streaming execution error:', error);
+        streamCallback.onError(error);
+      });
 
     // Return the execution ID immediately, streaming continues in background
     return executionId;
@@ -366,10 +361,7 @@ Now, please proceed with your task.`;
     };
   }
 
-  private buildSystemPrompt(
-    template: any,
-    context: AgentExecutionContext,
-  ): string {
+  private buildSystemPrompt(template: any, context: AgentExecutionContext): string {
     return `${template.prompt.role}
 
 ## Current Context
@@ -404,8 +396,8 @@ ${template.prompt.context}
 
   private async parseAgentOutput(
     output: string,
-    projectId: string,
-    userId: string,
+    _projectId: string,
+    _userId: string,
   ): Promise<AgentExecutionResult> {
     // This is a simplified parser
     // In production, you'd want more sophisticated parsing to extract:
@@ -471,9 +463,7 @@ ${template.prompt.context}
     }
 
     if (agent.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view agent executions for your own projects',
-      );
+      throw new ForbiddenException('You can only view agent executions for your own projects');
     }
 
     return agent;
@@ -517,9 +507,7 @@ ${template.prompt.context}
         const extractionResult = this.codeParser.extractFiles(agentOutput);
 
         if (extractionResult.files.length > 0) {
-          console.log(
-            `[${agentType}] Extracted ${extractionResult.files.length} code files`,
-          );
+          console.log(`[${agentType}] Extracted ${extractionResult.files.length} code files`);
 
           // Ensure project workspace exists
           await this.filesystem.createProjectWorkspace(projectId);
@@ -556,14 +544,11 @@ ${template.prompt.context}
             project?.state?.currentGate === 'G5_PENDING' &&
             (agentType === 'frontend-developer' || agentType === 'backend-developer')
           ) {
-            console.log(
-              `[${agentType}] Running build validation for G5 gate...`,
-            );
+            console.log(`[${agentType}] Running build validation for G5 gate...`);
 
             try {
               // Run full validation pipeline
-              const validationResult =
-                await this.buildExecutor.runFullValidation(projectId);
+              const validationResult = await this.buildExecutor.runFullValidation(projectId);
 
               // Create proof artifact with build results
               await this.prisma.proofArtifact.create({
@@ -609,26 +594,19 @@ ${template.prompt.context}
                 }
 
                 // Trigger automatic self-healing retry
-                console.log(
-                  `[${agentType}] Build validation failed. Triggering self-healing...`,
-                );
+                console.log(`[${agentType}] Build validation failed. Triggering self-healing...`);
 
                 try {
-                  const healingSuccess =
-                    await this.retryService.autoRetryOnBuildFailure(
-                      projectId,
-                      agentExecutionId,
-                      userId,
-                    );
+                  const healingSuccess = await this.retryService.autoRetryOnBuildFailure(
+                    projectId,
+                    agentExecutionId,
+                    userId,
+                  );
 
                   if (healingSuccess) {
-                    console.log(
-                      `[${agentType}] Self-healing succeeded. Code is now valid.`,
-                    );
+                    console.log(`[${agentType}] Self-healing succeeded. Code is now valid.`);
                   } else {
-                    console.log(
-                      `[${agentType}] Self-healing failed. Human intervention required.`,
-                    );
+                    console.log(`[${agentType}] Self-healing failed. Human intervention required.`);
                   }
                 } catch (retryError) {
                   console.error('Self-healing error:', retryError);

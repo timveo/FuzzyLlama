@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { BlockersService } from './blockers.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateBlockerDto } from './dto/create-blocker.dto';
@@ -73,10 +64,7 @@ export class BlockersController {
    * Resolve a blocker
    */
   @Post(':id/resolve')
-  async resolveBlocker(
-    @Param('id') id: string,
-    @Body() resolveBlockerDto: ResolveBlockerDto,
-  ) {
+  async resolveBlocker(@Param('id') id: string, @Body() resolveBlockerDto: ResolveBlockerDto) {
     return this.blockersService.resolveBlocker(id, resolveBlockerDto);
   }
 
@@ -85,10 +73,7 @@ export class BlockersController {
    * Escalate a blocker to L1/L2/L3
    */
   @Post(':id/escalate')
-  async escalateBlocker(
-    @Param('id') id: string,
-    @Body() escalateBlockerDto: EscalateBlockerDto,
-  ) {
+  async escalateBlocker(@Param('id') id: string, @Body() escalateBlockerDto: EscalateBlockerDto) {
     return this.blockersService.escalateBlocker(id, escalateBlockerDto);
   }
 
@@ -97,10 +82,7 @@ export class BlockersController {
    * Update a blocker
    */
   @Patch(':id')
-  async updateBlocker(
-    @Param('id') id: string,
-    @Body() updates: Partial<CreateBlockerDto>,
-  ) {
+  async updateBlocker(@Param('id') id: string, @Body() updates: Partial<CreateBlockerDto>) {
     return this.blockersService.updateBlocker(id, updates);
   }
 

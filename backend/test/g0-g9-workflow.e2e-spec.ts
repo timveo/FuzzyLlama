@@ -5,7 +5,6 @@ import {
   cleanupDatabase,
   createTestUser,
   createTestProject,
-  approveTestGate,
   waitFor,
   TestUser,
   TestProject,
@@ -45,7 +44,7 @@ describe('G0-G9 Complete Workflow E2E Tests', () => {
         .set('Authorization', `Bearer ${user.token}`)
         .expect(200);
 
-      let g0Gate = gates.body.find((g: any) => g.gateType === 'G0_PENDING');
+      const g0Gate = gates.body.find((g: any) => g.gateType === 'G0_PENDING');
       expect(g0Gate).toBeDefined();
 
       // Approve G0
@@ -65,7 +64,7 @@ describe('G0-G9 Complete Workflow E2E Tests', () => {
         .set('Authorization', `Bearer ${user.token}`)
         .expect(200);
 
-      let g1Gate = gates.body.find((g: any) => g.gateType === 'G1_PENDING');
+      const g1Gate = gates.body.find((g: any) => g.gateType === 'G1_PENDING');
       expect(g1Gate).toBeDefined();
 
       // Approve G1
@@ -107,7 +106,7 @@ describe('G0-G9 Complete Workflow E2E Tests', () => {
         .set('Authorization', `Bearer ${user.token}`)
         .expect(200);
 
-      let g2Gate = gates.body.find((g: any) => g.gateType === 'G2_PENDING');
+      const g2Gate = gates.body.find((g: any) => g.gateType === 'G2_PENDING');
 
       // Approve G2
       if (g2Gate) {
@@ -150,7 +149,7 @@ describe('G0-G9 Complete Workflow E2E Tests', () => {
         .set('Authorization', `Bearer ${user.token}`)
         .expect(200);
 
-      let g3Gate = gates.body.find((g: any) => g.gateType === 'G3_PENDING');
+      const g3Gate = gates.body.find((g: any) => g.gateType === 'G3_PENDING');
 
       if (g3Gate) {
         await request(app.getHttpServer())
@@ -170,9 +169,7 @@ describe('G0-G9 Complete Workflow E2E Tests', () => {
         .set('Authorization', `Bearer ${user.token}`)
         .expect(200);
 
-      const approvedGates = finalGates.body.filter(
-        (g: any) => g.status === 'APPROVED',
-      );
+      const approvedGates = finalGates.body.filter((g: any) => g.status === 'APPROVED');
 
       expect(approvedGates.length).toBeGreaterThanOrEqual(3); // G0, G1, G2 approved
     }, 60000); // 60 second timeout for entire flow

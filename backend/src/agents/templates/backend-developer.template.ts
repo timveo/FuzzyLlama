@@ -181,12 +181,7 @@ export class UsersService {
 
   handoffFormat: {
     phase: 'G5_COMPLETE',
-    deliverables: [
-      'src/',
-      'package.json',
-      'prisma/schema.prisma',
-      'test results',
-    ],
+    deliverables: ['src/', 'package.json', 'prisma/schema.prisma', 'test results'],
     nextAgent: ['QA_ENGINEER'],
     nextAction: 'Begin testing backend functionality',
   },

@@ -1388,7 +1388,7 @@ const useAnimatedCounter = (target: number, duration: number = 1000) => {
 type MetricType = 'team' | 'gate' | 'tokens' | 'momentum' | 'loc';
 
 // Shared state for LOC tracking across carousel rotations
-let locTotalAccumulator = { total: 0, added: 0, removed: 0 };
+const locTotalAccumulator = { total: 0, added: 0, removed: 0 };
 
 // Custom hook for fetching all metrics data
 const useMetricsData = (projectId: string | null) => {
@@ -2060,13 +2060,15 @@ const FloatingLOCContent = ({ theme, isActive }: { theme: ThemeMode; isActive: b
       return;
     }
 
-    // Reset delta when becoming active
-    setDeltaData({ added: 0, removed: 0 });
-    setTotals({
-      total: locTotalAccumulator.total,
-      sessionAdded: locTotalAccumulator.added,
-      sessionRemoved: locTotalAccumulator.removed,
-    });
+    // Reset delta when becoming active - use setTimeout to avoid synchronous setState in effect
+    const resetTimer = setTimeout(() => {
+      setDeltaData({ added: 0, removed: 0 });
+      setTotals({
+        total: locTotalAccumulator.total,
+        sessionAdded: locTotalAccumulator.added,
+        sessionRemoved: locTotalAccumulator.removed,
+      });
+    }, 0);
 
     const interval = setInterval(() => {
       const newAdded = Math.floor(Math.random() * 15) + 5;
@@ -2077,7 +2079,11 @@ const FloatingLOCContent = ({ theme, isActive }: { theme: ThemeMode; isActive: b
       }));
     }, 1500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(resetTimer);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
 
   const currentTotal = totals.total + deltaData.added - deltaData.removed;
@@ -2587,20 +2593,28 @@ export default function UnifiedDashboard() {
   // Effect to handle URL-based project selection
   useEffect(() => {
     if (urlProjectId && urlProjectId !== currentProjectId) {
-      setCurrentProjectId(urlProjectId);
-      setIsNewProject(urlIsNew);
+      // Use setTimeout to avoid synchronous setState in effect
+      const timer = setTimeout(() => {
+        setCurrentProjectId(urlProjectId);
+        setIsNewProject(urlIsNew);
 
-      // Clear the URL params after reading them
-      if (urlIsNew) {
-        setSearchParams({}, { replace: true });
-      }
+        // Clear the URL params after reading them
+        if (urlIsNew) {
+          setSearchParams({}, { replace: true });
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [urlProjectId, urlIsNew, currentProjectId, setSearchParams]);
 
   // Update project name when project data loads
   useEffect(() => {
     if (currentProject?.name) {
-      setCurrentProjectName(currentProject.name);
+      // Use setTimeout to avoid synchronous setState in effect
+      const timer = setTimeout(() => {
+        setCurrentProjectName(currentProject.name);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [currentProject]);
 

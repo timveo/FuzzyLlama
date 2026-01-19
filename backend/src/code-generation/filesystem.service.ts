@@ -50,8 +50,7 @@ export class FileSystemService {
   constructor(private readonly config: ConfigService) {
     // Workspace root where all project folders are created
     this.workspaceRoot =
-      this.config.get<string>('WORKSPACE_ROOT') ||
-      path.join(process.cwd(), '..', 'workspaces');
+      this.config.get<string>('WORKSPACE_ROOT') || path.join(process.cwd(), '..', 'workspaces');
 
     // Ensure workspace root exists
     fs.ensureDirSync(this.workspaceRoot);
@@ -80,9 +79,7 @@ export class FileSystemService {
 
     // Check if workspace already exists
     if (await fs.pathExists(projectPath)) {
-      this.logger.warn(
-        `Workspace already exists for project ${projectId}, using existing`,
-      );
+      this.logger.warn(`Workspace already exists for project ${projectId}, using existing`);
       return projectPath;
     }
 
@@ -114,9 +111,7 @@ export class FileSystemService {
       await this.writeFile(projectId, file.path, file.content);
     }
 
-    this.logger.log(
-      `Initialized ${projectType} project structure for ${projectId}`,
-    );
+    this.logger.log(`Initialized ${projectType} project structure for ${projectId}`);
   }
 
   /**
@@ -149,12 +144,7 @@ export class FileSystemService {
    */
   async writeFiles(projectId: string, files: FileToWrite[]): Promise<void> {
     for (const file of files) {
-      await this.writeFile(
-        projectId,
-        file.path,
-        file.content,
-        file.encoding || 'utf-8',
-      );
+      await this.writeFile(projectId, file.path, file.content, file.encoding || 'utf-8');
     }
 
     this.logger.log(`Wrote ${files.length} files for project ${projectId}`);
@@ -312,10 +302,7 @@ export class FileSystemService {
   /**
    * Copy files from template
    */
-  async copyTemplate(
-    templateName: string,
-    projectId: string,
-  ): Promise<void> {
+  async copyTemplate(templateName: string, projectId: string): Promise<void> {
     const templatesPath = path.join(process.cwd(), 'templates', templateName);
     const projectPath = this.getProjectPath(projectId);
 
@@ -329,9 +316,7 @@ export class FileSystemService {
 
   // ==================== Private Helper Methods ====================
 
-  private getBaseDirectories(
-    projectType: string,
-  ): string[] {
+  private getBaseDirectories(projectType: string): string[] {
     const common = ['docs', 'specs'];
 
     switch (projectType) {
@@ -365,7 +350,7 @@ export class FileSystemService {
     ];
   }
 
-  private getGitignoreContent(projectType: string): string {
+  private getGitignoreContent(_projectType: string): string {
     return `# Dependencies
 node_modules/
 .pnp

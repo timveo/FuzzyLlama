@@ -10,8 +10,36 @@ export class CreateProofArtifactDto {
   @IsString()
   gate: string;
 
-  @ApiProperty({ enum: ['test_output', 'coverage_report', 'lint_output', 'security_scan', 'build_output', 'lighthouse_report', 'accessibility_scan', 'spec_validation', 'deployment_log', 'smoke_test', 'screenshot', 'manual_verification'] })
-  @IsEnum(['test_output', 'coverage_report', 'lint_output', 'security_scan', 'build_output', 'lighthouse_report', 'accessibility_scan', 'spec_validation', 'deployment_log', 'smoke_test', 'screenshot', 'manual_verification'])
+  @ApiProperty({
+    enum: [
+      'test_output',
+      'coverage_report',
+      'lint_output',
+      'security_scan',
+      'build_output',
+      'lighthouse_report',
+      'accessibility_scan',
+      'spec_validation',
+      'deployment_log',
+      'smoke_test',
+      'screenshot',
+      'manual_verification',
+    ],
+  })
+  @IsEnum([
+    'test_output',
+    'coverage_report',
+    'lint_output',
+    'security_scan',
+    'build_output',
+    'lighthouse_report',
+    'accessibility_scan',
+    'spec_validation',
+    'deployment_log',
+    'smoke_test',
+    'screenshot',
+    'manual_verification',
+  ])
   proofType: string;
 
   @ApiProperty()

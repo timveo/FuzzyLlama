@@ -9,13 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SpecificationsService } from './specifications.service';
 import { CreateSpecificationDto } from './dto/create-specification.dto';
 import { UpdateSpecificationDto } from './dto/update-specification.dto';
@@ -60,11 +54,7 @@ export class SpecificationsController {
     @Query('specificationType') specificationType: string,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.specificationsService.findAll(
-      projectId,
-      user.id,
-      specificationType,
-    );
+    return this.specificationsService.findAll(projectId, user.id, specificationType);
   }
 
   @Get('agent/:agentId')
@@ -77,10 +67,7 @@ export class SpecificationsController {
     @Param('agentId') agentId: string,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.specificationsService.getSpecificationsByAgent(
-      agentId,
-      user.id,
-    );
+    return this.specificationsService.getSpecificationsByAgent(agentId, user.id);
   }
 
   @Get('stats/:projectId')
@@ -116,11 +103,7 @@ export class SpecificationsController {
     @Body() updateSpecificationDto: UpdateSpecificationDto,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.specificationsService.update(
-      id,
-      updateSpecificationDto,
-      user.id,
-    );
+    return this.specificationsService.update(id, updateSpecificationDto, user.id);
   }
 
   @Delete(':id')

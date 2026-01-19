@@ -142,11 +142,7 @@ Constraints:
 
   handoffFormat: {
     phase: 'G5_COMPLETE',
-    deliverables: [
-      'prompts/',
-      'docs/PROMPTS.md',
-      'test results',
-    ],
+    deliverables: ['prompts/', 'docs/PROMPTS.md', 'test results'],
     nextAgent: ['MODEL_EVALUATOR'],
     nextAction: 'Evaluate prompt effectiveness',
   },

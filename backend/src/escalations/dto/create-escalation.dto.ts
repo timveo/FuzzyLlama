@@ -1,9 +1,5 @@
 import { IsString, IsEnum } from 'class-validator';
-import {
-  EscalationLevel,
-  EscalationType,
-  Severity,
-} from '@prisma/client';
+import { EscalationLevel, EscalationType, Severity } from '@prisma/client';
 
 export class CreateEscalationDto {
   @IsString()

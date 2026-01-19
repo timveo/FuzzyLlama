@@ -13,13 +13,7 @@ import { DocumentsModule } from '../documents/documents.module';
 import { CodeGenerationModule } from '../code-generation/code-generation.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    WebSocketModule,
-    GatesModule,
-    DocumentsModule,
-    CodeGenerationModule,
-  ],
+  imports: [PrismaModule, WebSocketModule, GatesModule, DocumentsModule, CodeGenerationModule],
   controllers: [AgentsController],
   providers: [
     AgentExecutionService,

@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { QueriesService } from './queries.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateQueryDto } from './dto/create-query.dto';
@@ -74,10 +66,7 @@ export class QueriesController {
    * Answer a pending query
    */
   @Post(':id/answer')
-  async answerQuery(
-    @Param('id') id: string,
-    @Body() answerQueryDto: AnswerQueryDto,
-  ) {
+  async answerQuery(@Param('id') id: string, @Body() answerQueryDto: AnswerQueryDto) {
     return this.queriesService.answerQuery(id, answerQueryDto);
   }
 

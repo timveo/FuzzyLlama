@@ -9,12 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { GatesService } from './gates.service';
 import { CreateGateDto } from './dto/create-gate.dto';
 import { UpdateGateDto } from './dto/update-gate.dto';
@@ -34,40 +29,28 @@ export class GatesController {
   @ApiOperation({ summary: 'Create a new gate' })
   @ApiResponse({ status: 201, description: 'Gate created successfully' })
   @ApiResponse({ status: 403, description: 'Cannot create gate for project you do not own' })
-  async create(
-    @Body() createGateDto: CreateGateDto,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async create(@Body() createGateDto: CreateGateDto, @CurrentUser() user: RequestUser) {
     return this.gatesService.create(createGateDto, user.id);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all gates for a project' })
   @ApiResponse({ status: 200, description: 'Gates retrieved successfully' })
-  async findAll(
-    @Query('projectId') projectId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async findAll(@Query('projectId') projectId: string, @CurrentUser() user: RequestUser) {
     return this.gatesService.findAll(projectId, user.id);
   }
 
   @Get('current/:projectId')
   @ApiOperation({ summary: 'Get the current active gate for a project' })
   @ApiResponse({ status: 200, description: 'Current gate retrieved successfully' })
-  async getCurrentGate(
-    @Param('projectId') projectId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getCurrentGate(@Param('projectId') projectId: string, @CurrentUser() user: RequestUser) {
     return this.gatesService.getCurrentGate(projectId, user.id);
   }
 
   @Get('stats/:projectId')
   @ApiOperation({ summary: 'Get gate statistics for a project' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
-  async getGateStats(
-    @Param('projectId') projectId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getGateStats(@Param('projectId') projectId: string, @CurrentUser() user: RequestUser) {
     return this.gatesService.getGateStats(projectId, user.id);
   }
 

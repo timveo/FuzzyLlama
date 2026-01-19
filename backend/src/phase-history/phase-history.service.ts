@@ -31,18 +31,13 @@ export class PhaseHistoryService {
     });
   }
 
-  async completePhase(
-    phaseHistoryId: number,
-    input?: CompletePhaseInput,
-  ): Promise<any> {
+  async completePhase(phaseHistoryId: number, input?: CompletePhaseInput): Promise<any> {
     const phaseHistory = await this.prisma.phaseHistory.findUnique({
       where: { id: phaseHistoryId },
     });
 
     if (!phaseHistory) {
-      throw new NotFoundException(
-        `PhaseHistory with ID ${phaseHistoryId} not found`,
-      );
+      throw new NotFoundException(`PhaseHistory with ID ${phaseHistoryId} not found`);
     }
 
     return this.prisma.phaseHistory.update({
@@ -61,9 +56,7 @@ export class PhaseHistoryService {
     });
 
     if (!phaseHistory) {
-      throw new NotFoundException(
-        `PhaseHistory with ID ${phaseHistoryId} not found`,
-      );
+      throw new NotFoundException(`PhaseHistory with ID ${phaseHistoryId} not found`);
     }
 
     return this.prisma.phaseHistory.update({
@@ -82,9 +75,7 @@ export class PhaseHistoryService {
     });
 
     if (!phaseHistory) {
-      throw new NotFoundException(
-        `PhaseHistory with ID ${phaseHistoryId} not found`,
-      );
+      throw new NotFoundException(`PhaseHistory with ID ${phaseHistoryId} not found`);
     }
 
     return this.prisma.phaseHistory.update({

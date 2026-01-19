@@ -134,17 +134,12 @@ test('user can complete signup and login', async ({ page }) => {
 **Ready to ensure quality. Share the implementation for testing.**
 `,
 
-  defaultModel: 'gpt-3.5-turbo',  // Cost optimization for testing
+  defaultModel: 'gpt-3.5-turbo', // Cost optimization for testing
   maxTokens: 6000,
 
   handoffFormat: {
     phase: 'G6_COMPLETE',
-    deliverables: [
-      'e2e/',
-      'docs/TEST_PLAN.md',
-      'test results',
-      'coverage report',
-    ],
+    deliverables: ['e2e/', 'docs/TEST_PLAN.md', 'test results', 'coverage report'],
     nextAgent: ['SECURITY_ENGINEER'],
     nextAction: 'Begin security audit',
   },

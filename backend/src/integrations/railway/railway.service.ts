@@ -67,11 +67,7 @@ export class RailwayService {
   /**
    * Execute GraphQL query
    */
-  private async executeGraphQL(
-    token: string,
-    query: string,
-    variables?: any,
-  ): Promise<any> {
+  private async executeGraphQL(token: string, query: string, variables?: any): Promise<any> {
     try {
       const client = this.getApiClient(token);
       const response = await client.post('', {
@@ -80,9 +76,7 @@ export class RailwayService {
       });
 
       if (response.data.errors) {
-        throw new Error(
-          response.data.errors.map((e: any) => e.message).join(', '),
-        );
+        throw new Error(response.data.errors.map((e: any) => e.message).join(', '));
       }
 
       return response.data.data;
@@ -150,9 +144,7 @@ export class RailwayService {
       branch,
     });
 
-    console.log(
-      `[Railway] Connected GitHub repo: ${repoFullName} to project ${projectId}`,
-    );
+    console.log(`[Railway] Connected GitHub repo: ${repoFullName} to project ${projectId}`);
 
     return { serviceId: data.serviceCreate.id };
   }
@@ -217,10 +209,7 @@ export class RailwayService {
   /**
    * Get deployment status
    */
-  async getDeploymentStatus(
-    token: string,
-    projectId: string,
-  ): Promise<RailwayProjectStatus> {
+  async getDeploymentStatus(token: string, projectId: string): Promise<RailwayProjectStatus> {
     const query = `
       query GetProjectStatus($projectId: String!) {
         project(id: $projectId) {
@@ -259,15 +248,11 @@ export class RailwayService {
           url: deployEdge.node.url,
         })),
       )
-      .sort(
-        (a: any, b: any) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return {
       projectId,
-      status:
-        deployments.length > 0 ? deployments[0].status : 'NOT_DEPLOYED',
+      status: deployments.length > 0 ? deployments[0].status : 'NOT_DEPLOYED',
       deployments: deployments.slice(0, 10), // Last 10 deployments
     };
   }
@@ -317,8 +302,10 @@ export class RailwayService {
         options?.projectName || project.name || `fuzzyllama-${project.id.substring(0, 8)}`;
 
       // Create Railway project
-      const { projectId: railwayProjectId, projectUrl } =
-        await this.createProject(railwayToken, projectName);
+      const { projectId: railwayProjectId, projectUrl } = await this.createProject(
+        railwayToken,
+        projectName,
+      );
 
       // Extract GitHub repo name (owner/repo) from URL
       const repoFullName = this.extractRepoName(project.githubRepoUrl);
@@ -332,10 +319,7 @@ export class RailwayService {
       );
 
       // Get production environment
-      const environments = await this.getProjectEnvironments(
-        railwayToken,
-        railwayProjectId,
-      );
+      const environments = await this.getProjectEnvironments(railwayToken, railwayProjectId);
       const productionEnv = environments.find((env) => env.name === 'production');
 
       if (!productionEnv) {
@@ -346,12 +330,7 @@ export class RailwayService {
       const envVars = options?.environmentVariables || this.getDefaultEnvVars(project.type);
 
       if (Object.keys(envVars).length > 0) {
-        await this.setEnvironmentVariables(
-          railwayToken,
-          serviceId,
-          productionEnv.id,
-          envVars,
-        );
+        await this.setEnvironmentVariables(railwayToken, serviceId, productionEnv.id, envVars);
       }
 
       // Wait a few seconds for initial deployment to trigger
@@ -439,10 +418,7 @@ export class RailwayService {
       await this.sleep(2000);
 
       // Get updated status
-      const status = await this.getDeploymentStatus(
-        railwayToken,
-        project.railwayProjectId,
-      );
+      const status = await this.getDeploymentStatus(railwayToken, project.railwayProjectId);
 
       const deploymentUrl = status.deployments.find((d) => d.url)?.url || null;
 
@@ -508,8 +484,7 @@ export class RailwayService {
    * Generate random secret
    */
   private generateSecret(): string {
-    return Math.random().toString(36).substring(2) +
-      Math.random().toString(36).substring(2);
+    return Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
   }
 
   /**

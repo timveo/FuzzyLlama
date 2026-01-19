@@ -140,10 +140,7 @@ Create \`docs/DESIGN_SYSTEM.md\` with:
 
   handoffFormat: {
     phase: 'G4_COMPLETE',
-    deliverables: [
-      'designs/*.html',
-      'docs/DESIGN_SYSTEM.md',
-    ],
+    deliverables: ['designs/*.html', 'docs/DESIGN_SYSTEM.md'],
     nextAgent: ['FRONTEND_DEVELOPER'],
     nextAction: 'Implement selected design with design system',
   },

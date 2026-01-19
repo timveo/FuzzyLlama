@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { AgentExecutionService } from './agent-execution.service';
 import { AIProviderService } from './ai-provider.service';
 import { BuildExecutorService } from '../../code-generation/build-executor.service';
 import { CodeParserService } from '../../code-generation/code-parser.service';
@@ -38,10 +37,7 @@ export class AgentRetryService {
   /**
    * Retry agent execution with error feedback
    */
-  async retryWithErrors(
-    agentExecutionId: string,
-    userId: string,
-  ): Promise<RetryResult> {
+  async retryWithErrors(agentExecutionId: string, userId: string): Promise<RetryResult> {
     // Get original agent execution
     const agentExecution = await this.prisma.agent.findUnique({
       where: { id: agentExecutionId },
@@ -88,10 +84,7 @@ export class AgentRetryService {
   /**
    * Self-healing loop: Ask agent to fix errors, validate, repeat
    */
-  private async attemptSelfHealing(
-    context: RetryContext,
-    userId: string,
-  ): Promise<RetryResult> {
+  private async attemptSelfHealing(context: RetryContext, _userId: string): Promise<RetryResult> {
     const fixedErrors: string[] = [];
     let remainingErrors = [...context.errors];
 
@@ -101,11 +94,7 @@ export class AgentRetryService {
       );
 
       // Build self-healing prompt
-      const healingPrompt = this.buildSelfHealingPrompt(
-        context,
-        remainingErrors,
-        attempt,
-      );
+      const healingPrompt = this.buildSelfHealingPrompt(context, remainingErrors, attempt);
 
       try {
         // Execute agent with error feedback
@@ -116,31 +105,21 @@ export class AgentRetryService {
         );
 
         // Extract and write fixed code
-        const extractionResult = this.codeParser.extractFiles(
-          aiResponse.content,
-        );
+        const extractionResult = this.codeParser.extractFiles(aiResponse.content);
 
         if (extractionResult.files.length === 0) {
-          console.log(
-            `[Self-Healing] No code files extracted in attempt ${attempt}`,
-          );
+          console.log(`[Self-Healing] No code files extracted in attempt ${attempt}`);
           continue;
         }
 
         // Write fixed files
         for (const file of extractionResult.files) {
-          await this.filesystem.writeFile(
-            context.projectId,
-            file.path,
-            file.content,
-          );
+          await this.filesystem.writeFile(context.projectId, file.path, file.content);
           console.log(`[Self-Healing] Rewrote file: ${file.path}`);
         }
 
         // Run validation
-        const validationResult = await this.buildExecutor.runFullValidation(
-          context.projectId,
-        );
+        const validationResult = await this.buildExecutor.runFullValidation(context.projectId);
 
         // Check if errors are fixed
         const newErrors = [
@@ -156,19 +135,13 @@ export class AgentRetryService {
 
         if (errorCountAfter < errorCountBefore) {
           const fixedCount = errorCountBefore - errorCountAfter;
-          console.log(
-            `[Self-Healing] Fixed ${fixedCount} errors in attempt ${attempt}`,
-          );
-          fixedErrors.push(
-            ...remainingErrors.slice(0, fixedCount).map((e) => e),
-          );
+          console.log(`[Self-Healing] Fixed ${fixedCount} errors in attempt ${attempt}`);
+          fixedErrors.push(...remainingErrors.slice(0, fixedCount).map((e) => e));
         }
 
         // If all errors fixed, success!
         if (validationResult.overallSuccess) {
-          console.log(
-            `[Self-Healing] SUCCESS after ${attempt} attempt(s)! All errors fixed.`,
-          );
+          console.log(`[Self-Healing] SUCCESS after ${attempt} attempt(s)! All errors fixed.`);
 
           // Mark all errors as resolved
           await this.prisma.errorHistory.updateMany({
@@ -235,7 +208,10 @@ ${context.originalOutput.substring(0, 500)}...
 
 ## Errors Found (${errors.length} total)
 
-${errors.slice(0, 5).map((e, i) => `${i + 1}. ${e}`).join('\n')}
+${errors
+  .slice(0, 5)
+  .map((e, i) => `${i + 1}. ${e}`)
+  .join('\n')}
 
 ${errors.length > 5 ? `\n... and ${errors.length - 5} more errors` : ''}
 
@@ -284,10 +260,7 @@ Generate complete, working code files. No placeholders or TODOs.`;
   /**
    * Get most recent agent execution ID for a given agent type
    */
-  private async getAgentExecutionId(
-    projectId: string,
-    agentType: string,
-  ): Promise<string> {
+  private async getAgentExecutionId(projectId: string, agentType: string): Promise<string> {
     const agent = await this.prisma.agent.findFirst({
       where: {
         projectId,
@@ -327,16 +300,12 @@ Generate complete, working code files. No placeholders or TODOs.`;
       return false;
     }
 
-    console.log(
-      `[Auto-Retry] Triggering self-healing for ${agent.agentType}...`,
-    );
+    console.log(`[Auto-Retry] Triggering self-healing for ${agent.agentType}...`);
 
     const retryResult = await this.retryWithErrors(agentExecutionId, userId);
 
     if (retryResult.success) {
-      console.log(
-        `[Auto-Retry] Successfully healed after ${retryResult.attemptNumber} attempts`,
-      );
+      console.log(`[Auto-Retry] Successfully healed after ${retryResult.attemptNumber} attempts`);
 
       // Create handoff to QA if development is complete
       if (agent.agentType.includes('developer')) {

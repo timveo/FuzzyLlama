@@ -26,10 +26,7 @@ export class NotesController {
   }
 
   @Get()
-  async getNotes(
-    @Query('projectId') projectId: string,
-    @Query('limit') limit?: string,
-  ) {
+  async getNotes(@Query('projectId') projectId: string, @Query('limit') limit?: string) {
     const options: { limit?: number } = {};
     if (limit) options.limit = parseInt(limit, 10);
 
@@ -42,10 +39,7 @@ export class NotesController {
   }
 
   @Patch(':id')
-  async updateNote(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateNoteDto: UpdateNoteDto,
-  ) {
+  async updateNote(@Param('id', ParseIntPipe) id: number, @Body() updateNoteDto: UpdateNoteDto) {
     return this.notesService.updateNote(id, updateNoteDto.content);
   }
 

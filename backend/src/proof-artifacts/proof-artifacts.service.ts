@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateProofArtifactDto } from './dto/create-proof-artifact.dto';
 import { ValidationService } from './validators/validation.service';
@@ -18,10 +13,7 @@ export class ProofArtifactsService {
   /**
    * Create and optionally validate a proof artifact
    */
-  async create(
-    createDto: CreateProofArtifactDto,
-    userId: string,
-  ): Promise<any> {
+  async create(createDto: CreateProofArtifactDto, userId: string): Promise<any> {
     // Verify project ownership
     const project = await this.prisma.project.findUnique({
       where: { id: createDto.projectId },
@@ -32,15 +24,11 @@ export class ProofArtifactsService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only create proof artifacts for your own projects',
-      );
+      throw new ForbiddenException('You can only create proof artifacts for your own projects');
     }
 
     // Calculate file hash
-    const fileHash = await this.validationService.calculateFileHash(
-      createDto.filePath,
-    );
+    const fileHash = await this.validationService.calculateFileHash(createDto.filePath);
 
     // Run validation if requested
     let passFail: 'pass' | 'fail' | 'warning' | 'info' = 'info';
@@ -97,9 +85,7 @@ export class ProofArtifactsService {
     }
 
     if (artifact.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only validate proof artifacts for your own projects',
-      );
+      throw new ForbiddenException('You can only validate proof artifacts for your own projects');
     }
 
     // Run validation
@@ -144,9 +130,7 @@ export class ProofArtifactsService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view proof artifacts for your own projects',
-      );
+      throw new ForbiddenException('You can only view proof artifacts for your own projects');
     }
 
     const where: any = { projectId };
@@ -181,9 +165,7 @@ export class ProofArtifactsService {
     }
 
     if (artifact.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view proof artifacts for your own projects',
-      );
+      throw new ForbiddenException('You can only view proof artifacts for your own projects');
     }
 
     return artifact;
@@ -203,9 +185,7 @@ export class ProofArtifactsService {
     }
 
     if (artifact.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only delete proof artifacts for your own projects',
-      );
+      throw new ForbiddenException('You can only delete proof artifacts for your own projects');
     }
 
     await this.prisma.proofArtifact.delete({
@@ -229,9 +209,7 @@ export class ProofArtifactsService {
     }
 
     if (gate.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'You can only view proof artifacts for your own projects',
-      );
+      throw new ForbiddenException('You can only view proof artifacts for your own projects');
     }
 
     return await this.prisma.proofArtifact.findMany({
@@ -264,7 +242,7 @@ export class ProofArtifactsService {
     const results = [];
     let passed = 0;
     let failed = 0;
-    let warnings = 0;
+    const warnings = 0;
 
     for (const artifact of artifacts) {
       const validation = await this.validationService.validateArtifact(

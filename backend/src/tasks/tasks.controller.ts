@@ -9,12 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -34,10 +29,7 @@ export class TasksController {
   @ApiResponse({ status: 201, description: 'Task created successfully' })
   @ApiResponse({ status: 403, description: 'Cannot create task for project you do not own' })
   @ApiResponse({ status: 404, description: 'Project or parent task not found' })
-  async create(
-    @Body() createTaskDto: CreateTaskDto,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async create(@Body() createTaskDto: CreateTaskDto, @CurrentUser() user: RequestUser) {
     return this.tasksService.create(createTaskDto, user.id);
   }
 
@@ -45,30 +37,21 @@ export class TasksController {
   @ApiOperation({ summary: 'Get all tasks for a project' })
   @ApiResponse({ status: 200, description: 'Tasks retrieved successfully' })
   @ApiResponse({ status: 403, description: 'Cannot view tasks for project you do not own' })
-  async findAll(
-    @Query('projectId') projectId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async findAll(@Query('projectId') projectId: string, @CurrentUser() user: RequestUser) {
     return this.tasksService.findAll(projectId, user.id);
   }
 
   @Get('agent/:agentId')
   @ApiOperation({ summary: 'Get all tasks for an agent' })
   @ApiResponse({ status: 200, description: 'Tasks retrieved successfully' })
-  async getTasksByAgent(
-    @Param('agentId') agentId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getTasksByAgent(@Param('agentId') agentId: string, @CurrentUser() user: RequestUser) {
     return this.tasksService.getTasksByAgent(agentId, user.id);
   }
 
   @Get('stats/:projectId')
   @ApiOperation({ summary: 'Get task statistics for a project' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
-  async getTaskStats(
-    @Param('projectId') projectId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async getTaskStats(@Param('projectId') projectId: string, @CurrentUser() user: RequestUser) {
     return this.tasksService.getTaskStats(projectId, user.id);
   }
 

@@ -155,12 +155,7 @@ export class AnalyticsService implements OnModuleInit {
   /**
    * Track gate rejected
    */
-  trackGateRejected(
-    userId: string,
-    projectId: string,
-    gateType: string,
-    reason?: string,
-  ): void {
+  trackGateRejected(userId: string, projectId: string, gateType: string, reason?: string): void {
     this.track('gate_rejected', {
       userId,
       properties: {
@@ -195,11 +190,7 @@ export class AnalyticsService implements OnModuleInit {
   /**
    * Track project completed (G9)
    */
-  trackProjectCompleted(
-    userId: string,
-    projectId: string,
-    durationMinutes: number,
-  ): void {
+  trackProjectCompleted(userId: string, projectId: string, durationMinutes: number): void {
     this.track('project_completed', {
       userId,
       properties: {
@@ -225,11 +216,7 @@ export class AnalyticsService implements OnModuleInit {
   /**
    * Track Railway deployment
    */
-  trackRailwayDeployment(
-    userId: string,
-    projectId: string,
-    deploymentUrl: string,
-  ): void {
+  trackRailwayDeployment(userId: string, projectId: string, deploymentUrl: string): void {
     this.track('railway_deployment', {
       userId,
       properties: {
