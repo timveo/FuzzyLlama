@@ -14,12 +14,11 @@ import {
   ChevronDownIcon,
   CheckIcon,
   XMarkIcon,
-  ArrowsPointingOutIcon,
-  ArrowsPointingInIcon,
 } from '@heroicons/react/24/outline';
 import { projectsApi } from '../api/projects';
 import { metricsApi, type ProjectProgress, type WorkflowStatus, type ProjectCosts, type ProjectMetrics } from '../api/metrics';
 import { gatesApi } from '../api/gates';
+import { journeyApi } from '../api/journey';
 import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
 import FuzzyLlamaLogoSvg from '../assets/Llamalogo.png';
@@ -827,12 +826,11 @@ const AgentOrchestratorPanel = ({ theme }: { theme: ThemeMode }) => {
 
 // ============ CENTER PANEL COMPONENTS ============
 
-const WorkspacePanel = ({ activeTab, onTabChange, theme, isExpanded, onToggleExpand }: {
+const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId }: {
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
   theme: ThemeMode;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
+  projectId: string | null;
 }) => {
   const isDark = theme === 'dark';
   const tabs: { id: WorkspaceTab; label: string }[] = [
@@ -845,11 +843,8 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, isExpanded, onToggleExp
   return (
     <div className={`flex flex-col h-full p-1.5 rounded-2xl ${isDark ? '' : ''}`}>
       <div className={`flex-1 flex flex-col overflow-hidden rounded-xl ${isDark ? 'bg-slate-800/60' : 'bg-white border border-teal-200 shadow-sm'}`}>
-        {/* Tab Bar with expand button */}
-        <div className={`flex items-center justify-between pt-3 pb-2 px-3 ${isDark ? '' : 'bg-teal-50/50'}`}>
-          {/* Spacer for centering */}
-          <div className="w-8" />
-
+        {/* Tab Bar */}
+        <div className={`flex items-center justify-center pt-3 pb-2 px-3 ${isDark ? '' : 'bg-teal-50/50'}`}>
           {/* Centered tabs */}
           <div className={`flex items-center gap-0.5 p-0.5 rounded-full ${isDark ? 'bg-slate-800/60' : 'bg-teal-100'}`}>
             {tabs.map((tab) => (
@@ -866,25 +861,6 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, isExpanded, onToggleExp
               </button>
             ))}
           </div>
-
-          {/* Expand/Collapse button */}
-          <motion.button
-            onClick={onToggleExpand}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-              isExpanded
-                ? 'bg-teal-600 text-white'
-                : isDark ? 'bg-slate-700/50 hover:bg-slate-700 text-teal-300' : 'bg-teal-100 hover:bg-teal-200 text-teal-700'
-            }`}
-            title={isExpanded ? 'Collapse panel' : 'Expand panel'}
-          >
-            {isExpanded ? (
-              <ArrowsPointingInIcon className="w-4 h-4" />
-            ) : (
-              <ArrowsPointingOutIcon className="w-4 h-4" />
-            )}
-          </motion.button>
         </div>
 
         {/* Content Area */}
@@ -900,7 +876,7 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, isExpanded, onToggleExp
               {activeTab === 'ui' && <UIPreviewContent theme={theme} />}
               {activeTab === 'docs' && <DocsContent theme={theme} />}
               {activeTab === 'code' && <CodeContent theme={theme} />}
-              {activeTab === 'map' && <JourneyContent theme={theme} />}
+              {activeTab === 'map' && <JourneyContent theme={theme} projectId={projectId} onViewDocument={() => onTabChange('docs')} />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -916,30 +892,26 @@ const UIPreviewContent = ({ theme }: { theme: ThemeMode }) => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex gap-2 mb-4">
-        {views.map((view) => (
-          <button
-            key={view}
-            onClick={() => setSelectedView(view)}
-            className={`px-4 py-2 rounded-full text-xs font-medium capitalize transition-all ${
-              selectedView === view
-                ? 'bg-teal-600 text-white'
-                : isDark ? 'bg-slate-700/50 text-teal-300 hover:text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {view}
-          </button>
-        ))}
-      </div>
       <div className={`flex-1 rounded-2xl overflow-hidden ${isDark ? 'border bg-slate-900/50 border-slate-700/50' : 'border border-slate-200 bg-white'}`}>
-        <div className={`flex items-center gap-2 px-4 py-2 ${isDark ? 'border-b bg-slate-800/50 border-slate-700/50' : 'border-b border-slate-200 bg-slate-50'}`}>
+        <div className={`flex items-center gap-3 px-4 py-3 ${isDark ? 'border-b bg-slate-800/50 border-slate-700/50' : 'border-b border-slate-200 bg-slate-50'}`}>
           <div className="flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+            <div className="w-3 h-3 rounded-full bg-red-400" />
+            <div className="w-3 h-3 rounded-full bg-amber-400" />
+            <div className="w-3 h-3 rounded-full bg-emerald-400" />
           </div>
-          <div className={`flex-1 rounded-full px-3 py-1 text-[10px] text-center ${isDark ? 'bg-slate-900/50 text-slate-400' : 'bg-white text-slate-500'}`}>
-            localhost:3000/{selectedView}
+          <div className={`flex-1 rounded-lg px-4 py-2 flex items-center justify-center ${isDark ? 'bg-slate-900/50' : 'bg-white border border-slate-200'}`}>
+            <span className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>localhost:3000/</span>
+            <select
+              value={selectedView}
+              onChange={(e) => setSelectedView(e.target.value)}
+              className={`text-sm font-medium bg-transparent border-none outline-none cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}
+            >
+              {views.map((view) => (
+                <option key={view} value={view} className={isDark ? 'bg-slate-800' : 'bg-white'}>
+                  {view}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className={`h-full flex items-center justify-center p-8 ${isDark ? '' : 'bg-white'}`}>
@@ -1158,9 +1130,19 @@ const GATE_TASKS: Record<number, { task: string; status: 'done' | 'in-progress' 
   ],
 };
 
-const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
+const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode; projectId: string | null; onViewDocument?: (documentId: string, documentName: string) => void }) => {
   const isDark = theme === 'dark';
-  const currentGate = 3;
+
+  // Fetch journey data from API
+  const { data: journeyData } = useQuery({
+    queryKey: ['journey', projectId],
+    queryFn: () => projectId ? journeyApi.get(projectId) : null,
+    enabled: !!projectId,
+  });
+
+  // Use API data or fall back to mock data
+  const currentGate = journeyData?.currentGate ?? 3;
+  const progress = journeyData?.progressPercentage ?? Math.round((currentGate / 10) * 100);
 
   // Phase colors for timeline
   const phaseColors: Record<Phase, { bg: string; border: string; text: string; glow: string; gradient: string; light: string }> = {
@@ -1175,28 +1157,93 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
     return 'ship';
   };
 
-  const completedGates = currentGate;
-  const progress = Math.round((completedGates / 10) * 100);
+  // Helper to get gate data - prefer API data, fall back to mock
+  const getGateData = (gateNum: number) => {
+    const apiGate = journeyData?.gates?.find(g => g.gateNumber === gateNum);
+    const mockGateInfo = GATE_INFO[gateNum];
+    const mockTasks = GATE_TASKS[gateNum] || [];
+
+    if (apiGate) {
+      // Map API tasks to display format
+      const tasks = apiGate.tasks.map(t => ({
+        task: t.name,
+        status: t.status === 'complete' ? 'done' as const : t.status === 'in_progress' ? 'in-progress' as const : 'pending' as const,
+      }));
+
+      // Map API decisions to display format
+      const decisions = apiGate.decisions.map(d => ({
+        choice: d.choice,
+        reason: d.reason,
+      }));
+
+      // Map API documents to display format with icons
+      const documents = apiGate.documents.map(d => ({
+        id: d.id,
+        name: d.name,
+        path: d.path,
+        type: d.type,
+        icon: getDocumentIcon(d.type),
+      }));
+
+      return {
+        name: apiGate.metadata.name,
+        narrative: apiGate.metadata.narrative,
+        description: apiGate.metadata.description,
+        celebration: apiGate.metadata.celebration,
+        summary: mockGateInfo.summary, // Keep mock summary as API doesn't provide it yet
+        decisions: decisions.length > 0 ? decisions : mockGateInfo.decisions,
+        documents: documents.length > 0 ? documents : mockGateInfo.documents,
+        tasks: tasks.length > 0 ? tasks : mockTasks,
+      };
+    }
+
+    // Fall back to mock data
+    return {
+      name: mockGateInfo.name,
+      narrative: mockGateInfo.narrative,
+      description: mockGateInfo.description,
+      celebration: mockGateInfo.celebration,
+      summary: mockGateInfo.summary,
+      decisions: mockGateInfo.decisions,
+      documents: mockGateInfo.documents,
+      tasks: mockTasks,
+    };
+  };
+
+  // Helper to get document icon based on type
+  const getDocumentIcon = (type: string): string => {
+    const iconMap: Record<string, string> = {
+      'PRD': '📋',
+      'ARCHITECTURE': '🏗️',
+      'API_SPEC': '🔌',
+      'DESIGN': '🎨',
+      'TEST_PLAN': '🧪',
+      'DEPLOYMENT': '🚀',
+      'USER_GUIDE': '📚',
+      'default': '📄',
+    };
+    return iconMap[type] || iconMap['default'];
+  };
 
   return (
     <div className="h-full overflow-auto">
       {/* Header */}
-      <div className="text-center mb-4 px-4">
-        <h3 className={`text-lg font-bold ${isDark ? 'bg-gradient-to-r from-amber-300 via-cyan-400 to-orange-300 bg-clip-text text-transparent' : 'text-teal-700'}`}>
+      <div className="text-center mb-6 px-4">
+        <h3 className={`text-2xl font-bold ${isDark ? 'bg-gradient-to-r from-amber-300 via-cyan-400 to-orange-300 bg-clip-text text-transparent' : 'text-teal-700'}`}>
           Your Building Journey
         </h3>
-        <p className={`text-[10px] mt-1 italic ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>"Every line of code is a step forward"</p>
-        <div className="flex items-center justify-center gap-4 mt-2">
-          <span className={`text-[9px] ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>{currentGate} gates complete</span>
-          <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-teal-400'}`}>•</span>
-          <span className="text-[9px] text-emerald-500">{progress}% to launch</span>
+        <p className={`text-sm mt-2 italic ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>"Every line of code is a step forward"</p>
+        <div className="flex items-center justify-center gap-4 mt-3">
+          <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>{currentGate} gates complete</span>
+          <span className={`text-sm ${isDark ? 'text-slate-500' : 'text-teal-400'}`}>•</span>
+          <span className="text-sm text-emerald-500">{progress}% to launch</span>
         </div>
       </div>
 
       {/* Alternating Timeline */}
-      <div className="relative px-2">
-        {/* Central vertical line */}
-        <div className={`absolute left-1/2 top-0 bottom-0 w-0.5 transform -translate-x-1/2 ${isDark ? 'bg-slate-700/50' : 'bg-teal-200'}`} />
+      <div className="relative px-2 pb-8">
+        {/* Central vertical line - stops before Launch card */}
+        <div className={`absolute left-1/2 top-0 w-0.5 transform -translate-x-1/2 ${isDark ? 'bg-slate-700/50' : 'bg-teal-200'}`} style={{ bottom: '80px' }} />
 
         {/* Progress overlay on central line */}
         <div
@@ -1205,25 +1252,48 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
         />
 
         {/* Alternating Gate Cards */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((gateNum) => {
-            const gateInfo = GATE_INFO[gateNum];
+            const gateData = getGateData(gateNum);
             const phase = getPhaseForGate(gateNum);
             const colors = phaseColors[phase];
             const isCompleted = gateNum < currentGate;
             const isCurrent = gateNum === currentGate;
             const isUpcoming = gateNum > currentGate;
             const isLeft = gateNum % 2 === 0;
-            const tasks = GATE_TASKS[gateNum] || [];
 
             return (
-              <div key={gateNum} className={`flex items-start gap-2 ${isLeft ? 'flex-row' : 'flex-row-reverse'}`}>
+              <div key={gateNum} className="relative flex items-start">
+                {/* Center Node with Gate Number - absolutely positioned on timeline */}
+                <div className="absolute left-1/2 transform -translate-x-1/2 z-10">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: gateNum * 0.05, type: 'spring' }}
+                    className={`
+                      w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all
+                      ${isCompleted
+                        ? 'bg-emerald-500 border-emerald-400/50 text-white shadow-md shadow-emerald-500/30'
+                        : isCurrent
+                          ? isDark
+                            ? `${colors.bg} border-white/30 text-white ring-2 ring-offset-1 ring-offset-slate-900 ring-white/20 shadow-lg ${colors.glow}`
+                            : `bg-teal-950 border-teal-400 text-white ring-2 ring-offset-1 ring-offset-white ring-teal-300 shadow-lg shadow-teal-300/50`
+                          : isDark
+                            ? 'bg-slate-800 border-slate-600 text-slate-500'
+                            : 'bg-slate-100 border-slate-300 text-slate-400'
+                      }
+                    `}
+                  >
+                    G{gateNum}
+                  </motion.div>
+                </div>
+
                 {/* Content Side */}
                 <motion.div
                   initial={{ opacity: 0, x: isLeft ? -20 : 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: gateNum * 0.05 }}
-                  className={`flex-1 ${isLeft ? 'pr-2' : 'pl-2'}`}
+                  className={`w-1/2 ${isLeft ? 'pr-8' : 'pl-8 ml-auto'}`}
                 >
                   {/* Main Gate Card */}
                   <div className={`
@@ -1241,37 +1311,37 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
                           : `bg-white/50 border-slate-200 ${isUpcoming ? 'opacity-50' : ''}`
                     }
                   `}>
-                    <div className="p-2.5">
+                    <div className="p-4">
                       {/* Header row */}
                       <div className={`flex items-start gap-2 ${isLeft ? 'flex-row' : 'flex-row-reverse'}`}>
                         <div className={`flex-1 ${isLeft ? 'text-right' : 'text-left'}`}>
                           {/* Celebration badge */}
                           {isCompleted && (
-                            <span className={`inline-block text-[8px] px-1.5 py-0.5 rounded-full font-medium mb-1 ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
-                              {gateInfo.celebration}
+                            <span className={`inline-block text-xs px-2 py-1 rounded-full font-medium mb-2 ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {gateData.celebration}
                             </span>
                           )}
-                          <h4 className={`text-[11px] font-bold ${
+                          <h4 className={`text-base font-bold ${
                             isCompleted ? 'text-emerald-500' : isCurrent ? isDark ? colors.text : 'text-teal-700' : isDark ? 'text-slate-400' : 'text-slate-500'
                           }`}>
-                            {gateInfo.name}
+                            {gateData.name}
                           </h4>
-                          <p className={`text-[9px] italic ${isUpcoming ? isDark ? 'text-slate-600' : 'text-slate-400' : isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                            {gateInfo.narrative}
+                          <p className={`text-sm italic mt-1 ${isUpcoming ? isDark ? 'text-slate-600' : 'text-slate-400' : isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                            {gateData.narrative}
                           </p>
                         </div>
                       </div>
 
                       {/* Description */}
-                      <p className={`text-[9px] mt-1.5 leading-relaxed ${isUpcoming ? isDark ? 'text-slate-600' : 'text-slate-400' : isDark ? 'text-slate-400' : 'text-slate-600'} ${isLeft ? 'text-right' : 'text-left'}`}>
-                        {gateInfo.description}
+                      <p className={`text-sm mt-2 leading-relaxed ${isUpcoming ? isDark ? 'text-slate-600' : 'text-slate-400' : isDark ? 'text-slate-400' : 'text-slate-600'} ${isLeft ? 'text-right' : 'text-left'}`}>
+                        {gateData.description}
                       </p>
 
                       {/* Tasks for completed/current gates */}
                       {(isCompleted || isCurrent) && (
-                        <div className={`mt-2 space-y-0.5 ${isLeft ? 'text-right' : 'text-left'}`}>
-                          {tasks.slice(0, 3).map((task, i) => (
-                            <div key={i} className={`flex items-center gap-1 text-[8px] ${isLeft ? 'flex-row-reverse' : ''}`}>
+                        <div className={`mt-3 space-y-1 ${isLeft ? 'text-right' : 'text-left'}`}>
+                          {gateData.tasks.slice(0, 3).map((task: { task: string; status: 'done' | 'in-progress' | 'pending' }, i: number) => (
+                            <div key={i} className={`flex items-center gap-1.5 text-xs ${isLeft ? 'flex-row-reverse' : ''}`}>
                               <span className={task.status === 'done' ? 'text-emerald-500' : task.status === 'in-progress' ? 'text-cyan-500' : isDark ? 'text-slate-500' : 'text-slate-400'}>
                                 {task.status === 'done' ? '✓' : task.status === 'in-progress' ? '●' : '○'}
                               </span>
@@ -1286,30 +1356,30 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
 
                   {/* Teaching Moment Panel - 2/3 width, justified to outer edge */}
                   {(isCompleted || isCurrent) && (
-                    <div className={`mt-1.5 flex ${isLeft ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`mt-3 flex ${isLeft ? 'justify-start' : 'justify-end'}`}>
                       <motion.div
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: gateNum * 0.05 + 0.1 }}
-                        className={`w-2/3 p-2.5 rounded-lg border ${
+                        className={`w-2/3 p-4 rounded-lg border ${
                           isDark ? 'bg-teal-950/5 border-teal-500/20' : 'bg-teal-100/50 border-teal-200'
                         }`}
                       >
                         <div className={`${isLeft ? 'text-right' : 'text-left'}`}>
                           {/* Summary paragraph */}
-                          <p className={`text-[9px] leading-relaxed mb-2 ${isDark ? 'text-teal-200/80' : 'text-teal-800'}`}>
-                            {gateInfo.summary}
+                          <p className={`text-sm leading-relaxed mb-3 ${isDark ? 'text-teal-200/80' : 'text-teal-800'}`}>
+                            {gateData.summary}
                           </p>
 
                           {/* Key Decisions - bulletized */}
-                          {gateInfo.decisions.length > 0 && (
-                            <div className="mb-2">
-                              <p className={`text-[8px] font-semibold uppercase tracking-wide mb-1 ${isDark ? 'text-teal-400' : 'text-teal-700'}`}>
+                          {gateData.decisions.length > 0 && (
+                            <div className="mb-3">
+                              <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDark ? 'text-teal-400' : 'text-teal-700'}`}>
                                 Key Decisions
                               </p>
-                              <ul className={`space-y-1 ${isLeft ? 'text-right' : 'text-left'}`}>
-                                {gateInfo.decisions.map((decision, i) => (
-                                  <li key={i} className={`flex items-start gap-1.5 text-[8px] ${isLeft ? 'flex-row-reverse' : ''}`}>
+                              <ul className={`space-y-1.5 ${isLeft ? 'text-right' : 'text-left'}`}>
+                                {gateData.decisions.map((decision: { choice: string; reason: string }, i: number) => (
+                                  <li key={i} className={`flex items-start gap-1.5 text-xs ${isLeft ? 'flex-row-reverse' : ''}`}>
                                     <span className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>•</span>
                                     <span className={isDark ? 'text-teal-200/70' : 'text-teal-700'}>
                                       <span className="font-medium">{decision.choice}</span>
@@ -1322,23 +1392,28 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
                           )}
 
                           {/* Documents created in this gate */}
-                          {gateInfo.documents.length > 0 && (
+                          {gateData.documents.length > 0 && (
                             <div>
-                              <p className={`text-[8px] font-semibold uppercase tracking-wide mb-1 ${isDark ? 'text-teal-400' : 'text-teal-700'}`}>
+                              <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDark ? 'text-teal-400' : 'text-teal-700'}`}>
                                 Documents
                               </p>
-                              <div className={`flex flex-wrap gap-1 ${isLeft ? 'justify-end' : 'justify-start'}`}>
-                                {gateInfo.documents.map((doc, i) => (
-                                  <a
-                                    key={i}
-                                    href={doc.path}
-                                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] transition-colors ${
+                              <div className={`flex flex-wrap gap-1.5 ${isLeft ? 'justify-end' : 'justify-start'}`}>
+                                {gateData.documents.map((doc: { id?: string; name: string; path: string; icon: string; type?: string }, i: number) => (
+                                  <button
+                                    key={doc.id || i}
+                                    onClick={() => {
+                                      if (doc.id && onViewDocument) {
+                                        onViewDocument(doc.id, doc.name);
+                                      }
+                                    }}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
                                       isDark ? 'bg-teal-950/10 hover:bg-teal-950/20 border border-teal-500/20 text-teal-300' : 'bg-teal-200 hover:bg-teal-300 border border-teal-300 text-teal-700'
                                     }`}
+                                    title={doc.path || doc.name}
                                   >
                                     <span>{doc.icon}</span>
                                     <span>{doc.name}</span>
-                                  </a>
+                                  </button>
                                 ))}
                               </div>
                             </div>
@@ -1348,33 +1423,6 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
                     </div>
                   )}
                 </motion.div>
-
-                {/* Center Node with Gate Number */}
-                <div className="relative flex flex-col items-center z-10 pt-1">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: gateNum * 0.05, type: 'spring' }}
-                    className={`
-                      w-10 h-10 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-all
-                      ${isCompleted
-                        ? 'bg-emerald-500 border-emerald-400/50 text-white shadow-md shadow-emerald-500/30'
-                        : isCurrent
-                          ? isDark
-                            ? `${colors.bg} border-white/30 text-white ring-2 ring-offset-1 ring-offset-slate-900 ring-white/20 shadow-lg ${colors.glow}`
-                            : `bg-teal-950 border-teal-400 text-white ring-2 ring-offset-1 ring-offset-white ring-teal-300 shadow-lg shadow-teal-300/50`
-                          : isDark
-                            ? 'bg-slate-800 border-slate-600 text-slate-500'
-                            : 'bg-slate-100 border-slate-300 text-slate-400'
-                      }
-                    `}
-                  >
-                    G{gateNum}
-                  </motion.div>
-                </div>
-
-                {/* Empty Side (for alternating layout) */}
-                <div className="flex-1" />
               </div>
             );
           })}
@@ -1385,19 +1433,22 @@ const JourneyContent = ({ theme }: { theme: ThemeMode }) => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="flex justify-center mt-6 pb-4"
+          className="flex flex-col items-center mt-8 pb-6"
         >
-          <div className={`flex items-center gap-2 px-5 py-3 rounded-2xl border ${isDark ? 'bg-gradient-to-r from-orange-500/20 to-amber-500/20 border-orange-500/30' : 'bg-gradient-to-r from-teal-100 to-cyan-100 border-teal-300'}`}>
+          {/* Connecting line from timeline to card */}
+          <div className={`w-0.5 h-6 ${isDark ? 'bg-slate-700/50' : 'bg-teal-200'}`} />
+
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl border ${isDark ? 'bg-gradient-to-r from-orange-500/20 to-amber-500/20 border-orange-500/30' : 'bg-gradient-to-r from-teal-100 to-cyan-100 border-teal-300'}`}>
             <motion.span
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-2xl"
+              className="text-3xl"
             >
               🚀
             </motion.span>
             <div>
-              <span className={`text-sm font-bold block ${isDark ? 'text-orange-300' : 'text-teal-700'}`}>Launch Awaits!</span>
-              <span className={`text-[10px] ${isDark ? 'text-orange-400/70' : 'text-teal-600'}`}>{10 - currentGate} gates remaining</span>
+              <span className={`text-base font-bold block ${isDark ? 'text-orange-300' : 'text-teal-700'}`}>Launch Awaits!</span>
+              <span className={`text-sm ${isDark ? 'text-orange-400/70' : 'text-teal-600'}`}>{10 - currentGate} gates remaining</span>
             </div>
           </div>
         </motion.div>
@@ -2523,7 +2574,6 @@ export default function UnifiedDashboard() {
   const [showGateApproval, setShowGateApproval] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState('E-Commerce Platform');
-  const [isCenterExpanded, setIsCenterExpanded] = useState(false);
   const isDark = theme === 'dark';
 
   // Prefetch projects for future use
@@ -2659,8 +2709,7 @@ export default function UnifiedDashboard() {
               activeTab={activeTab}
               onTabChange={setActiveTab}
               theme={theme}
-              isExpanded={isCenterExpanded}
-              onToggleExpand={() => setIsCenterExpanded(!isCenterExpanded)}
+              projectId={currentProjectId}
             />
           </div>
 
