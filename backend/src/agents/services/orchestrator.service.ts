@@ -2,6 +2,11 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GateStateMachineService } from '../../gates/services/gate-state-machine.service';
 import { AgentExecutionService } from './agent-execution.service';
+import {
+  G1PresentationService,
+  G1PresentationData,
+} from '../../gates/services/g1-presentation.service';
+import { DeploymentMode } from '@prisma/client';
 
 export interface TaskDecompositionResult {
   tasks: Array<{
@@ -20,7 +25,74 @@ export class OrchestratorService {
     private readonly prisma: PrismaService,
     private readonly gateStateMachine: GateStateMachineService,
     private readonly agentExecution: AgentExecutionService,
+    private readonly g1Presentation: G1PresentationService,
   ) {}
+
+  /**
+   * Present G1 gate for user approval.
+   *
+   * Called after PM Onboarding completes the intake questionnaire.
+   * This method:
+   * 1. Prepares the G1 presentation data (classification, workflow, risks, assumptions)
+   * 2. Records artifacts (risks, deliverables, decisions) in the database
+   * 3. Updates the project with deployment mode
+   * 4. Transitions the gate to IN_REVIEW
+   * 5. Returns formatted presentation for the user
+   */
+  async presentG1Gate(
+    projectId: string,
+    userId: string,
+  ): Promise<{
+    presentationContent: string;
+    presentationData: G1PresentationData;
+  }> {
+    // 1. Prepare G1 presentation data
+    const presentationData = await this.g1Presentation.prepareG1Presentation(projectId);
+
+    // 2. Record artifacts using integrated services (risks, deliverables, decisions)
+    await this.g1Presentation.recordG1Artifacts(projectId, presentationData, userId);
+
+    // 3. Update project type and state with deployment mode
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        type: presentationData.projectType as any,
+        state: {
+          update: {
+            deploymentMode: this.mapDeploymentMode(presentationData.deploymentMode),
+          },
+        },
+      },
+    });
+
+    // 4. Transition gate to IN_REVIEW
+    await this.gateStateMachine.transitionToReview(projectId, 'G1_PENDING', {
+      description: 'G1 - Project Scope Approval ready for review',
+      passingCriteria:
+        'User has reviewed project classification, workflow, risks, and assumptions',
+    });
+
+    // 5. Format and return presentation
+    const presentationContent = this.g1Presentation.formatG1Presentation(presentationData);
+
+    return { presentationContent, presentationData };
+  }
+
+  /**
+   * Map string deployment mode to Prisma enum
+   */
+  private mapDeploymentMode(mode: string): DeploymentMode {
+    switch (mode) {
+      case 'LOCAL_ONLY':
+        return DeploymentMode.LOCAL_ONLY;
+      case 'OPTIONAL':
+        return DeploymentMode.OPTIONAL;
+      case 'REQUIRED':
+        return DeploymentMode.REQUIRED;
+      default:
+        return DeploymentMode.UNDETERMINED;
+    }
+  }
 
   /**
    * Initialize project workflow and create initial tasks

@@ -5,7 +5,7 @@ export const orchestratorTemplate: AgentTemplate = {
   name: 'Orchestrator',
   version: '5.0.0',
   projectTypes: ['traditional', 'ai_ml', 'hybrid', 'enhancement'],
-  gates: ['G0_COMPLETE', 'G1_PENDING', 'G1_COMPLETE'],
+  gates: ['G1_PENDING', 'G1_COMPLETE'],
 
   systemPrompt: `# Orchestrator Agent
 

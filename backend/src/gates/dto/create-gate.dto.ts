@@ -2,8 +2,6 @@ import { IsString, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum GateType {
-  G0_PENDING = 'G0_PENDING',
-  G0_COMPLETE = 'G0_COMPLETE',
   G1_PENDING = 'G1_PENDING',
   G1_COMPLETE = 'G1_COMPLETE',
   G2_PENDING = 'G2_PENDING',
@@ -29,7 +27,7 @@ export class CreateGateDto {
   @IsString()
   projectId: string;
 
-  @ApiProperty({ enum: GateType, description: 'Gate type (G0-G9)' })
+  @ApiProperty({ enum: GateType, description: 'Gate type (G1-G9)' })
   @IsEnum(GateType)
   gateType: GateType;
 

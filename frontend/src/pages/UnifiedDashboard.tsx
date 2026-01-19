@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CodeBracketIcon,
@@ -22,11 +22,13 @@ import { documentsApi } from '../api/documents';
 import type { Document } from '../types';
 import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
+import { useProjectStore } from '../stores/project';
 import { useWebSocket } from '../hooks/useWebSocket';
 import FuzzyLlamaLogoSvg from '../assets/Llamalogo.png';
 import FuzzyLlamaLogoTransparent from '../assets/Llamalogo-transparent.png';
 import { SettingsModal } from '../components/SettingsModal';
 import { OrchestratorChat } from '../components/chat/OrchestratorChat';
+import { documentGitApi } from '../api/document-git';
 
 // Types
 interface FileTreeNode {
@@ -35,15 +37,6 @@ interface FileTreeNode {
   path: string;
   children?: FileTreeNode[];
   content?: string;
-}
-
-interface GateApprovalData {
-  gateNumber: number;
-  title: string;
-  description: string;
-  checklist: { item: string; completed: boolean }[];
-  artifacts: string[];
-  agentRecommendation: string;
 }
 
 type WorkspaceTab = 'ui' | 'docs' | 'code' | 'map';
@@ -70,6 +63,7 @@ const ALL_AGENTS = [
 ];
 
 // Gate names, descriptions, decisions (teaching moments), documents, and celebrations
+// Based on Multi-Agent-Product-Creator framework: G1-G9 (no G0)
 const GATE_INFO: Record<number, {
   name: string;
   narrative: string;
@@ -80,179 +74,113 @@ const GATE_INFO: Record<number, {
   documents: { name: string; path: string; icon: string }[];  // Docs created in this gate
   celebration: string;
 }> = {
-  0: {
-    name: 'The Vision Takes Shape',
-    narrative: 'Every great product starts with a clear "why"',
-    description: 'You defined what you\'re building and why it matters. The foundation of every great product.',
-    deliverables: ['Problem statement', 'Target users defined', 'Initial concept validated'],
-    summary: 'Established the core problem space and validated that developers need AI-assisted tooling to manage complex multi-agent workflows.',
-    decisions: [
-      { choice: 'Developer productivity over enterprise features', reason: 'Indie devs need speed, not governance overhead' },
-      { choice: 'AI-first approach over manual workflows', reason: 'Automating repetitive tasks compounds time savings' },
-    ],
-    documents: [
-      { name: 'Vision Statement', path: '/docs/vision.md', icon: '📄' },
-      { name: 'User Research', path: '/docs/user-research.md', icon: '👥' },
-    ],
-    celebration: '🎯 Vision Set!'
-  },
   1: {
-    name: 'Requirements Crystallize',
+    name: 'Scope Approved',
+    narrative: 'Every great product starts with a clear "why"',
+    description: 'Project scope approved through intake questionnaire.',
+    deliverables: ['Project Intake document', 'Success criteria defined', 'Constraints identified'],
+    summary: 'Established the project vision, goals, and constraints through the intake process.',
+    decisions: [],
+    documents: [
+      { name: 'Project Intake', path: '/docs/intake.md', icon: '📄' },
+      { name: 'G1 Summary', path: '/docs/g1-summary.md', icon: '✅' },
+    ],
+    celebration: '🎯 Scope Approved!'
+  },
+  2: {
+    name: 'PRD Approved',
     narrative: 'From ideas to actionable specifications',
     description: 'Product requirements fully documented. Every feature has a purpose.',
     deliverables: ['PRD document', 'User stories', 'Success metrics', 'Feature prioritization'],
-    summary: 'Translated the vision into concrete requirements with measurable success criteria and a prioritized feature backlog.',
-    decisions: [
-      { choice: 'Real-time agent visibility over async notifications', reason: 'Transparency builds trust with users' },
-      { choice: 'Gate-based workflow over continuous deployment', reason: 'Quality checkpoints reduce costly production bugs' },
-      { choice: 'MoSCoW prioritization framework', reason: 'Clear must-have vs nice-to-have prevents scope creep' },
-    ],
+    summary: 'Translated the vision into concrete requirements with measurable success criteria.',
+    decisions: [],
     documents: [
       { name: 'PRD.md', path: '/docs/PRD.md', icon: '📋' },
-      { name: 'User Stories', path: '/docs/user-stories.md', icon: '📝' },
-      { name: 'Success Metrics', path: '/docs/metrics.md', icon: '📊' },
     ],
     celebration: '📋 PRD Complete!'
   },
-  2: {
-    name: 'Architecture Emerges',
+  3: {
+    name: 'Architecture Approved',
     narrative: 'The skeleton that supports everything',
-    description: 'The skeleton of your application took form. Decisions made here echo through every feature.',
+    description: 'System architecture and tech stack approved.',
     deliverables: ['System design doc', 'Tech stack decision', 'Database schema', 'API contracts'],
-    summary: 'Designed a scalable microservices architecture with event-driven communication between agents and a robust data layer.',
-    decisions: [
-      { choice: 'Microservices over monolith', reason: 'Agents need independent scaling and deployment' },
-      { choice: 'PostgreSQL over MongoDB', reason: 'ACID compliance critical for gate approval state management' },
-      { choice: 'FastAPI for backend', reason: 'Native async support and auto-generated OpenAPI docs' },
-      { choice: 'React + TypeScript for frontend', reason: 'Type safety catches bugs early, large ecosystem' },
-    ],
+    summary: 'Designed system architecture with appropriate technology choices.',
+    decisions: [],
     documents: [
       { name: 'Architecture.md', path: '/docs/ARCHITECTURE.md', icon: '🏗️' },
       { name: 'API Contracts', path: '/docs/API.md', icon: '🔌' },
-      { name: 'Database Schema', path: '/docs/schema.md', icon: '🗄️' },
     ],
-    celebration: '🏗️ Foundations Laid!'
+    celebration: '🏗️ Architecture Approved!'
   },
-  3: {
-    name: 'Design Takes Form',
+  4: {
+    name: 'Design Approved',
     narrative: 'Where user experience meets visual craft',
-    description: 'UX/UI design completed. Users will thank you for the attention to detail.',
+    description: 'UX/UI design completed and approved.',
     deliverables: ['Wireframes', 'Design system', 'User flows', 'Prototype'],
-    summary: 'Created a cohesive design system with a three-panel layout optimized for developer workflows and extended coding sessions.',
-    decisions: [
-      { choice: 'Three-panel layout over tabbed interface', reason: 'Users need simultaneous context of agents, work, and progress' },
-      { choice: 'Dark mode as default', reason: 'Developers work late; reducing eye strain improves productivity' },
-      { choice: 'Teal accent color palette', reason: 'Professional yet distinctive, good contrast in both themes' },
-    ],
+    summary: 'Created design system with 3 options, user selected and refined.',
+    decisions: [],
     documents: [
       { name: 'Design System', path: '/docs/design-system.md', icon: '🎨' },
-      { name: 'Wireframes', path: '/docs/wireframes.fig', icon: '📐' },
-      { name: 'User Flows', path: '/docs/user-flows.md', icon: '🔀' },
     ],
     celebration: '🎨 Design Approved!'
   },
-  4: {
-    name: 'Core Features Alive',
-    narrative: 'Ideas become reality, one function at a time',
-    description: 'You\'re breathing life into essential functionality. This is where ideas become real.',
-    deliverables: ['Core features', 'Basic UI', 'Database setup', 'API endpoints'],
-    summary: 'Built the orchestrator engine and core agent framework, establishing the foundation for all 14 specialized agents.',
-    decisions: [
-      { choice: 'Orchestrator-first development', reason: 'Coordination logic is the hardest to retrofit later' },
-      { choice: 'WebSocket over polling for updates', reason: 'Instant feedback transforms user experience' },
-      { choice: 'Agent state machine pattern', reason: 'Predictable state transitions simplify debugging' },
-    ],
-    documents: [
-      { name: 'MVP Spec', path: '/docs/mvp-spec.md', icon: '⚡' },
-      { name: 'Agent Framework', path: '/docs/agent-framework.md', icon: '🤖' },
-    ],
-    celebration: '⚡ MVP Built!'
-  },
   5: {
-    name: 'Feature Complete',
-    narrative: 'All the pieces come together',
-    description: 'All planned features implemented. Your product is taking its full shape.',
-    deliverables: ['All features built', 'Integration complete', 'Error handling', 'Edge cases covered'],
-    summary: 'Completed all 14 specialized agents with full orchestration, gate approval workflows, and comprehensive error handling.',
-    decisions: [
-      { choice: 'Rollback capability at each gate', reason: 'Mistakes happen; recovery should be seamless' },
-      { choice: '14 specialized agents over general-purpose', reason: 'Expertise beats flexibility for code quality' },
-      { choice: 'Graceful degradation for AI failures', reason: 'Users should never be completely blocked' },
-    ],
+    name: 'Feature Acceptance',
+    narrative: 'Ideas become reality, one function at a time',
+    description: 'Development complete. All features implemented.',
+    deliverables: ['Core features', 'All user stories', 'Spec compliance', 'Technical debt documented'],
+    summary: 'Built all planned features with spec compliance verified.',
+    decisions: [],
     documents: [
-      { name: 'Feature Matrix', path: '/docs/features.md', icon: '✨' },
-      { name: 'Error Handling', path: '/docs/error-handling.md', icon: '🚨' },
+      { name: 'Spec Compliance', path: '/docs/compliance.md', icon: '⚡' },
     ],
-    celebration: '✨ Features Done!'
+    celebration: '⚡ Development Complete!'
   },
   6: {
-    name: 'Integration Harmony',
-    narrative: 'Making all systems sing together',
-    description: 'All systems integrated and working together seamlessly.',
-    deliverables: ['Third-party integrations', 'Service connections', 'Data pipelines', 'Auth flow'],
-    summary: 'Connected all services with secure authentication, established data pipelines, and integrated external AI providers.',
-    decisions: [
-      { choice: 'JWT tokens over session cookies', reason: 'Stateless auth simplifies horizontal scaling' },
-      { choice: 'Redis for agent state caching', reason: 'Sub-millisecond reads keep UI responsive during heavy processing' },
-      { choice: 'OpenAI + Anthropic multi-provider', reason: 'Redundancy prevents single point of failure' },
-    ],
+    name: 'Quality Sign-off',
+    narrative: 'Confidence through comprehensive testing',
+    description: 'QA testing passed. Quality metrics met.',
+    deliverables: ['Test results summary', 'Coverage metrics', 'Performance tests', 'Accessibility audit'],
+    summary: 'QA testing complete with coverage and accessibility requirements met.',
+    decisions: [],
     documents: [
-      { name: 'Integration Guide', path: '/docs/integrations.md', icon: '🔗' },
-      { name: 'Auth Flow', path: '/docs/auth.md', icon: '🔐' },
+      { name: 'Test Results', path: '/docs/test-results.md', icon: '🧪' },
     ],
-    celebration: '🔗 All Connected!'
+    celebration: '🧪 QA Passed!'
   },
   7: {
-    name: 'Quality Assured',
-    narrative: 'Confidence through comprehensive testing',
-    description: 'Comprehensive testing passed. You can deploy with confidence.',
-    deliverables: ['Unit tests', 'Integration tests', 'E2E tests', 'Performance tests', 'Security audit'],
-    summary: 'Achieved 85% test coverage with comprehensive E2E tests, performance benchmarks, and completed security audit.',
-    decisions: [
-      { choice: '80% coverage threshold over 100%', reason: 'Diminishing returns; focus testing on critical paths' },
-      { choice: 'Playwright over Cypress for E2E', reason: 'Better multi-browser support, lighter footprint' },
-      { choice: 'Automated security scanning in CI', reason: 'Catch vulnerabilities before they reach production' },
-    ],
+    name: 'Security Acceptance',
+    narrative: 'Building trust through security',
+    description: 'Security review complete. No critical vulnerabilities.',
+    deliverables: ['Security scan results', 'Vulnerability summary', 'Threat model', 'Remediation plan'],
+    summary: 'Security audit complete with no critical or high vulnerabilities.',
+    decisions: [],
     documents: [
-      { name: 'Test Plan', path: '/docs/test-plan.md', icon: '🧪' },
       { name: 'Security Audit', path: '/docs/security-audit.md', icon: '🔒' },
-      { name: 'Perf Benchmarks', path: '/docs/performance.md', icon: '📈' },
     ],
-    celebration: '🧪 Tests Pass!'
+    celebration: '🔒 Security Approved!'
   },
   8: {
-    name: 'Deploy Ready',
-    narrative: 'Production environment awaits',
-    description: 'Production environment prepared. The runway is clear for launch.',
-    deliverables: ['CI/CD pipeline', 'Monitoring setup', 'Logging configured', 'Backup strategy'],
-    summary: 'Configured production infrastructure with automated deployments, comprehensive monitoring, and disaster recovery.',
-    decisions: [
-      { choice: 'Docker Compose over Kubernetes', reason: 'Right-sized complexity for current scale' },
-      { choice: 'Structured JSON logging', reason: 'Queryable logs enable faster incident debugging' },
-      { choice: 'Blue-green deployment strategy', reason: 'Zero-downtime deploys with instant rollback' },
-    ],
+    name: 'Go/No-Go',
+    narrative: 'The runway is clear',
+    description: 'Pre-deployment review complete. Ready for production.',
+    deliverables: ['Pre-deployment report', 'Deployment guide', 'Rollback plan', 'Lighthouse audits'],
+    summary: 'All quality gates passed, deployment infrastructure ready.',
+    decisions: [],
     documents: [
-      { name: 'Deploy Guide', path: '/docs/deployment.md', icon: '🚀' },
-      { name: 'Runbook', path: '/docs/runbook.md', icon: '📖' },
-      { name: 'Monitoring Setup', path: '/docs/monitoring.md', icon: '📡' },
+      { name: 'Pre-Deployment Report', path: '/docs/pre-deployment.md', icon: '🚀' },
     ],
     celebration: '🚀 Ready to Launch!'
   },
   9: {
-    name: 'Live & Learning',
+    name: 'Production Acceptance',
     narrative: 'Your creation meets the world',
-    description: 'Product successfully launched! Real users, real feedback, real impact.',
-    deliverables: ['Production deployment', 'User onboarding', 'Documentation', 'Support process'],
-    summary: 'Successfully launched to beta users with onboarding flow, documentation portal, and feedback collection system.',
-    decisions: [
-      { choice: 'Soft launch to beta users first', reason: 'Controlled feedback loop catches UX issues early' },
-      { choice: 'In-app feedback widget', reason: 'Friction-free input increases user engagement' },
-      { choice: 'Weekly release cadence', reason: 'Predictable updates build user confidence' },
-    ],
+    description: 'Product deployed and stable in production.',
+    deliverables: ['Smoke tests passed', 'Production metrics healthy', 'User acceptance'],
+    summary: 'Production deployment verified with passing smoke tests.',
+    decisions: [],
     documents: [
       { name: 'Launch Checklist', path: '/docs/launch-checklist.md', icon: '✅' },
-      { name: 'User Guide', path: '/docs/user-guide.md', icon: '📚' },
-      { name: 'Release Notes', path: '/docs/releases.md', icon: '📣' },
     ],
     celebration: '🎉 You Shipped!'
   },
@@ -304,190 +232,6 @@ const GitHubIcon = ({ className }: { className?: string }) => (
     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
   </svg>
 );
-
-// ============ GATE APPROVAL POPUP ============
-
-const GateApprovalPopup = ({
-  isOpen,
-  onClose,
-  onApprove,
-  onDeny,
-  gateData,
-  theme
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onApprove: () => void;
-  onDeny: () => void;
-  gateData: GateApprovalData;
-  theme: ThemeMode;
-}) => {
-  const [denyReason, setDenyReason] = useState('');
-  const [showDenyInput, setShowDenyInput] = useState(false);
-  const isDark = theme === 'dark';
-
-  if (!isOpen) return null;
-
-  const completedCount = gateData.checklist.filter(c => c.completed).length;
-  const totalCount = gateData.checklist.length;
-
-  const handleDeny = () => {
-    if (showDenyInput && denyReason.trim()) {
-      onDeny();
-      setShowDenyInput(false);
-      setDenyReason('');
-    } else {
-      setShowDenyInput(true);
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          onClick={(e) => e.stopPropagation()}
-          className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden ${
-            isDark ? 'bg-slate-800 border border-slate-700' : 'bg-teal-900 border border-teal-700'
-          }`}
-        >
-          {/* Header */}
-          <div className={`p-4 border-b ${isDark ? 'border-slate-700 bg-slate-800/80' : 'border-teal-700 bg-teal-800/80'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-white font-bold">
-                  G{gateData.gateNumber}
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">{gateData.title}</h2>
-                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-teal-300'}`}>Gate {gateData.gateNumber} Approval Required</p>
-                </div>
-              </div>
-              <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-            {/* Description */}
-            <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-teal-100'}`}>
-              {gateData.description}
-            </p>
-
-            {/* Checklist */}
-            <div className={`rounded-xl p-3 ${isDark ? 'bg-slate-700/50' : 'bg-teal-800/50'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className={`text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-teal-300'}`}>
-                  Checklist
-                </span>
-                <span className="text-xs text-emerald-400 font-medium">
-                  {completedCount}/{totalCount} complete
-                </span>
-              </div>
-              <div className="space-y-2">
-                {gateData.checklist.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded flex items-center justify-center ${
-                      item.completed ? 'bg-emerald-500' : isDark ? 'bg-slate-600' : 'bg-teal-700'
-                    }`}>
-                      {item.completed && <CheckIcon className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className={`text-sm ${item.completed ? 'text-emerald-400' : isDark ? 'text-slate-300' : 'text-teal-200'}`}>
-                      {item.item}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Artifacts */}
-            <div className={`rounded-xl p-3 ${isDark ? 'bg-slate-700/50' : 'bg-teal-800/50'}`}>
-              <span className={`text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-teal-300'}`}>
-                Artifacts
-              </span>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {gateData.artifacts.map((artifact, i) => (
-                  <span key={i} className={`text-xs px-2 py-1 rounded-full ${
-                    isDark ? 'bg-slate-600 text-slate-300' : 'bg-teal-700 text-teal-200'
-                  }`}>
-                    {artifact}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Agent Recommendation */}
-            <div className={`rounded-xl p-3 border-l-4 border-teal-500 ${isDark ? 'bg-teal-950/10' : 'bg-teal-600/20'}`}>
-              <div className="flex items-start gap-2">
-                <span className="text-lg">🤖</span>
-                <div>
-                  <span className={`text-xs font-semibold ${isDark ? 'text-teal-400' : 'text-teal-300'}`}>Agent Recommendation</span>
-                  <p className={`text-sm mt-1 ${isDark ? 'text-slate-300' : 'text-teal-100'}`}>
-                    {gateData.agentRecommendation}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Deny reason input */}
-            {showDenyInput && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className={`rounded-xl p-3 ${isDark ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-500/20 border border-red-400/30'}`}
-              >
-                <label className="text-xs font-semibold text-red-400 block mb-2">
-                  Reason for denial (will be sent to Agent Orchestrator)
-                </label>
-                <textarea
-                  value={denyReason}
-                  onChange={(e) => setDenyReason(e.target.value)}
-                  placeholder="Describe what needs to be addressed..."
-                  className={`w-full h-20 rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                    isDark ? 'bg-slate-700 text-white placeholder-slate-400' : 'bg-teal-800 text-white placeholder-teal-400'
-                  }`}
-                />
-              </motion.div>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className={`p-4 border-t ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-teal-700 bg-teal-800/50'}`}>
-            <div className="flex gap-3">
-              <button
-                onClick={handleDeny}
-                className={`flex-1 py-3 rounded-xl font-medium transition-colors ${
-                  showDenyInput && !denyReason.trim()
-                    ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                    : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                }`}
-                disabled={showDenyInput && !denyReason.trim()}
-              >
-                {showDenyInput ? 'Submit Denial' : 'Deny'}
-              </button>
-              <button
-                onClick={onApprove}
-                className="flex-1 py-3 rounded-xl font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
-              >
-                Approve Gate
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
 
 // ============ SPLASH PAGE FOR NEW USERS ============
 
@@ -595,16 +339,50 @@ const SplashPage = ({ onGetStarted }: { onGetStarted: () => void }) => {
 
 // ============ GITHUB POPUP ============
 
-const GitHubPopup = ({ isOpen, onClose, theme }: { isOpen: boolean; onClose: () => void; theme: ThemeMode }) => {
-  if (!isOpen) return null;
+const GitHubPopup = ({ isOpen, onClose, theme, projectId }: { isOpen: boolean; onClose: () => void; theme: ThemeMode; projectId: string | null }) => {
   const isDark = theme === 'dark';
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'status' | 'history'>('status');
+  const [showCommitInput, setShowCommitInput] = useState(false);
+  const [commitMessage, setCommitMessage] = useState('');
 
-  const actions = [
-    { label: 'Run Workflow', desc: 'Trigger a GitHub Action' },
-    { label: 'Sync Repository', desc: 'Pull latest changes' },
-    { label: 'View Actions', desc: 'See workflow history' },
-    { label: 'Deploy', desc: 'Deploy to production' },
-  ];
+  // Fetch git status
+  const { data: gitStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ['git-status', projectId],
+    queryFn: () => projectId ? documentGitApi.getStatus(projectId) : null,
+    enabled: !!projectId && isOpen,
+  });
+
+  // Fetch commit history
+  const { data: history, isLoading: historyLoading } = useQuery({
+    queryKey: ['git-history', projectId],
+    queryFn: () => projectId ? documentGitApi.getHistory(projectId, 10) : null,
+    enabled: !!projectId && isOpen && activeTab === 'history',
+  });
+
+  // Commit mutation
+  const commitMutation = useMutation({
+    mutationFn: (message: string) => projectId ? documentGitApi.commitAll(projectId, message) : Promise.reject('No project'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['git-status', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['git-history', projectId] });
+      setShowCommitInput(false);
+      setCommitMessage('');
+    },
+  });
+
+  // Sync mutation
+  const syncMutation = useMutation({
+    mutationFn: () => projectId ? documentGitApi.syncToFilesystem(projectId) : Promise.reject('No project'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['git-status', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['git-history', projectId] });
+    },
+  });
+
+  if (!isOpen) return null;
+
+  const totalChanges = (gitStatus?.staged?.length || 0) + (gitStatus?.unstaged?.length || 0) + (gitStatus?.untracked?.length || 0);
 
   return (
     <AnimatePresence>
@@ -620,32 +398,204 @@ const GitHubPopup = ({ isOpen, onClose, theme }: { isOpen: boolean; onClose: () 
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -10, scale: 0.95 }}
           onClick={(e) => e.stopPropagation()}
-          className={`rounded-2xl shadow-xl border w-72 overflow-hidden ${
-            isDark ? 'bg-slate-800 border-slate-700' : 'bg-teal-900 border-teal-700'
+          className={`rounded-2xl shadow-xl border w-80 overflow-hidden ${
+            isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
           }`}
         >
-          <div className={`p-4 border-b flex items-center justify-between ${isDark ? 'border-slate-700' : 'border-teal-700'}`}>
+          {/* Header */}
+          <div className={`p-3 border-b flex items-center justify-between ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
             <div className="flex items-center gap-2">
-              <GitHubIcon className="w-5 h-5 text-white" />
-              <span className="font-semibold text-white">GitHub Actions</span>
+              <GitHubIcon className={`w-5 h-5 ${isDark ? 'text-white' : 'text-slate-700'}`} />
+              <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-slate-700'}`}>Version Control</span>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-white">
-              <XMarkIcon className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="p-2">
-            {actions.map((action) => (
-              <button
-                key={action.label}
-                className={`w-full flex flex-col p-3 rounded-xl transition-colors text-left ${
-                  isDark ? 'hover:bg-slate-700' : 'hover:bg-teal-800'
-                }`}
-              >
-                <span className="text-sm font-medium text-white">{action.label}</span>
-                <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-teal-300'}`}>{action.desc}</span>
+            <div className="flex items-center gap-2">
+              {gitStatus && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                  {gitStatus.branch || 'main'}
+                </span>
+              )}
+              <button onClick={onClose} className={`${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}>
+                <XMarkIcon className="w-5 h-5" />
               </button>
-            ))}
+            </div>
           </div>
+
+          {!projectId ? (
+            <div className={`p-6 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <p className="text-sm">Select a project to view version control</p>
+            </div>
+          ) : (
+            <>
+              {/* Tabs */}
+              <div className={`flex border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                {(['status', 'history'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                      activeTab === tab
+                        ? isDark ? 'text-teal-300 border-b-2 border-teal-400' : 'text-teal-600 border-b-2 border-teal-500'
+                        : isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab === 'status' ? `Status${totalChanges > 0 ? ` (${totalChanges})` : ''}` : 'History'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Content */}
+              <div className="p-3 max-h-64 overflow-y-auto">
+                {activeTab === 'status' ? (
+                  statusLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : gitStatus?.isClean ? (
+                    <div className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <CheckIcon className="w-8 h-8 mx-auto mb-2 text-emerald-500" />
+                      <p className="text-xs">All documents committed</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {gitStatus?.staged && gitStatus.staged.length > 0 && (
+                        <div>
+                          <h4 className={`text-[10px] font-semibold mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                            Staged ({gitStatus.staged.length})
+                          </h4>
+                          {gitStatus.staged.map((file) => (
+                            <div key={file} className={`text-[10px] py-0.5 px-2 rounded ${isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
+                              {file.replace('docs/', '')}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {gitStatus?.unstaged && gitStatus.unstaged.length > 0 && (
+                        <div>
+                          <h4 className={`text-[10px] font-semibold mb-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                            Modified ({gitStatus.unstaged.length})
+                          </h4>
+                          {gitStatus.unstaged.map((file) => (
+                            <div key={file} className={`text-[10px] py-0.5 px-2 rounded ${isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+                              {file.replace('docs/', '')}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {gitStatus?.untracked && gitStatus.untracked.length > 0 && (
+                        <div>
+                          <h4 className={`text-[10px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                            New ({gitStatus.untracked.length})
+                          </h4>
+                          {gitStatus.untracked.map((file) => (
+                            <div key={file} className={`text-[10px] py-0.5 px-2 rounded ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                              {file.replace('docs/', '')}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  historyLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : history && history.length > 0 ? (
+                    <div className="space-y-1">
+                      {history.map((commit) => (
+                        <div key={commit.hash} className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}`}>
+                          <p className={`text-[11px] font-medium truncate ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                            {commit.message}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {commit.hash.substring(0, 7)}
+                            </span>
+                            <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>•</span>
+                            <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {new Date(commit.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <p className="text-xs">No commit history yet</p>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className={`p-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                {showCommitInput ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={commitMessage}
+                      onChange={(e) => setCommitMessage(e.target.value)}
+                      placeholder="Commit message..."
+                      autoFocus
+                      className={`w-full px-3 py-2 rounded-lg text-xs ${
+                        isDark ? 'bg-slate-700 text-white placeholder-slate-400 border border-slate-600' : 'bg-white text-slate-700 placeholder-slate-400 border border-slate-200'
+                      }`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && commitMessage.trim()) commitMutation.mutate(commitMessage);
+                        if (e.key === 'Escape') setShowCommitInput(false);
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowCommitInput(false)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => commitMessage.trim() && commitMutation.mutate(commitMessage)}
+                        disabled={!commitMessage.trim() || commitMutation.isPending}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium ${
+                          commitMessage.trim() && !commitMutation.isPending
+                            ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                            : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {commitMutation.isPending ? 'Committing...' : 'Commit'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => syncMutation.mutate()}
+                      disabled={syncMutation.isPending}
+                      className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1 ${
+                        isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {syncMutation.isPending ? (
+                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        'Sync'
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setShowCommitInput(true)}
+                      disabled={gitStatus?.isClean}
+                      className={`flex-1 py-2 rounded-lg text-xs font-medium ${
+                        gitStatus?.isClean
+                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      }`}
+                    >
+                      Commit All
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -705,7 +655,7 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId, autoSelectDo
             >
               {activeTab === 'ui' && <UIPreviewContent theme={theme} />}
               {activeTab === 'docs' && <DocsContent theme={theme} projectId={projectId} autoSelectDocumentKey={autoSelectDocumentKey} />}
-              {activeTab === 'code' && <CodeContent theme={theme} />}
+              {activeTab === 'code' && <CodeContent theme={theme} projectId={projectId} />}
               {activeTab === 'map' && <JourneyContent theme={theme} projectId={projectId} onViewDocument={() => onTabChange('docs')} />}
             </motion.div>
           </AnimatePresence>
@@ -769,51 +719,83 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
     enabled: !!projectId,
   });
 
+  // Filter out internal/tracking documents that shouldn't be shown to users
+  // These are created for internal tracking but not meant for user review
+  const INTERNAL_DOC_TITLES = [
+    'feedback log',
+    'cost log',
+    'project context',
+    'change requests',
+    'post launch',
+    'orchestrator output',
+    'orchestrator',  // Also match just "ORCHESTRATOR Output"
+  ];
+
+  const isInternalDocument = useCallback((doc: Document): boolean => {
+    return INTERNAL_DOC_TITLES.some(title =>
+      doc.title.toLowerCase().includes(title.toLowerCase())
+    );
+  }, []);
+
+  // Filter to only show user-facing documents (gate summaries, PRD, Architecture, etc.)
+  const userFacingDocuments = useMemo(() =>
+    (apiDocuments || []).filter((d: Document) => !isInternalDocument(d)),
+    [apiDocuments, isInternalDocument]
+  );
+
   // Auto-select document when prop changes (from gate approval)
   useEffect(() => {
-    if (autoSelectDocumentKey === 'intake' && apiDocuments?.length) {
-      const intakeDoc = apiDocuments.find((d: Document) =>
-        d.title === 'Project Intake' || d.documentType === 'REQUIREMENTS'
+    if (autoSelectDocumentKey === 'intake' && userFacingDocuments?.length) {
+      // For G1, prefer the G1 Summary doc, fallback to intake
+      const g1SummaryDoc = userFacingDocuments.find((d: Document) =>
+        d.title.includes('G1 Summary')
       );
-      if (intakeDoc) {
-        const docId = intakeDoc.id;
-        const timer = setTimeout(() => setSelectedDocId(docId), 0);
+      const intakeDoc = userFacingDocuments.find((d: Document) =>
+        d.title === 'Project Intake'
+      );
+      const targetDoc = g1SummaryDoc || intakeDoc;
+      if (targetDoc) {
+        const timer = setTimeout(() => setSelectedDocId(targetDoc.id), 0);
         return () => clearTimeout(timer);
       }
     }
-  }, [autoSelectDocumentKey, apiDocuments]);
+  }, [autoSelectDocumentKey, userFacingDocuments]);
 
   // Auto-select first document when loaded
   useEffect(() => {
-    if (apiDocuments?.length && !selectedDocId) {
-      const docId = apiDocuments[0].id;
+    if (userFacingDocuments?.length && !selectedDocId) {
+      const docId = userFacingDocuments[0].id;
       const timer = setTimeout(() => {
         setSelectedDocId(docId);
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [apiDocuments, selectedDocId]);
+  }, [userFacingDocuments, selectedDocId]);
 
-  const selectedDoc = apiDocuments?.find((d: Document) => d.id === selectedDocId);
+  const selectedDoc = userFacingDocuments?.find((d: Document) => d.id === selectedDocId);
 
   // Map document type to gate number
   const getGateForDoc = (doc: Document): number => {
+    // G1 Summary documents
+    if (doc.title.includes('G1 Summary')) return 1;
+    if (doc.title === 'Project Intake') return 0;
+
     const typeToGate: Record<string, number> = {
       'REQUIREMENTS': 0,
-      'PRD': 1,
-      'ARCHITECTURE': 2,
-      'DESIGN': 3,
-      'TECHNICAL': 4,
-      'TEST': 5,
-      'SECURITY': 6,
-      'DEPLOYMENT': 7,
+      'PRD': 2,
+      'ARCHITECTURE': 3,
+      'DESIGN': 4,
+      'TECHNICAL': 5,
+      'TEST': 6,
+      'SECURITY': 7,
+      'DEPLOYMENT': 8,
       'OTHER': 0,
     };
     return typeToGate[doc.documentType] ?? 0;
   };
 
   // Group documents by gate
-  const groupedDocs = (apiDocuments || []).reduce((acc: Record<number, Document[]>, doc: Document) => {
+  const groupedDocs = userFacingDocuments.reduce((acc: Record<number, Document[]>, doc: Document) => {
     const gate = getGateForDoc(doc);
     if (!acc[gate]) acc[gate] = [];
     acc[gate].push(doc);
@@ -839,7 +821,7 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
     );
   }
 
-  if (!apiDocuments?.length) {
+  if (!userFacingDocuments?.length) {
     return (
       <div className="h-full flex items-center justify-center">
         <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No documents yet</p>
@@ -856,7 +838,7 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
           .map(([gate, docs]) => (
           <div key={gate} className="mb-2">
             <div className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              {gate === '0' ? 'Intake' : `Gate ${gate}`}
+              {gate === '0' ? 'Discovery' : `Gate ${gate}`}
             </div>
             {(docs as Document[]).map((doc) => (
               <button
@@ -882,7 +864,7 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
             <div className="mb-3">
               <h2 className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>{selectedDoc.title}</h2>
               <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                {selectedDoc.documentType} • {new Date(selectedDoc.updatedAt).toLocaleDateString()}
+                {selectedDoc.documentType} • v{selectedDoc.version || 1} • {new Date(selectedDoc.updatedAt).toLocaleDateString()}
               </p>
             </div>
             <div className={`text-xs leading-relaxed whitespace-pre-wrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -897,10 +879,97 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
   );
 };
 
-const CodeContent = ({ theme }: { theme: ThemeMode }) => {
+const CodeContent = ({ theme, projectId }: { theme: ThemeMode; projectId: string | null }) => {
   const isDark = theme === 'dark';
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/docs', '/src']));
   const [selectedFile, setSelectedFile] = useState<FileTreeNode | null>(null);
+
+  // Fetch real documents from API
+  const { data: apiDocuments, isLoading } = useQuery({
+    queryKey: ['documents', projectId],
+    queryFn: () => projectId ? documentsApi.list(projectId) : Promise.resolve([]),
+    enabled: !!projectId,
+  });
+
+  // Filter out internal/tracking documents (same as Docs tab)
+  const INTERNAL_DOC_TITLES = [
+    'feedback log', 'cost log', 'project context', 'change requests',
+    'post launch', 'orchestrator output', 'orchestrator',
+  ];
+  const userFacingDocuments = useMemo(() => {
+    if (!apiDocuments) return [];
+    return apiDocuments.filter((doc: Document) =>
+      !INTERNAL_DOC_TITLES.some(title => doc.title.toLowerCase().includes(title))
+    );
+  }, [apiDocuments]);
+
+  // Build file tree from documents
+  const buildFileTree = useCallback((documents: Document[]): FileTreeNode[] => {
+    const docsFolder: FileTreeNode = {
+      name: 'docs',
+      type: 'folder',
+      path: '/docs',
+      children: [],
+    };
+
+    // Group documents by type for organization
+    const typeToFolder: Record<string, string> = {
+      'REQUIREMENTS': 'discovery',
+      'PRD': 'product',
+      'ARCHITECTURE': 'architecture',
+      'DESIGN': 'design',
+      'TECHNICAL': 'technical',
+      'TEST': 'testing',
+      'SECURITY': 'security',
+      'DEPLOYMENT': 'deployment',
+      'OTHER': 'other',
+    };
+
+    // Create subfolders based on document types present
+    const subfolders: Record<string, FileTreeNode> = {};
+
+    documents.forEach((doc) => {
+      const folderName = typeToFolder[doc.documentType] || 'other';
+      const folderPath = `/docs/${folderName}`;
+
+      if (!subfolders[folderName]) {
+        subfolders[folderName] = {
+          name: folderName,
+          type: 'folder',
+          path: folderPath,
+          children: [],
+        };
+      }
+
+      // Convert document title to filename
+      const fileName = `${doc.title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-')}.md`;
+      const filePath = `${folderPath}/${fileName}`;
+
+      subfolders[folderName].children!.push({
+        name: fileName,
+        type: 'file',
+        path: filePath,
+        content: doc.content || '',
+      });
+    });
+
+    // Add subfolders to docs folder (sorted)
+    docsFolder.children = Object.values(subfolders).sort((a, b) => a.name.localeCompare(b.name));
+
+    // If no documents, return empty state with placeholder
+    if (documents.length === 0) {
+      return mockFileTree; // Fall back to mock tree when no real documents
+    }
+
+    // Merge with src folder from mock (for now, until we have real code files)
+    const srcFolder = mockFileTree.find(n => n.name === 'src');
+    const result: FileTreeNode[] = [docsFolder];
+    if (srcFolder) result.push(srcFolder);
+
+    return result;
+  }, []);
+
+  const fileTree = userFacingDocuments.length > 0 ? buildFileTree(userFacingDocuments) : mockFileTree;
 
   const toggleFolder = (path: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -922,22 +991,34 @@ const CodeContent = ({ theme }: { theme: ThemeMode }) => {
             else if (isMarkdown) setSelectedFile(node);
           }}
           className={`w-full flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all ${
-            isSelected ? 'bg-teal-950/20 text-teal-300' : 'hover:bg-slate-700/30'
+            isSelected
+              ? isDark ? 'bg-teal-950/20 text-teal-300' : 'bg-teal-100 text-teal-700'
+              : isDark ? 'hover:bg-slate-700/30' : 'hover:bg-slate-100'
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
           {node.type === 'folder' ? (
             <>
-              {isExpanded ? <ChevronDownIcon className="w-3 h-3 text-teal-400" /> : <ChevronRightIcon className="w-3 h-3 text-teal-400" />}
-              {isExpanded ? <FolderOpenIcon className="w-4 h-4 text-amber-400" /> : <FolderIcon className="w-4 h-4 text-amber-400" />}
+              {isExpanded
+                ? <ChevronDownIcon className={`w-3 h-3 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
+                : <ChevronRightIcon className={`w-3 h-3 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />}
+              {isExpanded
+                ? <FolderOpenIcon className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-500'}`} />
+                : <FolderIcon className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-500'}`} />}
             </>
           ) : (
             <>
               <span className="w-3" />
-              <DocumentIcon className={`w-4 h-4 ${isMarkdown ? 'text-blue-400' : 'text-teal-500'}`} />
+              <DocumentIcon className={`w-4 h-4 ${isMarkdown ? (isDark ? 'text-blue-400' : 'text-blue-500') : (isDark ? 'text-teal-500' : 'text-teal-600')}`} />
             </>
           )}
-          <span className={`text-xs ${isSelected ? 'text-teal-300 font-medium' : isMarkdown ? 'text-teal-100' : 'text-teal-400'}`}>
+          <span className={`text-xs ${
+            isSelected
+              ? isDark ? 'text-teal-300 font-medium' : 'text-teal-700 font-medium'
+              : isMarkdown
+                ? isDark ? 'text-teal-100' : 'text-slate-700'
+                : isDark ? 'text-teal-400' : 'text-slate-500'
+          }`}>
             {node.name}
           </span>
         </button>
@@ -948,6 +1029,28 @@ const CodeContent = ({ theme }: { theme: ThemeMode }) => {
     );
   };
 
+  if (!projectId) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <CodeBracketIcon className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-teal-600' : 'text-teal-400'}`} />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Select a project to view files</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Loading files...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex gap-4">
       <div className={`w-56 rounded-2xl p-3 overflow-auto border ${isDark ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
@@ -955,13 +1058,13 @@ const CodeContent = ({ theme }: { theme: ThemeMode }) => {
           <CodeBracketIcon className={`w-4 h-4 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
           <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>Files</span>
         </div>
-        <div className="space-y-0.5">{mockFileTree.map(node => renderTreeNode(node))}</div>
+        <div className="space-y-0.5">{fileTree.map(node => renderTreeNode(node))}</div>
       </div>
       <div className={`flex-1 rounded-2xl overflow-hidden border ${isDark ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         {selectedFile ? (
           <>
             <div className={`flex items-center gap-2 px-4 py-2 border-b ${isDark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
-              <DocumentIcon className="w-4 h-4 text-blue-400" />
+              <DocumentIcon className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-500'}`} />
               <span className={`text-xs font-mono ${isDark ? 'text-white' : 'text-slate-700'}`}>{selectedFile.path}</span>
             </div>
             <div className={`p-5 overflow-auto h-full ${isDark ? '' : 'bg-white'}`}>
@@ -974,7 +1077,7 @@ const CodeContent = ({ theme }: { theme: ThemeMode }) => {
           <div className={`h-full flex items-center justify-center ${isDark ? '' : 'bg-white'}`}>
             <div className="text-center">
               <DocumentIcon className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-teal-600' : 'text-teal-400'}`} />
-              <p className={`text-sm ${isDark ? 'text-teal-400' : 'text-slate-500'}`}>Select a .md file</p>
+              <p className={`text-sm ${isDark ? 'text-teal-400' : 'text-slate-500'}`}>Select a file to view</p>
             </div>
           </div>
         )}
@@ -984,63 +1087,52 @@ const CodeContent = ({ theme }: { theme: ThemeMode }) => {
 };
 
 // Tasks accomplished at each gate
+// Tasks for each gate (G1-G9)
 const GATE_TASKS: Record<number, { task: string; status: 'done' | 'in-progress' | 'pending' }[]> = {
-  0: [
-    { task: 'Identified target user personas', status: 'done' },
-    { task: 'Documented core problem statement', status: 'done' },
-    { task: 'Validated concept with stakeholders', status: 'done' },
-  ],
   1: [
-    { task: 'Wrote comprehensive PRD', status: 'done' },
-    { task: 'Created user story map', status: 'done' },
-    { task: 'Defined success metrics & KPIs', status: 'done' },
-    { task: 'Prioritized MVP features', status: 'done' },
+    { task: 'Complete intake questionnaire', status: 'pending' },
+    { task: 'Define project scope', status: 'pending' },
+    { task: 'Identify constraints', status: 'pending' },
   ],
   2: [
-    { task: 'Designed system architecture', status: 'done' },
-    { task: 'Selected technology stack', status: 'done' },
-    { task: 'Created database schema', status: 'done' },
-    { task: 'Defined API contracts', status: 'done' },
+    { task: 'Create PRD document', status: 'pending' },
+    { task: 'Define user stories', status: 'pending' },
+    { task: 'Set success metrics', status: 'pending' },
   ],
   3: [
-    { task: 'Created wireframes for all screens', status: 'in-progress' },
-    { task: 'Built design system components', status: 'in-progress' },
-    { task: 'Mapped user flows', status: 'done' },
-    { task: 'Created interactive prototype', status: 'pending' },
+    { task: 'Design system architecture', status: 'pending' },
+    { task: 'Create database schema', status: 'pending' },
+    { task: 'Define API contracts', status: 'pending' },
   ],
   4: [
-    { task: 'Build authentication system', status: 'pending' },
-    { task: 'Create core UI components', status: 'pending' },
-    { task: 'Set up database', status: 'pending' },
-    { task: 'Implement basic API', status: 'pending' },
+    { task: 'Create 3 design options', status: 'pending' },
+    { task: 'User selects direction', status: 'pending' },
+    { task: 'Refine and finalize design', status: 'pending' },
   ],
   5: [
-    { task: 'Complete all planned features', status: 'pending' },
-    { task: 'Handle edge cases', status: 'pending' },
-    { task: 'Add error handling', status: 'pending' },
+    { task: 'Implement all features', status: 'pending' },
+    { task: 'Verify spec compliance', status: 'pending' },
+    { task: 'Document technical debt', status: 'pending' },
   ],
   6: [
-    { task: 'Integrate third-party services', status: 'pending' },
-    { task: 'Set up OAuth providers', status: 'pending' },
-    { task: 'Connect data pipelines', status: 'pending' },
+    { task: 'Run test suite', status: 'pending' },
+    { task: 'Check coverage metrics', status: 'pending' },
+    { task: 'Complete accessibility audit', status: 'pending' },
   ],
   7: [
-    { task: 'Write unit tests (80% coverage)', status: 'pending' },
-    { task: 'Create integration tests', status: 'pending' },
-    { task: 'Run E2E test suite', status: 'pending' },
-    { task: 'Complete security audit', status: 'pending' },
+    { task: 'Run security scans', status: 'pending' },
+    { task: 'Review vulnerabilities', status: 'pending' },
+    { task: 'Create remediation plan', status: 'pending' },
   ],
   8: [
-    { task: 'Configure CI/CD pipeline', status: 'pending' },
-    { task: 'Set up monitoring & alerts', status: 'pending' },
-    { task: 'Configure logging', status: 'pending' },
-    { task: 'Create backup strategy', status: 'pending' },
+    { task: 'Run Lighthouse audits', status: 'pending' },
+    { task: 'Prepare deployment guide', status: 'pending' },
+    { task: 'Create rollback plan', status: 'pending' },
   ],
   9: [
-    { task: 'Deploy to production', status: 'pending' },
-    { task: 'Set up user onboarding', status: 'pending' },
-    { task: 'Publish documentation', status: 'pending' },
-    { task: 'Establish support process', status: 'pending' },
+    { task: 'Run smoke tests', status: 'pending' },
+    { task: 'Verify production metrics', status: 'pending' },
+    { task: 'Confirm user acceptance', status: 'pending' },
   ],
 };
 
@@ -1052,11 +1144,14 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
     queryKey: ['journey', projectId],
     queryFn: () => projectId ? journeyApi.get(projectId) : null,
     enabled: !!projectId,
+    refetchOnMount: true, // Ensure fresh data when tab is opened
   });
 
   // Use API data or fall back to mock data
-  const currentGate = journeyData?.currentGate ?? 3;
-  const progress = journeyData?.progressPercentage ?? Math.round((currentGate / 10) * 100);
+  // When journeyData exists, completedGates is computed from gates with 'completed' status
+  const currentGate = journeyData?.currentGate ?? 1; // Default to G1 if not loaded
+  const completedGates = journeyData?.completedGates ?? (journeyData?.gates?.filter(g => g.status === 'completed').length ?? 0);
+  const progress = journeyData?.progressPercentage ?? Math.round((completedGates / 10) * 100);
 
   // Helper to get gate data - prefer API data, fall back to mock
   const getGateData = (gateNum: number) => {
@@ -1100,10 +1195,13 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
         decisions: decisions.length > 0 ? decisions : mockGateInfo.decisions,
         documents: documents.length > 0 ? documents : mockGateInfo.documents,
         tasks: tasks.length > 0 ? tasks : mockTasks,
+        // Include gate status from API
+        status: apiGate.status,
       };
     }
 
-    // Fall back to mock data
+    // Fall back to mock data - determine status from currentGate
+    const status = gateNum < currentGate ? 'completed' : gateNum === currentGate ? 'current' : 'upcoming';
     return {
       name: mockGateInfo.name,
       narrative: mockGateInfo.narrative,
@@ -1113,6 +1211,7 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
       decisions: mockGateInfo.decisions,
       documents: mockGateInfo.documents,
       tasks: mockTasks,
+      status,
     };
   };
 
@@ -1140,7 +1239,7 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
         </h3>
         <p className={`text-sm mt-2 italic ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>"Every line of code is a step forward"</p>
         <div className="flex items-center justify-center gap-4 mt-3">
-          <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>{currentGate} gates complete</span>
+          <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-teal-600'}`}>{completedGates} gates complete</span>
           <span className={`text-sm ${isDark ? 'text-slate-500' : 'text-teal-400'}`}>•</span>
           <span className="text-sm text-emerald-500">{progress}% to launch</span>
         </div>
@@ -1161,9 +1260,10 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
         <div className="space-y-6">
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((gateNum) => {
             const gateData = getGateData(gateNum);
-            const isCompleted = gateNum < currentGate;
-            const isCurrent = gateNum === currentGate;
-            const isUpcoming = gateNum > currentGate;
+            // Use status from API/gateData instead of calculating from currentGate
+            const isCompleted = gateData.status === 'completed';
+            const isCurrent = gateData.status === 'current';
+            const isUpcoming = gateData.status === 'upcoming';
             const isLeft = gateNum % 2 === 0;
 
             return (
@@ -1173,8 +1273,8 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={isCurrent ? {
-                      scale: [1, 1.05, 1],
-                      transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' }
+                      scale: [1, 1.15, 1],
+                      transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' }
                     } : { scale: 1 }}
                     transition={{ delay: gateNum * 0.05, type: 'spring' }}
                     className={`
@@ -1183,8 +1283,8 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                         ? 'bg-emerald-500 border-emerald-400/50 text-white shadow-md shadow-emerald-500/30'
                         : isCurrent
                           ? isDark
-                            ? 'bg-gradient-to-br from-cyan-400 to-teal-500 border-cyan-300 text-white ring-4 ring-cyan-400/40 shadow-xl shadow-cyan-500/50'
-                            : 'bg-gradient-to-br from-cyan-500 to-teal-600 border-cyan-300 text-white ring-4 ring-cyan-400/50 shadow-xl shadow-cyan-400/60'
+                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 border-amber-300 text-white ring-4 ring-amber-400/50 shadow-xl shadow-amber-500/50'
+                            : 'bg-gradient-to-br from-amber-500 to-orange-600 border-amber-300 text-white ring-4 ring-amber-400/60 shadow-xl shadow-amber-400/60'
                           : isDark
                             ? 'bg-slate-800 border-slate-600 text-slate-500'
                             : 'bg-slate-100 border-slate-300 text-slate-400'
@@ -1211,8 +1311,8 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                         : `bg-gradient-to-br ${isLeft ? 'from-emerald-50 to-white' : 'from-white to-emerald-50'} border-emerald-300`
                       : isCurrent
                         ? isDark
-                          ? 'bg-gradient-to-br from-cyan-500/20 to-teal-500/10 border-cyan-500/40 shadow-lg shadow-cyan-500/30'
-                          : 'bg-gradient-to-br from-cyan-50 to-teal-50 border-cyan-300 shadow-lg shadow-cyan-200/50'
+                          ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border-amber-500/40 shadow-lg shadow-amber-500/30'
+                          : 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300 shadow-lg shadow-amber-200/50'
                         : isDark
                           ? `bg-slate-800/30 border-slate-700/30 ${isUpcoming ? 'opacity-50' : ''}`
                           : `bg-white/50 border-slate-200 ${isUpcoming ? 'opacity-50' : ''}`
@@ -1229,7 +1329,7 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
                             </span>
                           )}
                           <h4 className={`text-base font-bold ${
-                            isCompleted ? 'text-emerald-500' : isCurrent ? isDark ? 'text-cyan-400' : 'text-cyan-700' : isDark ? 'text-slate-400' : 'text-slate-500'
+                            isCompleted ? 'text-emerald-500' : isCurrent ? isDark ? 'text-amber-400' : 'text-amber-700' : isDark ? 'text-slate-400' : 'text-slate-500'
                           }`}>
                             {gateData.name}
                           </h4>
@@ -1355,7 +1455,7 @@ const JourneyContent = ({ theme, projectId, onViewDocument }: { theme: ThemeMode
             </motion.span>
             <div>
               <span className={`text-base font-bold block ${isDark ? 'text-orange-300' : 'text-teal-700'}`}>Launch Awaits!</span>
-              <span className={`text-sm ${isDark ? 'text-orange-400/70' : 'text-teal-600'}`}>{10 - currentGate} gates remaining</span>
+              <span className={`text-sm ${isDark ? 'text-orange-400/70' : 'text-teal-600'}`}>{10 - completedGates} gates remaining</span>
             </div>
           </div>
         </motion.div>
@@ -1460,11 +1560,9 @@ const useMetricsData = (projectId: string | null) => {
 const FloatingMetricsCard = ({
   theme,
   projectId,
-  onGateClick,
 }: {
   theme: ThemeMode;
   projectId: string | null;
-  onGateClick: (gate: number) => void;
 }) => {
   const isDark = theme === 'dark';
   const [currentMetric, setCurrentMetric] = useState<MetricType>('gate');
@@ -1584,7 +1682,7 @@ const FloatingMetricsCard = ({
       case 'team':
         return <FloatingTeamContent phase={selectedPhase} theme={theme} currentGate={currentGate} workflowStatus={metricsData.workflowStatus} />;
       case 'gate':
-        return <FloatingGateContent currentGate={currentGate} selectedPhase={selectedPhase} theme={theme} onGateClick={onGateClick} progress={metricsData.progress} />;
+        return <FloatingGateContent currentGate={currentGate} selectedPhase={selectedPhase} theme={theme} progress={metricsData.progress} />;
       case 'tokens':
         return <FloatingTokenContent selectedPhase={selectedPhase} theme={theme} currentGate={currentGate} costs={metricsData.costs} />;
       case 'momentum':
@@ -1820,11 +1918,10 @@ const FloatingTeamContent = ({ phase, theme, currentGate, workflowStatus }: {
   );
 };
 
-const FloatingGateContent = ({ currentGate, selectedPhase, theme, onGateClick, progress: progressData }: {
+const FloatingGateContent = ({ currentGate, selectedPhase, theme, progress: progressData }: {
   currentGate: number;
   selectedPhase: Phase;
   theme: ThemeMode;
-  onGateClick: (gate: number) => void;
   progress?: ProjectProgress | null;
 }) => {
   const isDark = theme === 'dark';
@@ -1891,16 +1988,6 @@ const FloatingGateContent = ({ currentGate, selectedPhase, theme, onGateClick, p
           </div>
         </div>
 
-        <button
-          onClick={() => onGateClick(currentGate)}
-          className={`w-full py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            isDark
-              ? 'bg-teal-600 hover:bg-teal-500 text-white'
-              : 'bg-teal-600 hover:bg-teal-700 text-white'
-          }`}
-        >
-          Review Gate
-        </button>
       </div>
     </div>
   );
@@ -2149,51 +2236,74 @@ const FloatingLOCContent = ({ theme, isActive }: { theme: ThemeMode; isActive: b
 
 // ============ PROJECTS VIEW ============
 
+// Helper to extract gate number from gate type string
+const extractGateNumber = (gateType: string | undefined): number => {
+  if (!gateType) return 1;
+  const match = gateType.match(/G(\d+)/i);
+  return match ? parseInt(match[1], 10) : 1;
+};
+
+// Helper to calculate progress from gate number
+const calculateProgress = (gateNumber: number): number => {
+  return Math.round((gateNumber / 9) * 100);
+};
+
+// Helper to format time ago
+const formatTimeAgo = (date: Date | string): string => {
+  const now = new Date();
+  const then = new Date(date);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffMins > 0) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+  return 'Just now';
+};
+
 const ProjectsView = ({ theme, onSelectProject }: { theme: ThemeMode; onSelectProject: (id: string, name: string) => void }) => {
   const isDark = theme === 'dark';
-  const [selectedProject, setSelectedProject] = useState<string | null>('1');
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
-  const projects = [
-    {
-      id: '1',
-      name: 'E-Commerce Platform',
-      status: 'active',
-      gate: 4,
-      progress: 40,
-      description: 'A full-featured e-commerce platform with product catalog, shopping cart, checkout flow, and payment processing integration.',
-      tech: ['React', 'Node.js', 'PostgreSQL', 'Stripe'],
-      lastUpdated: '2 hours ago',
-      agents: 3,
-      filesGenerated: 47,
-      linesOfCode: 12450
-    },
-    {
-      id: '2',
-      name: 'Mobile App Backend',
-      status: 'active',
-      gate: 2,
-      progress: 20,
-      description: 'RESTful API backend for a mobile fitness tracking application with user authentication and workout logging.',
-      tech: ['NestJS', 'MongoDB', 'Redis', 'JWT'],
-      lastUpdated: '1 day ago',
-      agents: 2,
-      filesGenerated: 23,
-      linesOfCode: 5840
-    },
-    {
-      id: '3',
-      name: 'Analytics Dashboard',
-      status: 'completed',
-      gate: 9,
-      progress: 100,
-      description: 'Real-time analytics dashboard with interactive charts, data visualization, and exportable reports.',
-      tech: ['Vue.js', 'D3.js', 'FastAPI', 'ClickHouse'],
-      lastUpdated: '1 week ago',
-      agents: 4,
-      filesGenerated: 89,
-      linesOfCode: 24780
-    },
-  ];
+  // Fetch real projects from API
+  const { data: apiProjects, isLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+  });
+
+  // Transform API projects to the format expected by the UI
+  const projects = useMemo(() => {
+    if (!apiProjects) return [];
+
+    return apiProjects.map(project => {
+      const gateNumber = extractGateNumber(project.state?.currentGate);
+      const progress = project.state?.percentComplete ?? calculateProgress(gateNumber);
+      const isCompleted = gateNumber >= 9 || project.state?.currentGate === 'PROJECT_COMPLETE';
+
+      return {
+        id: project.id,
+        name: project.name,
+        status: isCompleted ? 'completed' : 'active',
+        gate: gateNumber,
+        progress,
+        description: `${project.type || 'traditional'} project`, // Project type as description fallback
+        tech: [], // Could be extracted from architecture document later
+        lastUpdated: formatTimeAgo(project.updatedAt),
+        agents: 0, // Could be calculated from active tasks
+        filesGenerated: 0, // Could be calculated from documents
+        linesOfCode: 0, // Could be calculated from code analysis
+      };
+    });
+  }, [apiProjects]);
+
+  // Auto-select first project when loaded
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProject) {
+      setSelectedProject(projects[0].id);
+    }
+  }, [projects, selectedProject]);
 
   // User lifetime stats
   const userData = {
@@ -2325,7 +2435,17 @@ const ProjectsView = ({ theme, onSelectProject }: { theme: ThemeMode; onSelectPr
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            {projects.map((project) => (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                <span className={`ml-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Loading projects...</span>
+              </div>
+            ) : projects.length === 0 ? (
+              <div className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <p className="text-sm">No projects yet</p>
+                <p className="text-xs mt-1">Click "+ New" to create your first project</p>
+              </div>
+            ) : projects.map((project) => (
               <motion.div
                 key={project.id}
                 whileHover={{ scale: 1.01 }}
@@ -2502,21 +2622,45 @@ export default function UnifiedDashboard() {
   const [mainView, setMainView] = useState<MainView>('dashboard');
   const themeFromStore = useThemeStore((state) => state.theme);
   const user = useAuthStore((state) => state.user);
+  const { activeProject, setActiveProject, updateProjectState, clearActiveProject } = useProjectStore();
   const theme: ThemeMode = themeFromStore === 'dark' ? 'dark' : 'light';
   const [showGitHub, setShowGitHub] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showGateApproval, setShowGateApproval] = useState(false);
-  const [currentGateData, setCurrentGateData] = useState<GateApprovalData | null>(null);
   const [autoSelectDocumentKey, setAutoSelectDocumentKey] = useState<string | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
   const [isNewProject, setIsNewProject] = useState(false);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
   const isDark = theme === 'dark';
 
   // Agent streaming state
   const [activeAgent, setActiveAgent] = useState<{ agentType: string; taskDescription?: string } | null>(null);
   const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
   const [isAgentWorking, setIsAgentWorking] = useState(false);
+  const [isStreamingDocument, setIsStreamingDocument] = useState(false);
+
+  // Document-producing agents that work in background (don't stream reasoning to chat)
+  // These agents create documents that appear in the Docs tab for review
+  const BACKGROUND_AGENTS = [
+    'PRODUCT_MANAGER',
+    'ARCHITECT',
+    'UX_UI_DESIGNER',
+    'FRONTEND_DEVELOPER',
+    'BACKEND_DEVELOPER',
+    'DATABASE_SPECIALIST',
+    'DEVOPS_ENGINEER',
+    'QA_ENGINEER',
+    'SECURITY_SPECIALIST',
+    'TECHNICAL_WRITER',
+    'ML_ENGINEER',
+    'DATA_ENGINEER',
+    'ORCHESTRATOR',
+  ];
+
+  // Check if an agent works in background (produces documents, doesn't stream to chat)
+  const isBackgroundAgent = useCallback((agentType: string): boolean => {
+    return BACKGROUND_AGENTS.includes(agentType);
+  }, []);
 
   // WebSocket event handlers
   const handleAgentStarted = useCallback((event: { agentType?: string; taskDescription?: string }) => {
@@ -2526,14 +2670,36 @@ export default function UnifiedDashboard() {
       taskDescription: event.taskDescription,
     });
     setStreamingChunks([]);
+    setIsStreamingDocument(false); // Reset document detection for new agent
     setIsAgentWorking(true);
   }, []);
 
-  const handleAgentChunk = useCallback((event: { chunk?: string }) => {
-    if (event.chunk) {
-      setStreamingChunks(prev => [...prev, event.chunk!]);
+  const handleAgentChunk = useCallback((event: { chunk?: string; agentType?: string }) => {
+    // Only accumulate chunks for conversational agents (like PM_ONBOARDING)
+    // Background/document agents work silently and save to Docs tab
+    if (event.chunk && activeAgent && !isBackgroundAgent(activeAgent.agentType)) {
+      // Check if this chunk starts a document (intake, PRD, etc.)
+      // Documents start with markdown headers like "# Project Intake:" or code fences
+      const combinedContent = streamingChunks.join('') + event.chunk;
+      const isDocumentContent =
+        combinedContent.includes('# Project Intake') ||
+        combinedContent.includes('```markdown\n# Project Intake') ||
+        combinedContent.includes('## Discovery Answers') ||
+        (combinedContent.includes('## Project Description') && combinedContent.includes('### Existing Code'));
+
+      if (isDocumentContent) {
+        // Stop streaming - document will appear in Docs tab
+        setIsStreamingDocument(true);
+        setStreamingChunks([]); // Clear any accumulated chunks
+        return;
+      }
+
+      // Don't accumulate if we've already detected document content
+      if (!isStreamingDocument) {
+        setStreamingChunks(prev => [...prev, event.chunk!]);
+      }
     }
-  }, []);
+  }, [activeAgent, isBackgroundAgent, streamingChunks, isStreamingDocument]);
 
   const handleAgentCompleted = useCallback((event: { agentType?: string; result?: unknown }) => {
     console.log('Agent completed:', event);
@@ -2550,6 +2716,7 @@ export default function UnifiedDashboard() {
     setTimeout(() => {
       setActiveAgent(null);
       setStreamingChunks([]);
+      setIsStreamingDocument(false);
       // Gate approvals happen via chat conversation, not modal popup
     }, 2000);
   }, [currentProjectId, searchParams, queryClient]);
@@ -2559,21 +2726,34 @@ export default function UnifiedDashboard() {
     setIsAgentWorking(false);
     setActiveAgent(null);
     setStreamingChunks([]);
+    setIsStreamingDocument(false);
   }, []);
 
-  const handleGateReady = useCallback(() => {
-    console.log('Gate ready for approval - handled via chat conversation');
-    // Gate approvals happen via chat conversation, not modal popup
+  const handleGateReady = useCallback((event: {
+    gateId: string;
+    gateType: string;
+    artifacts: Array<{ type: string; id?: string; title: string; content?: string }>;
+    timestamp: string;
+  }) => {
+    console.log('Gate ready for approval:', event);
+
+    // Extract gate number from type (e.g., "G1_PENDING" -> 1)
+    const gateNumber = parseInt(event.gateType.replace(/[^\d]/g, '')) || 1;
+
+    // Auto-switch to docs tab and select relevant document
+    setActiveTab('docs');
+    setAutoSelectDocumentKey(getDocumentKeyForGate(gateNumber));
   }, []);
 
   const handleDocumentCreated = useCallback((event: { document?: { id: string; title?: string } }) => {
     console.log('Document created event received:', event, 'currentProjectId:', currentProjectId);
-    // Invalidate documents query to refetch the list
+    // Invalidate documents and journey queries to refetch
     // Use both currentProjectId and urlProjectId to ensure we catch it
     const projectId = currentProjectId || searchParams.get('project');
     if (projectId) {
-      console.log('Invalidating documents query for project:', projectId);
+      console.log('Invalidating documents and journey queries for project:', projectId);
       queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['journey', projectId] });
     }
   }, [currentProjectId, queryClient, searchParams]);
 
@@ -2598,13 +2778,14 @@ export default function UnifiedDashboard() {
     enabled: !!urlProjectId,
   });
 
-  // Effect to handle URL-based project selection
+  // Effect to handle URL-based project selection and resume prompt
   useEffect(() => {
     if (urlProjectId && urlProjectId !== currentProjectId) {
-      // Use setTimeout to avoid synchronous setState in effect
+      // URL has a project - use it
       const timer = setTimeout(() => {
         setCurrentProjectId(urlProjectId);
         setIsNewProject(urlIsNew);
+        setShowResumePrompt(false);
 
         // Clear the URL params after reading them
         if (urlIsNew) {
@@ -2612,22 +2793,177 @@ export default function UnifiedDashboard() {
         }
       }, 0);
       return () => clearTimeout(timer);
+    } else if (!urlProjectId && !currentProjectId && activeProject) {
+      // No URL project, no current project, but we have a saved one - show resume prompt
+      setShowResumePrompt(true);
     }
-  }, [urlProjectId, urlIsNew, currentProjectId, setSearchParams]);
+  }, [urlProjectId, urlIsNew, currentProjectId, activeProject, setSearchParams]);
 
-  // Update project name when project data loads
+  // Update project name when project data loads and save to project store
   useEffect(() => {
-    if (currentProject?.name) {
+    if (currentProject?.name && currentProjectId) {
       // Use setTimeout to avoid synchronous setState in effect
       const timer = setTimeout(() => {
         setCurrentProjectName(currentProject.name);
+        // Save active project to store for resume functionality
+        setActiveProject({
+          id: currentProjectId,
+          name: currentProject.name,
+          type: currentProject.type,
+          state: currentProject.state ? {
+            currentPhase: currentProject.state.currentPhase,
+            currentGate: currentProject.state.currentGate,
+            percentComplete: currentProject.state.percentComplete,
+          } : undefined,
+          lastAccessedAt: new Date().toISOString(),
+          createdAt: currentProject.createdAt ? new Date(currentProject.createdAt).toISOString() : undefined,
+        });
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [currentProject]);
+  }, [currentProject, currentProjectId, setActiveProject]);
+
+  // Sync project progress updates to the store
+  const { data: projectProgress } = useQuery({
+    queryKey: ['projectProgress', currentProjectId],
+    queryFn: () => currentProjectId ? metricsApi.getProjectProgress(currentProjectId) : null,
+    enabled: !!currentProjectId,
+    refetchInterval: 10000, // Refetch every 10 seconds
+  });
+
+  useEffect(() => {
+    if (projectProgress && currentProjectId) {
+      updateProjectState({
+        currentPhase: projectProgress.currentPhase,
+        currentGate: String(projectProgress.currentGate),
+        percentComplete: projectProgress.percentComplete,
+      });
+    }
+  }, [projectProgress, currentProjectId, updateProjectState]);
+
+  // Handlers for resume prompt
+  const [isResuming, setIsResuming] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+
+  const handleResumeProject = async () => {
+    if (!activeProject) return;
+
+    setIsResuming(true);
+    setResumeError(null);
+
+    try {
+      // Verify project still exists in backend
+      const project = await projectsApi.get(activeProject.id);
+      if (project) {
+        setCurrentProjectId(activeProject.id);
+        setCurrentProjectName(project.name);
+        setShowResumePrompt(false);
+        // Update store with fresh data
+        setActiveProject({
+          ...activeProject,
+          name: project.name,
+          type: project.type,
+          state: project.state ? {
+            currentPhase: project.state.currentPhase,
+            currentGate: project.state.currentGate,
+            percentComplete: project.state.percentComplete,
+          } : activeProject.state,
+          lastAccessedAt: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to resume project:', error);
+      setResumeError('Project not found. It may have been deleted.');
+      // Clear invalid project from store
+      clearActiveProject();
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+  const handleStartFresh = () => {
+    clearActiveProject();
+    setShowResumePrompt(false);
+    // Navigate to home to start a new project
+    window.location.href = '/home';
+  };
 
   if (showSplash) {
     return <SplashPage onGetStarted={() => setShowSplash(false)} />;
+  }
+
+  // Show resume prompt when returning to workspace without a project in URL
+  if (showResumePrompt && activeProject) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className={`max-w-md w-full mx-4 p-6 rounded-2xl shadow-xl ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}
+        >
+          <div className="text-center mb-6">
+            <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${isDark ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
+              <FolderIcon className={`w-8 h-8 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
+            </div>
+            <h2 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              Welcome Back!
+            </h2>
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              Would you like to continue working on your project?
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-xl mb-6 ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+            <p className={`text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+              {activeProject.name}
+            </p>
+            {activeProject.state && (
+              <div className={`flex items-center gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <span className="flex items-center gap-1">
+                  <span className={`w-2 h-2 rounded-full ${
+                    activeProject.state.currentPhase === 'ship' ? 'bg-emerald-500' :
+                    activeProject.state.currentPhase === 'dev' ? 'bg-amber-500' : 'bg-cyan-500'
+                  }`} />
+                  {activeProject.state.currentPhase === 'ship' ? 'Ship' :
+                   activeProject.state.currentPhase === 'dev' ? 'Development' : 'Planning'}
+                </span>
+                <span>•</span>
+                <span>Gate {activeProject.state.currentGate?.replace(/[^\d]/g, '') || '0'}</span>
+                <span>•</span>
+                <span>{activeProject.state.percentComplete || 0}% complete</span>
+              </div>
+            )}
+          </div>
+
+          {resumeError && (
+            <div className={`p-3 rounded-lg mb-4 text-sm ${isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700'}`}>
+              {resumeError}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleStartFresh}
+              disabled={isResuming}
+              className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                isDark
+                  ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 disabled:opacity-50'
+                  : 'bg-slate-200 hover:bg-slate-300 text-slate-700 disabled:opacity-50'
+              }`}
+            >
+              Start New Project
+            </button>
+            <button
+              onClick={handleResumeProject}
+              disabled={isResuming}
+              className="flex-1 px-4 py-3 rounded-xl text-sm font-medium bg-teal-500 hover:bg-teal-600 text-white transition-colors disabled:opacity-50"
+            >
+              {isResuming ? 'Loading...' : 'Resume Project'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
   }
 
   const handleGateApprove = async () => {
@@ -2637,148 +2973,48 @@ export default function UnifiedDashboard() {
       // Get current gate and approve it
       const currentGate = await gatesApi.getCurrent(currentProjectId);
       if (currentGate) {
+        // 1. Approve the gate via gates API
         await gatesApi.approve(currentGate.id, { approved: true });
 
-        // Trigger next agent to start working
+        // 2. Trigger workflow coordinator to handle post-approval tasks
+        // This decomposes tasks (for G1), creates documents, and starts next agent
         try {
-          const result = await workflowApi.getStatus(currentProjectId);
-          console.log('Workflow status after approval:', result);
-
-          // Execute next task in the workflow
-          const nextTaskResult = await fetch(`/api/agents/workflow/execute-next/${currentProjectId}`, {
+          const gateApprovedResult = await fetch(`/api/agents/workflow/gate-approved/${currentProjectId}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ gateType: currentGate.gateType }),
+          });
+          const result = await gateApprovedResult.json();
+          console.log('Gate approval processed:', result);
+        } catch (workflowError) {
+          console.log('Workflow continuation error:', workflowError);
+          // Fallback to execute-next if gate-approved fails
+          await fetch(`/api/agents/workflow/execute-next/${currentProjectId}`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
               'Content-Type': 'application/json',
             },
           });
-          const nextTask = await nextTaskResult.json();
-          console.log('Next task started:', nextTask);
-        } catch (workflowError) {
-          console.log('Workflow continuation:', workflowError);
         }
       }
-      setShowGateApproval(false);
-      setCurrentGateData(null);
+      // Invalidate journey data to reflect gate completion
+      queryClient.invalidateQueries({ queryKey: ['journey', currentProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['documents', currentProjectId] });
     } catch (error) {
       console.error('Failed to approve gate:', error);
     }
   };
 
-  const handleGateDeny = async () => {
-    if (!currentProjectId) return;
-
-    try {
-      const currentGate = await gatesApi.getCurrent(currentProjectId);
-      if (currentGate) {
-        await gatesApi.approve(currentGate.id, { approved: false, reviewNotes: 'Changes requested' });
-      }
-      setShowGateApproval(false);
-      setCurrentGateData(null);
-    } catch (error) {
-      console.error('Failed to reject gate:', error);
-    }
-  };
-
   // Helper to get document key for a gate number
   const getDocumentKeyForGate = (gateNumber: number): string => {
-    // G0/G1 = intake document
+    // G1 = intake document
     if (gateNumber <= 1) return 'intake';
     // Other gates use first document from that gate
     return `g${gateNumber}-0`;
-  };
-
-  // Helper to fetch and show gate approval
-  const showGateApprovalPopup = async () => {
-    if (!currentProjectId) return;
-
-    try {
-      const currentGate = await gatesApi.getCurrent(currentProjectId);
-      if (currentGate) {
-        // Map gate data to GateApprovalData format
-        const gateNumber = parseInt(currentGate.gateType.replace(/[^\d]/g, '')) || 1;
-        const gateData: GateApprovalData = {
-          gateNumber,
-          title: getGateTitle(currentGate.gateType),
-          description: currentGate.description || getGateDescription(currentGate.gateType),
-          checklist: getGateChecklist(currentGate.gateType),
-          artifacts: [],
-          agentRecommendation: getGateRecommendation(currentGate.gateType),
-        };
-        setCurrentGateData(gateData);
-        setShowGateApproval(true);
-
-        // Auto-switch to docs tab and select relevant document
-        setActiveTab('docs');
-        setAutoSelectDocumentKey(getDocumentKeyForGate(gateNumber));
-      }
-    } catch (error) {
-      console.error('Failed to fetch gate:', error);
-    }
-  };
-
-  // Helper functions for gate display
-  const getGateTitle = (gateType: string): string => {
-    const titles: Record<string, string> = {
-      'G1_PENDING': 'Scope Approval',
-      'G2_PENDING': 'PRD Approval',
-      'G3_PENDING': 'Architecture Approval',
-      'G4_PENDING': 'Design Approval',
-      'G5_PENDING': 'Feature Acceptance',
-      'G6_PENDING': 'Quality Sign-off',
-      'G7_PENDING': 'Security Acceptance',
-      'G8_PENDING': 'Go/No-Go Decision',
-      'G9_PENDING': 'Production Release',
-    };
-    return titles[gateType] || 'Gate Approval';
-  };
-
-  const getGateDescription = (gateType: string): string => {
-    const descriptions: Record<string, string> = {
-      'G1_PENDING': 'Your project has been analyzed and scoped. Review the project classification and initial assumptions before proceeding.',
-      'G2_PENDING': 'The Product Manager has completed the PRD. Review user stories, success metrics, and scope boundaries.',
-      'G3_PENDING': 'The Architect has designed the system. Review tech stack, API contracts, and database schema.',
-      'G4_PENDING': 'The Designer has created the UI/UX. Review design system and component layouts.',
-      'G5_PENDING': 'Development is complete. Review implemented features and spec compliance.',
-      'G6_PENDING': 'QA has completed testing. Review test results, coverage, and accessibility audit.',
-      'G7_PENDING': 'Security review is complete. Review security scan results and threat model.',
-      'G8_PENDING': 'Pre-deployment checks are complete. Review performance metrics and deployment guide.',
-      'G9_PENDING': 'Ready for production release. Final review before go-live.',
-    };
-    return descriptions[gateType] || 'Review and approve to proceed to the next phase.';
-  };
-
-  const getGateChecklist = (gateType: string): { item: string; completed: boolean }[] => {
-    const checklists: Record<string, { item: string; completed: boolean }[]> = {
-      'G1_PENDING': [
-        { item: 'Project type identified', completed: true },
-        { item: 'Success criteria captured', completed: true },
-        { item: 'Constraints documented', completed: true },
-        { item: 'Initial scope defined', completed: true },
-      ],
-      'G2_PENDING': [
-        { item: 'User stories defined', completed: true },
-        { item: 'Success metrics established', completed: true },
-        { item: 'Scope boundaries set', completed: true },
-        { item: 'PRD document created', completed: true },
-      ],
-      'G3_PENDING': [
-        { item: 'Tech stack selected', completed: true },
-        { item: 'API contracts defined', completed: true },
-        { item: 'Database schema designed', completed: true },
-        { item: 'Architecture document created', completed: true },
-      ],
-    };
-    return checklists[gateType] || [{ item: 'Requirements reviewed', completed: true }];
-  };
-
-  const getGateRecommendation = (gateType: string): string => {
-    const recommendations: Record<string, string> = {
-      'G1_PENDING': 'The Orchestrator has completed the initial project analysis. Ready to proceed to PRD creation.',
-      'G2_PENDING': 'The Product Manager recommends approval. All user stories and requirements are documented.',
-      'G3_PENDING': 'The Architect recommends approval. System design is complete and scalable.',
-    };
-    return recommendations[gateType] || 'Ready for approval.';
   };
 
   const handleSelectProject = (id: string, name: string) => {
@@ -2794,18 +3030,8 @@ export default function UnifiedDashboard() {
         : 'bg-slate-100 text-slate-900'
     }`}>
       {/* Popups */}
-      <GitHubPopup isOpen={showGitHub} onClose={() => setShowGitHub(false)} theme={theme} />
+      <GitHubPopup isOpen={showGitHub} onClose={() => setShowGitHub(false)} theme={theme} projectId={currentProjectId} />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
-      {currentGateData && (
-        <GateApprovalPopup
-          isOpen={showGateApproval}
-          onClose={() => { setShowGateApproval(false); setCurrentGateData(null); }}
-          onApprove={handleGateApprove}
-          onDeny={handleGateDeny}
-          gateData={currentGateData}
-          theme={theme}
-        />
-      )}
 
       {/* Header */}
       <header className={`relative h-14 border-b flex items-center px-4 z-10 ${
@@ -2848,10 +3074,10 @@ export default function UnifiedDashboard() {
 
         {/* Center Section - Project Name */}
         <div className="flex-1 flex justify-center">
-          {mainView === 'dashboard' && (
+          {mainView === 'dashboard' && (currentProjectName || activeProject?.name) && (
             <div className="flex items-center gap-2">
               <span className={`text-xs font-medium ${isDark ? 'text-teal-400' : 'text-teal-200'}`}>Project:</span>
-              <span className="text-sm font-semibold text-white">{currentProjectName}</span>
+              <span className="text-sm font-semibold text-white">{currentProjectName || activeProject?.name}</span>
             </div>
           )}
         </div>
@@ -2895,14 +3121,7 @@ export default function UnifiedDashboard() {
               activeAgent={activeAgent}
               streamingChunks={streamingChunks}
               isAgentWorking={isAgentWorking}
-              pendingGateApproval={showGateApproval && currentGateData ? {
-                gateNumber: currentGateData.gateNumber,
-                title: currentGateData.title,
-                description: currentGateData.description,
-                documentName: currentGateData.gateNumber === 1 ? 'Project Intake' : undefined,
-              } : null}
               onApproveGate={handleGateApprove}
-              onDenyGate={handleGateDeny}
               onViewDocument={() => {
                 setActiveTab('docs');
               }}
@@ -2922,11 +3141,6 @@ export default function UnifiedDashboard() {
                       answers: intakeAnswers,
                     });
                     console.log('Intake submitted successfully:', result);
-
-                    // Trigger gate approval in chat after a short delay
-                    setTimeout(() => {
-                      showGateApprovalPopup();
-                    }, 1500);
                   } catch (error) {
                     console.error('Failed to submit intake:', error);
                   }
@@ -2950,7 +3164,6 @@ export default function UnifiedDashboard() {
           <FloatingMetricsCard
             theme={theme}
             projectId={currentProjectId}
-            onGateClick={() => showGateApprovalPopup()}
           />
         </div>
       )}

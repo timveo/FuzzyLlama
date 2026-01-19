@@ -1,11 +1,17 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
+import { DocumentGitService } from './services/document-git.service';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(DocumentsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private documentGit: DocumentGitService,
+  ) {}
 
   async create(createDocumentDto: CreateDocumentDto, userId: string) {
     // Verify project ownership
@@ -34,6 +40,26 @@ export class DocumentsService {
         },
       },
     });
+
+    // Save document to git-backed filesystem
+    try {
+      await this.documentGit.saveDocument(
+        createDocumentDto.projectId,
+        document.id,
+        document.title,
+        document.content,
+        {
+          autoCommit: true,
+          commitMessage: `Add ${document.title}`,
+          author: {
+            name: document.createdBy?.name || 'FuzzyLlama User',
+            email: document.createdBy?.email || 'user@fuzzyllama.dev',
+          },
+        },
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to save document to git: ${error.message}`);
+    }
 
     return document;
   }
@@ -108,11 +134,12 @@ export class DocumentsService {
 
     // If content is being updated, increment version
     const updateData: any = { ...updateDocumentDto };
-    if (updateDocumentDto.content && updateDocumentDto.content !== document.content) {
+    const contentChanged = updateDocumentDto.content && updateDocumentDto.content !== document.content;
+    if (contentChanged) {
       updateData.version = document.version + 1;
     }
 
-    return await this.prisma.document.update({
+    const updatedDocument = await this.prisma.document.update({
       where: { id },
       data: updateData,
       include: {
@@ -122,6 +149,30 @@ export class DocumentsService {
         },
       },
     });
+
+    // Update document in git-backed filesystem if content changed
+    if (contentChanged) {
+      try {
+        await this.documentGit.saveDocument(
+          document.projectId,
+          id,
+          updatedDocument.title,
+          updatedDocument.content,
+          {
+            autoCommit: true,
+            commitMessage: `Update ${updatedDocument.title} (v${updatedDocument.version})`,
+            author: {
+              name: updatedDocument.createdBy?.name || 'FuzzyLlama User',
+              email: updatedDocument.createdBy?.email || 'user@fuzzyllama.dev',
+            },
+          },
+        );
+      } catch (error) {
+        this.logger.warn(`Failed to update document in git: ${error.message}`);
+      }
+    }
+
+    return updatedDocument;
   }
 
   async delete(id: string, userId: string) {

@@ -1,9 +1,8 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
-// Gate progression order
+// Gate progression order (G1-G9, no G0)
 const GATE_PROGRESSION = [
-  'G0_COMPLETE',
   'G1_PENDING',
   'G1_COMPLETE',
   'G2_PENDING',
@@ -37,25 +36,15 @@ export class GateStateMachineService {
    * Initialize gates for a new project
    */
   async initializeProjectGates(projectId: string): Promise<void> {
-    // Create G0_COMPLETE gate (project created)
-    await this.prisma.gate.create({
-      data: {
-        projectId,
-        gateType: 'G0_COMPLETE',
-        status: 'APPROVED',
-        description: 'Project initialization complete',
-        approvedAt: new Date(),
-      },
-    });
-
-    // Create G1_PENDING gate (intake/requirements)
+    // Create G1_PENDING gate (scope/intake approval)
+    // G1 is the first gate - no G0 in the Multi-Agent-Product-Creator framework
     await this.prisma.gate.create({
       data: {
         projectId,
         gateType: 'G1_PENDING',
         status: 'PENDING',
-        description: 'Intake and initial requirements gathering',
-        passingCriteria: 'User has provided project vision, goals, and constraints',
+        description: 'Project scope approval - intake questionnaire complete',
+        passingCriteria: 'User has approved project scope, vision, goals, and constraints',
       },
     });
   }

@@ -247,7 +247,7 @@ export class EventStoreService {
       name: null,
       type: null,
       currentPhase: 'intake',
-      currentGate: 'G0_PENDING',
+      currentGate: 'G1_PENDING',
       status: 'active',
       gates: [],
       tasks: [],
@@ -274,7 +274,7 @@ export class EventStoreService {
           name: eventData.name,
           type: eventData.type,
           currentPhase: 'intake',
-          currentGate: 'G0_PENDING',
+          currentGate: 'G1_PENDING',
           status: 'active',
         };
 

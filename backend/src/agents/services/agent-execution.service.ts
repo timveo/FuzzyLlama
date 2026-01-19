@@ -354,7 +354,7 @@ Now, please proceed with your task.`;
     return {
       projectId,
       userId,
-      currentGate: project.state?.currentGate || 'G0_PENDING',
+      currentGate: project.state?.currentGate || 'G1_PENDING',
       currentPhase: project.state?.currentPhase || 'pre_startup',
       projectState: project.state,
       availableDocuments: project.documents.map((d) => d.title),

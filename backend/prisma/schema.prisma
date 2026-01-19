@@ -182,7 +182,17 @@ model ProjectState {
   currentAgent    String?
   percentComplete Int     @default(0)
 
+  // Deployment mode captured from intake (determines G9 behavior)
+  deploymentMode  DeploymentMode @default(UNDETERMINED)
+
   updatedAt DateTime @updatedAt
+}
+
+enum DeploymentMode {
+  LOCAL_ONLY   // Skip G9 entirely
+  OPTIONAL     // Ask at G8 if ready to deploy
+  REQUIRED     // Full G8-G9 execution
+  UNDETERMINED // Not yet determined, ask at G8
 }
 
 enum Phase {

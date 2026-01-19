@@ -118,7 +118,7 @@ export class ProjectionService {
       create: {
         projectId,
         currentPhase: 'intake',
-        currentGate: 'G0_PENDING',
+        currentGate: 'G1_PENDING',
         percentComplete: 0,
       },
       update: {},

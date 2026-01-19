@@ -106,7 +106,7 @@ export class ProjectsService {
         state: {
           create: {
             currentPhase: Phase.pre_startup,
-            currentGate: 'G0_PENDING',
+            currentGate: 'G1_PENDING',
             percentComplete: 0,
           },
         },
@@ -293,7 +293,7 @@ export class ProjectsService {
       },
       state: state || {
         currentPhase: Phase.pre_startup,
-        currentGate: 'G0_PENDING',
+        currentGate: 'G1_PENDING',
         percentComplete: 0,
       },
     };
