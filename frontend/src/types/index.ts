@@ -1,4 +1,6 @@
 // User & Auth Types
+export type TeachingLevel = 'NOVICE' | 'INTERMEDIATE' | 'EXPERT';
+
 export interface User {
   id: string;
   email: string;
@@ -8,6 +10,8 @@ export interface User {
   emailVerified: boolean;
   monthlyAgentExecutions: number;
   lastExecutionReset?: Date | null;
+  teachingLevel?: TeachingLevel | null;
+  onboardedAt?: Date | null;
   createdAt: Date;
   updatedAt?: Date;
 }

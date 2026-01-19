@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { TeachingLevel } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -25,6 +26,8 @@ export class UsersService {
         emailVerified: true,
         monthlyAgentExecutions: true,
         lastExecutionReset: true,
+        teachingLevel: true,
+        onboardedAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -35,6 +38,37 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async updateTeachingLevel(userId: string, teachingLevel: TeachingLevel) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        teachingLevel,
+        onboardedAt: user.onboardedAt || new Date(),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatarUrl: true,
+        planTier: true,
+        teachingLevel: true,
+        onboardedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return updatedUser;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto, currentUserId: string) {
@@ -182,8 +216,8 @@ export class UsersService {
 
     // Define limits based on plan tier
     const limits = {
-      FREE: { projects: 1, executions: 50 },
-      PRO: { projects: 10, executions: 500 },
+      FREE: { projects: 100, executions: 500 },
+      PRO: { projects: 100, executions: 500 },
       TEAM: { projects: Infinity, executions: 2000 },
       ENTERPRISE: { projects: Infinity, executions: Infinity },
     };

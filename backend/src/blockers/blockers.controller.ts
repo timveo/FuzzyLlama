@@ -14,7 +14,7 @@ import { CreateBlockerDto } from './dto/create-blocker.dto';
 import { ResolveBlockerDto } from './dto/resolve-blocker.dto';
 import { EscalateBlockerDto } from './dto/escalate-blocker.dto';
 
-@Controller('api/blockers')
+@Controller('blockers')
 @UseGuards(JwtAuthGuard)
 export class BlockersController {
   constructor(private readonly blockersService: BlockersService) {}

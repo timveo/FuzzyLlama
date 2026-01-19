@@ -2,8 +2,8 @@ import apiClient from '../lib/api-client';
 
 // Types for metrics API responses
 export interface ProjectProgress {
-  currentGate: number;
-  currentPhase: 'plan' | 'dev' | 'ship';
+  currentGate: string | number; // Backend returns string like "G1_PENDING", frontend may parse to number
+  currentPhase: string; // Backend returns phase name like "pre_startup", "intake", etc.
   percentComplete: number;
   completedTasks: number;
   totalTasks: number;
@@ -97,43 +97,43 @@ export const metricsApi = {
 
   // Get project costs
   getProjectCosts: async (projectId: string): Promise<ProjectCosts> => {
-    const response = await apiClient.get<ProjectCosts>(`/api/costs/project/${projectId}`);
+    const response = await apiClient.get<ProjectCosts>(`/costs/project/${projectId}`);
     return response.data;
   },
 
   // Get costs per gate
   getCostsPerGate: async (projectId: string): Promise<GateCosts[]> => {
-    const response = await apiClient.get<GateCosts[]>(`/api/costs/project/${projectId}/per-gate`);
+    const response = await apiClient.get<GateCosts[]>(`/costs/project/${projectId}/per-gate`);
     return response.data;
   },
 
   // Get project metrics
   getProjectMetrics: async (projectId: string): Promise<ProjectMetrics> => {
-    const response = await apiClient.get<ProjectMetrics>(`/api/metrics/${projectId}`);
+    const response = await apiClient.get<ProjectMetrics>(`/metrics/${projectId}`);
     return response.data;
   },
 
   // Calculate and update project metrics
   calculateMetrics: async (projectId: string): Promise<ProjectMetrics> => {
-    const response = await apiClient.post<ProjectMetrics>(`/api/metrics/calculate/${projectId}`);
+    const response = await apiClient.post<ProjectMetrics>(`/metrics/calculate/${projectId}`);
     return response.data;
   },
 
   // Get phase history for velocity calculations
   getPhaseHistory: async (projectId: string): Promise<PhaseHistoryEntry[]> => {
-    const response = await apiClient.get<PhaseHistoryEntry[]>(`/api/phase-history/${projectId}`);
+    const response = await apiClient.get<PhaseHistoryEntry[]>(`/phase-history/${projectId}`);
     return response.data;
   },
 
   // Get current phase
   getCurrentPhase: async (projectId: string): Promise<PhaseHistoryEntry | null> => {
-    const response = await apiClient.get<PhaseHistoryEntry | null>(`/api/phase-history/current/${projectId}`);
+    const response = await apiClient.get<PhaseHistoryEntry | null>(`/phase-history/current/${projectId}`);
     return response.data;
   },
 
   // Get directory tree for code stats
   getDirectoryTree: async (projectId: string): Promise<any> => {
-    const response = await apiClient.get(`/api/code-generation/${projectId}/tree`);
+    const response = await apiClient.get(`/code-generation/${projectId}/tree`);
     return response.data;
   },
 

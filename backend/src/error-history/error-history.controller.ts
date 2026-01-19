@@ -14,7 +14,7 @@ import { LogErrorDto } from './dto/log-error.dto';
 import { ResolveErrorDto } from './dto/resolve-error.dto';
 import { ErrorType } from '@prisma/client';
 
-@Controller('api/errors')
+@Controller('errors')
 @UseGuards(JwtAuthGuard)
 export class ErrorHistoryController {
   constructor(private readonly errorHistoryService: ErrorHistoryService) {}

@@ -19,7 +19,7 @@ async function main() {
   const testUser = await prisma.user.create({
     data: {
       email: 'test@fuzzyllama.dev',
-      passwordHash: '$2b$10$XjW8.8E5KXrr7T9B9v5dkOq1V1Z9B4Vj4c3X2Q1R0S9W8X7Y6Z5', // "password123"
+      passwordHash: '$2b$10$WgWceNSHcHFRlLFMG9GeQOdj6WhwOcvtrTenrB5uuUXPgG50r3JxO', // "password123"
       name: 'Test User',
       emailVerified: true,
       planTier: 'FREE',

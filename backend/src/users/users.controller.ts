@@ -18,6 +18,7 @@ import {
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateTeachingLevelDto } from './dto/update-teaching-level.dto';
 import { RequestUser } from '../common/types/user.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -80,5 +81,15 @@ export class UsersController {
   @ApiResponse({ status: 403, description: 'Forbidden - can only view own stats' })
   async getUsageStats(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.usersService.getUsageStats(id, user.id);
+  }
+
+  @Patch('me/teaching-level')
+  @ApiOperation({ summary: 'Update current user teaching level preference' })
+  @ApiResponse({ status: 200, description: 'Teaching level updated' })
+  async updateTeachingLevel(
+    @Body() dto: UpdateTeachingLevelDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.usersService.updateTeachingLevel(user.id, dto.teachingLevel);
   }
 }

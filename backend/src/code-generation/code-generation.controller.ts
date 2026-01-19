@@ -12,7 +12,7 @@ import { FileSystemService } from './filesystem.service';
 import { CodeParserService } from './code-parser.service';
 import { BuildExecutorService } from './build-executor.service';
 
-@Controller('api/code-generation')
+@Controller('code-generation')
 @UseGuards(JwtAuthGuard)
 export class CodeGenerationController {
   constructor(

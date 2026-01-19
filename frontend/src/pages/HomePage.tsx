@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useMutation } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import {
   Home,
   FolderOpen,
@@ -18,12 +20,36 @@ import {
   Palette,
   GraduationCap,
   Users,
+  Loader2,
 } from 'lucide-react';
 import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
 import { SettingsModal } from '../components/SettingsModal';
+import { CreateProjectModal } from '../components/CreateProjectModal';
+import { projectsApi } from '../api/projects';
+import { workflowApi } from '../api/workflow';
 import FuzzyLlamaLogo from '../assets/Llamalogo.png';
 import FuzzyLlamaLogoTransparent from '../assets/Llamalogo-transparent.png';
+
+// Helper functions for project creation
+// Note: The backend uses Claude to extract a proper project name from the requirements
+// This is just a temporary placeholder until the workflow starts
+function extractProjectName(_description: string): string {
+  return 'New Project';
+}
+
+function inferProjectType(description: string): 'traditional' | 'ai_ml' | 'hybrid' | 'enhancement' {
+  const lowerDesc = description.toLowerCase();
+  if (lowerDesc.includes('ai') || lowerDesc.includes('ml') || lowerDesc.includes('machine learning') ||
+      lowerDesc.includes('chatbot') || lowerDesc.includes('gpt') || lowerDesc.includes('llm')) {
+    return 'ai_ml';
+  }
+  if (lowerDesc.includes('enhance') || lowerDesc.includes('existing') ||
+      lowerDesc.includes('add feature') || lowerDesc.includes('improve')) {
+    return 'enhancement';
+  }
+  return 'traditional';
+}
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -32,24 +58,130 @@ const HomePage = () => {
   const isDark = theme === 'dark';
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [promptValue, setPromptValue] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
-  const handlePromptSubmit = () => {
-    // Parse prompt to determine navigation
-    const prompt = promptValue.toLowerCase();
-    if (prompt.includes('new project') || prompt.includes('create')) {
-      navigate('/projects/new');
-    } else if (prompt.includes('project')) {
-      navigate('/dashboard');
-    } else {
-      navigate('/workspace');
-    }
+  // Mutation for creating project and starting workflow
+  const createProjectMutation = useMutation({
+    mutationFn: async (description: string) => {
+      // Track start time to ensure minimum loading display
+      const startTime = Date.now();
+      const MIN_LOADING_TIME = 5000; // 5 seconds minimum
+
+      // Create the project
+      const project = await projectsApi.create({
+        name: extractProjectName(description),
+        type: inferProjectType(description),
+        description,
+      });
+
+      // Start the workflow
+      await workflowApi.start({
+        projectId: project.id,
+        requirements: description,
+      });
+
+      // Ensure minimum loading time for better UX
+      const elapsed = Date.now() - startTime;
+      if (elapsed < MIN_LOADING_TIME) {
+        await new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
+      }
+
+      return project;
+    },
+    onSuccess: (project) => {
+      // Navigate to workspace with new project
+      navigate(`/workspace?project=${project.id}&new=true`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create project');
+      setIsCreating(false);
+    },
+  });
+
+  const handlePromptSubmit = async () => {
+    const prompt = promptValue.trim();
+    if (!prompt) return;
+
+    setIsCreating(true);
+    createProjectMutation.mutate(prompt);
+  };
+
+  const handleCreateFromModal = () => {
+    setShowCreateModal(false);
   };
 
   return (
     <div className="h-screen w-screen flex overflow-hidden">
-      {/* Settings Modal */}
+      {/* Modals */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <CreateProjectModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onProjectCreated={handleCreateFromModal}
+      />
+
+      {/* Creating overlay */}
+      <AnimatePresence>
+        {isCreating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="text-center"
+            >
+              <motion.img
+                src={FuzzyLlamaLogoTransparent}
+                alt="Creating..."
+                animate={{
+                  scale: [1, 1.08, 1],
+                  rotate: [0, 2, -2, 0]
+                }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="w-40 h-40 mx-auto mb-6"
+              />
+              <motion.p
+                className="text-2xl text-white font-medium"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                Creating your project...
+              </motion.p>
+              <motion.p
+                className="text-slate-400 mt-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                Setting up the Product Manager agent
+              </motion.p>
+              <motion.div
+                className="mt-6 flex justify-center gap-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="w-2 h-2 rounded-full bg-teal-500"
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{ duration: 0.6, delay: i * 0.15, repeat: Infinity }}
+                  />
+                ))}
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Sidebar */}
       <div className={`w-56 flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-900'} text-white`}>
@@ -79,8 +211,8 @@ const HomePage = () => {
           <div className="pt-4 pb-2">
             <span className="px-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Projects</span>
           </div>
-          <NavItem icon={FolderOpen} label="Projects" onClick={() => navigate('/dashboard')} isDark={true} />
-          <NavItem icon={Plus} label="New project" onClick={() => navigate('/projects/new')} isDark={true} />
+          <NavItem icon={FolderOpen} label="Projects" onClick={() => navigate('/workspace')} isDark={true} />
+          <NavItem icon={Plus} label="New project" onClick={() => setShowCreateModal(true)} isDark={true} />
 
           <div className="pt-4 pb-2">
             <span className="px-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Workspace</span>
@@ -245,9 +377,18 @@ const HomePage = () => {
                   </button>
                   <button
                     onClick={handlePromptSubmit}
-                    className="w-8 h-8 rounded-full bg-teal-600 hover:bg-teal-500 flex items-center justify-center transition-colors"
+                    disabled={isCreating || !promptValue.trim()}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                      isCreating || !promptValue.trim()
+                        ? 'bg-slate-600 cursor-not-allowed'
+                        : 'bg-teal-600 hover:bg-teal-500'
+                    }`}
                   >
-                    <ArrowRight className="w-4 h-4 text-white" />
+                    {isCreating ? (
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4 text-white" />
+                    )}
                   </button>
                 </div>
               </div>

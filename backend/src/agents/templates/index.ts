@@ -1,5 +1,6 @@
 import { AgentTemplate } from '../interfaces/agent-template.interface';
 import { productManagerTemplate } from './product-manager.template';
+import { productManagerOnboardingTemplate } from './product-manager-onboarding.template';
 import { architectTemplate } from './architect.template';
 import { uxUiDesignerTemplate } from './ux-ui-designer.template';
 import { frontendDeveloperTemplate } from './frontend-developer.template';
@@ -16,6 +17,7 @@ import { orchestratorTemplate } from './orchestrator.template';
 
 export const agentTemplates: Record<string, AgentTemplate> = {
   PRODUCT_MANAGER: productManagerTemplate,
+  PRODUCT_MANAGER_ONBOARDING: productManagerOnboardingTemplate,
   ARCHITECT: architectTemplate,
   UX_UI_DESIGNER: uxUiDesignerTemplate,
   FRONTEND_DEVELOPER: frontendDeveloperTemplate,

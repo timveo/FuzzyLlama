@@ -1,4 +1,4 @@
-import { User, PlanTier } from '@prisma/client';
+import { User, PlanTier, TeachingLevel } from '@prisma/client';
 
 /**
  * User object returned in JWT payload
@@ -26,6 +26,8 @@ export interface UserProfile {
   emailVerified: boolean;
   monthlyAgentExecutions: number;
   lastExecutionReset: Date | null;
+  teachingLevel: TeachingLevel | null;
+  onboardedAt: Date | null;
   createdAt: Date;
 }
 

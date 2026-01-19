@@ -206,4 +206,32 @@ export class AgentsController {
   ) {
     return this.workflowCoordinator.getWorkflowStatus(projectId, user.id);
   }
+
+  @Post('workflow/intake')
+  @ApiOperation({ summary: 'Submit intake answers for project onboarding' })
+  @ApiResponse({ status: 200, description: 'Intake answers submitted successfully' })
+  async submitIntake(
+    @Body() body: { projectId: string; answers: { questionId: string; answer: string }[] },
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.workflowCoordinator.submitIntakeAnswers(
+      body.projectId,
+      user.id,
+      body.answers,
+    );
+  }
+
+  @Post('workflow/onboarding-message')
+  @ApiOperation({ summary: 'Send a message to the onboarding agent' })
+  @ApiResponse({ status: 200, description: 'Message sent to onboarding agent' })
+  async sendOnboardingMessage(
+    @Body() body: { projectId: string; message: string },
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.workflowCoordinator.sendOnboardingMessage(
+      body.projectId,
+      user.id,
+      body.message,
+    );
+  }
 }

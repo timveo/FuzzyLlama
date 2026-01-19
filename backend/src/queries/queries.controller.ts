@@ -12,7 +12,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { AnswerQueryDto } from './dto/answer-query.dto';
 
-@Controller('api/queries')
+@Controller('queries')
 @UseGuards(JwtAuthGuard)
 export class QueriesController {
   constructor(private readonly queriesService: QueriesService) {}

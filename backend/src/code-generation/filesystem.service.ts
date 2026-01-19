@@ -227,6 +227,19 @@ export class FileSystemService {
       throw new Error(`Invalid path: ${relativePath}`);
     }
 
+    // Check if directory exists, return empty structure if not
+    try {
+      await fs.access(fullPath);
+    } catch {
+      // Directory doesn't exist yet - return empty structure
+      return {
+        name: relativePath || projectId,
+        path: relativePath || '.',
+        type: 'directory',
+        children: [],
+      };
+    }
+
     return this.buildDirectoryTree(fullPath, relativePath || '.');
   }
 

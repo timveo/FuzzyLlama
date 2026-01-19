@@ -12,7 +12,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateEscalationDto } from './dto/create-escalation.dto';
 import { ResolveEscalationDto } from './dto/resolve-escalation.dto';
 
-@Controller('api/escalations')
+@Controller('escalations')
 @UseGuards(JwtAuthGuard)
 export class EscalationsController {
   constructor(private readonly escalationsService: EscalationsService) {}

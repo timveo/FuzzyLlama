@@ -205,6 +205,8 @@ export class AuthService {
         emailVerified: true,
         monthlyAgentExecutions: true,
         lastExecutionReset: true,
+        teachingLevel: true,
+        onboardedAt: true,
         createdAt: true,
       },
     });

@@ -13,7 +13,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SaveContextDto } from './dto/save-context.dto';
 import { ExtendTTLDto } from './dto/extend-ttl.dto';
 
-@Controller('api/session-context')
+@Controller('session-context')
 @UseGuards(JwtAuthGuard)
 export class SessionContextController {
   constructor(

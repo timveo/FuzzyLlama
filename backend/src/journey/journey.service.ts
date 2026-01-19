@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 
-// Gate metadata - static information about each gate
+// Gate metadata - static information about each gate (used as fallback)
+// Project-specific content will override description and deliverables
 const GATE_METADATA: Record<number, {
   name: string;
   narrative: string;
@@ -17,8 +18,8 @@ const GATE_METADATA: Record<number, {
   0: {
     name: 'The Vision Takes Shape',
     narrative: 'Every great product starts with a clear "why"',
-    description: 'You defined what you\'re building and why it matters. The foundation of every great product.',
-    deliverables: ['Problem statement', 'Target users defined', 'Initial concept validated'],
+    description: 'Project vision and requirements captured through onboarding.',
+    deliverables: ['Project Intake document', 'Success criteria defined', 'Constraints identified'],
     celebration: '🎯 Vision Set!',
     phase: 'plan',
   },
@@ -108,6 +109,12 @@ export interface GateJourneyData {
     celebration: string;
     phase: 'plan' | 'dev' | 'ship';
   };
+  // Project-specific summary that overrides generic metadata
+  projectSummary?: string;
+  keyDecisions?: Array<{
+    title: string;
+    description: string;
+  }>;
   tasks: Array<{
     id: string;
     name: string;
@@ -272,7 +279,8 @@ export class JourneyService {
         }));
 
       // Filter documents for this gate
-      const gateDocuments = documents
+      // For G0, also include the Project Intake document
+      let gateDocuments = documents
         .filter(d => d.gateId === gateRecord?.id)
         .map(d => ({
           id: d.id,
@@ -281,11 +289,46 @@ export class JourneyService {
           type: d.documentType,
         }));
 
+      // For G0, include the intake document even if not linked to gate
+      if (gateNum === 0) {
+        const intakeDoc = documents.find(d => d.title === 'Project Intake');
+        if (intakeDoc && !gateDocuments.some(d => d.id === intakeDoc.id)) {
+          gateDocuments.push({
+            id: intakeDoc.id,
+            name: intakeDoc.title,
+            path: intakeDoc.filePath || '',
+            type: intakeDoc.documentType,
+          });
+        }
+      }
+
+      // Extract project-specific summary for G0 from intake document
+      let projectSummary: string | undefined;
+      let keyDecisions: Array<{ title: string; description: string }> | undefined;
+
+      if (gateNum === 0) {
+        // Get the intake document content
+        const intakeDoc = await this.prisma.document.findFirst({
+          where: {
+            projectId,
+            title: 'Project Intake',
+          },
+        });
+
+        if (intakeDoc?.content) {
+          // Extract key information from intake document
+          projectSummary = this.extractProjectSummaryFromIntake(intakeDoc.content, project.name);
+          keyDecisions = this.extractKeyDecisionsFromIntake(intakeDoc.content);
+        }
+      }
+
       gatesData.push({
         gateNumber: gateNum,
         gateType: gateRecord?.gateType || `${gateKey}_PENDING`,
         status,
         metadata,
+        projectSummary,
+        keyDecisions,
         tasks: gateTasks,
         decisions: gateDecisions,
         documents: gateDocuments,
@@ -322,5 +365,86 @@ export class JourneyService {
   private parseGateNumber(gateType: string): number {
     const match = gateType.match(/G(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
+  }
+
+  /**
+   * Extract a project-specific summary from the intake document
+   */
+  private extractProjectSummaryFromIntake(content: string, projectName: string): string {
+    // Try to extract the project description section
+    const descMatch = content.match(/## Project Description\s*\n([\s\S]*?)(?=\n##|$)/i);
+    if (descMatch) {
+      const description = descMatch[1].trim().substring(0, 300);
+      return description + (description.length >= 300 ? '...' : '');
+    }
+
+    // Try to extract success criteria
+    const successMatch = content.match(/### Success Criteria\s*\n([\s\S]*?)(?=\n###|$)/i);
+    if (successMatch) {
+      const success = successMatch[1].trim().substring(0, 300);
+      return `Building ${projectName}: ${success}${success.length >= 300 ? '...' : ''}`;
+    }
+
+    // Fallback to project name
+    return `Captured requirements for ${projectName} through onboarding.`;
+  }
+
+  /**
+   * Extract key decisions from the intake document
+   */
+  private extractKeyDecisionsFromIntake(content: string): Array<{ title: string; description: string }> {
+    const decisions: Array<{ title: string; description: string }> = [];
+
+    // Extract Existing Code status
+    const codeMatch = content.match(/### Existing Code[\s\S]*?\*\*Status:\*\*\s*([^\n]+)/i);
+    if (codeMatch) {
+      const status = codeMatch[1].trim();
+      decisions.push({
+        title: status === 'none' ? 'Starting fresh' : `Code status: ${status}`,
+        description: status === 'none'
+          ? 'Building from scratch with no existing codebase'
+          : `Working with ${status} code`,
+      });
+    }
+
+    // Extract Technical Background
+    const techMatch = content.match(/### Technical Background[\s\S]*?\*\*Level:\*\*\s*([^\n]+)/i);
+    if (techMatch) {
+      const level = techMatch[1].trim();
+      decisions.push({
+        title: `Teaching level: ${level}`,
+        description: level === 'NOVICE'
+          ? 'Explanations will be beginner-friendly'
+          : level === 'EXPERT'
+          ? 'Technical discussions can be advanced'
+          : 'Balanced explanations with some technical terms',
+      });
+    }
+
+    // Extract Deployment mode
+    const deployMatch = content.match(/### Deployment[\s\S]*?\*\*Mode:\*\*\s*([^\n]+)/i);
+    if (deployMatch) {
+      const mode = deployMatch[1].trim();
+      decisions.push({
+        title: `Deployment: ${mode.replace('_', ' ').toLowerCase()}`,
+        description: mode === 'LOCAL_ONLY'
+          ? 'Project will run locally without cloud deployment'
+          : mode === 'REQUIRED'
+          ? 'Cloud deployment is required for this project'
+          : 'Cloud deployment is optional',
+      });
+    }
+
+    // Extract Project Type from assessment
+    const typeMatch = content.match(/### Project Type\s*\n([^\n]+)/i);
+    if (typeMatch) {
+      const projectType = typeMatch[1].trim();
+      decisions.push({
+        title: `Project type: ${projectType}`,
+        description: `Workflow optimized for ${projectType} projects`,
+      });
+    }
+
+    return decisions;
   }
 }

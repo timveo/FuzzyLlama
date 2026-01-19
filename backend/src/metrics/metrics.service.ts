@@ -49,7 +49,17 @@ export class MetricsService {
     });
 
     if (!metrics) {
-      throw new NotFoundException(`Metrics for project ${projectId} not found`);
+      // Return default metrics for new projects instead of throwing
+      return {
+        projectId,
+        storiesTotal: 0,
+        storiesCompleted: 0,
+        bugsOpen: 0,
+        bugsResolved: 0,
+        testCoverage: '0%',
+        qualityGateStatus: 'pending',
+        retryCount: 0,
+      };
     }
 
     return metrics;

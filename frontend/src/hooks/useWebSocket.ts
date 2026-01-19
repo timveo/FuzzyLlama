@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../stores/auth';
+import { config } from '../lib/config';
 
 interface AgentEvent {
   agentId: string;
@@ -29,6 +30,11 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const user = useAuthStore((state) => state.user);
+  const currentProjectIdRef = useRef<string | undefined>(projectId);
+
+  // Store events in a ref to avoid recreating socket on every render
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
 
   // Get access token
   const getToken = useCallback(() => {
@@ -46,6 +52,7 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
     }
   }, []);
 
+  // Main socket connection effect - only depends on user
   useEffect(() => {
     if (!user) return;
 
@@ -56,7 +63,7 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
     }
 
     // Connect to WebSocket server
-    const socket = io('http://localhost:3000', {
+    const socket = io(config.wsUrl, {
       auth: {
         token,
       },
@@ -75,8 +82,9 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
       setError(null);
 
       // Join project room if projectId provided
-      if (projectId) {
-        socket.emit('join:project', { projectId });
+      if (currentProjectIdRef.current) {
+        console.log('Joining project room on connect:', currentProjectIdRef.current);
+        socket.emit('join:project', { projectId: currentProjectIdRef.current });
       }
     });
 
@@ -104,51 +112,77 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
       console.log('Joined project room:', data.projectId);
     });
 
-    // Agent execution event handlers
-    if (events?.onAgentStarted) {
-      socket.on('agent:started', events.onAgentStarted);
-    }
+    // Agent execution event handlers - use refs to always get latest handlers
+    socket.on('agent:started', (event) => {
+      console.log('Received agent:started event:', event);
+      eventsRef.current?.onAgentStarted?.(event);
+    });
 
-    if (events?.onAgentChunk) {
-      socket.on('agent:chunk', events.onAgentChunk);
-    }
+    socket.on('agent:chunk', (event) => {
+      eventsRef.current?.onAgentChunk?.(event);
+    });
 
-    if (events?.onAgentCompleted) {
-      socket.on('agent:completed', events.onAgentCompleted);
-    }
+    socket.on('agent:completed', (event) => {
+      console.log('Received agent:completed event:', event);
+      eventsRef.current?.onAgentCompleted?.(event);
+    });
 
-    if (events?.onAgentFailed) {
-      socket.on('agent:failed', events.onAgentFailed);
-    }
+    socket.on('agent:failed', (event) => {
+      console.log('Received agent:failed event:', event);
+      eventsRef.current?.onAgentFailed?.(event);
+    });
 
-    if (events?.onGateReady) {
-      socket.on('gate:ready', events.onGateReady);
-    }
+    socket.on('gate:ready', (event) => {
+      console.log('Received gate:ready event:', event);
+      eventsRef.current?.onGateReady?.(event);
+    });
 
-    if (events?.onGateApproved) {
-      socket.on('gate:approved', events.onGateApproved);
-    }
+    socket.on('gate:approved', (event) => {
+      eventsRef.current?.onGateApproved?.(event);
+    });
 
-    if (events?.onTaskCreated) {
-      socket.on('task:created', events.onTaskCreated);
-    }
+    socket.on('task:created', (event) => {
+      eventsRef.current?.onTaskCreated?.(event);
+    });
 
-    if (events?.onDocumentCreated) {
-      socket.on('document:created', events.onDocumentCreated);
-    }
+    socket.on('document:created', (event) => {
+      console.log('Received document:created event:', event);
+      eventsRef.current?.onDocumentCreated?.(event);
+    });
 
-    if (events?.onNotification) {
-      socket.on('notification', events.onNotification);
-    }
+    socket.on('notification', (event) => {
+      eventsRef.current?.onNotification?.(event);
+    });
 
     // Cleanup on unmount
     return () => {
-      if (projectId && socket.connected) {
-        socket.emit('leave:project', { projectId });
+      if (currentProjectIdRef.current && socket.connected) {
+        socket.emit('leave:project', { projectId: currentProjectIdRef.current });
       }
       socket.disconnect();
     };
-  }, [user, projectId, getToken, events]);
+  }, [user, getToken]);
+
+  // Handle project room changes - join/leave rooms when projectId changes
+  useEffect(() => {
+    const socket = socketRef.current;
+    const previousProjectId = currentProjectIdRef.current;
+    currentProjectIdRef.current = projectId;
+
+    if (!socket?.connected) return;
+
+    // Leave previous room
+    if (previousProjectId && previousProjectId !== projectId) {
+      console.log('Leaving project room:', previousProjectId);
+      socket.emit('leave:project', { projectId: previousProjectId });
+    }
+
+    // Join new room
+    if (projectId && projectId !== previousProjectId) {
+      console.log('Joining project room:', projectId);
+      socket.emit('join:project', { projectId });
+    }
+  }, [projectId]);
 
   // Join a project room
   const joinProject = useCallback((newProjectId: string) => {

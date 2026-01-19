@@ -426,6 +426,11 @@ export class DocumentsService {
         });
         break;
 
+      case 'PRODUCT_MANAGER_ONBOARDING':
+        // Onboarding documents are handled by workflow-coordinator.service.ts
+        // in handleOnboardingComplete() - don't duplicate document creation here
+        break;
+
       default:
         // Generic document for other agents
         documents.push({

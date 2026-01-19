@@ -37,6 +37,12 @@ export interface GateJourneyData {
   gateType: string;
   status: GateStatus;
   metadata: GateMetadata;
+  // Project-specific content (overrides generic metadata)
+  projectSummary?: string;
+  keyDecisions?: Array<{
+    title: string;
+    description: string;
+  }>;
   tasks: GateTask[];
   decisions: GateDecision[];
   documents: GateDocument[];

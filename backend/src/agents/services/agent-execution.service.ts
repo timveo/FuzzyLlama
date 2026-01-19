@@ -92,8 +92,12 @@ export class AgentExecutionService {
       );
     }
 
-    // Build execution context
-    const context = await this.buildExecutionContext(executeDto.projectId, userId);
+    // Build execution context, merging any additional context from DTO
+    const builtContext = await this.buildExecutionContext(executeDto.projectId, userId);
+    const context = {
+      ...builtContext,
+      ...(executeDto.context || {}), // Merge in any additional context (e.g., userMessage)
+    };
 
     // Create agent execution record
     const agentExecution = await this.prisma.agent.create({
@@ -218,8 +222,12 @@ export class AgentExecutionService {
       throw new NotFoundException(`Agent template not found: ${executeDto.agentType}`);
     }
 
-    // Build execution context
-    const context = await this.buildExecutionContext(executeDto.projectId, userId);
+    // Build execution context, merging any additional context from DTO
+    const builtContext = await this.buildExecutionContext(executeDto.projectId, userId);
+    const context = {
+      ...builtContext,
+      ...(executeDto.context || {}), // Merge in any additional context (e.g., userMessage)
+    };
 
     // Create agent execution record
     const agentExecution = await this.prisma.agent.create({
@@ -232,6 +240,9 @@ export class AgentExecutionService {
         contextData: context as any,
       },
     });
+
+    // Store the execution ID for use in callbacks
+    const executionId = agentExecution.id;
 
     // Increment user's monthly execution count
     await this.prisma.user.update({
@@ -246,8 +257,9 @@ export class AgentExecutionService {
     // Build system prompt from template
     const systemPrompt = this.buildSystemPromptFromNewTemplate(template, context);
 
-    // Execute AI prompt with streaming
-    await this.aiProvider.executePromptStream(
+    // Execute AI prompt with streaming (fire-and-forget, don't await)
+    // This allows us to return the execution ID immediately while streaming continues
+    this.aiProvider.executePromptStream(
       systemPrompt,
       executeDto.userPrompt,
       {
@@ -258,7 +270,7 @@ export class AgentExecutionService {
         onComplete: async (response) => {
           // Update agent execution record
           await this.prisma.agent.update({
-            where: { id: agentExecution.id },
+            where: { id: executionId },
             data: {
               status: 'COMPLETED',
               outputResult: response.content,
@@ -271,7 +283,7 @@ export class AgentExecutionService {
           // Post-processing: Generate documents and handle handoffs
           try {
             await this.postProcessAgentCompletion(
-              agentExecution.id,
+              executionId,
               executeDto.projectId,
               executeDto.agentType,
               response.content,
@@ -287,7 +299,7 @@ export class AgentExecutionService {
         onError: async (error) => {
           // Update agent execution with error
           await this.prisma.agent.update({
-            where: { id: agentExecution.id },
+            where: { id: executionId },
             data: {
               status: 'FAILED',
               outputResult: error.message,
@@ -300,9 +312,13 @@ export class AgentExecutionService {
       },
       executeDto.model || template.defaultModel,
       template.maxTokens,
-    );
+    ).catch((error) => {
+      console.error('Streaming execution error:', error);
+      streamCallback.onError(error);
+    });
 
-    return agentExecution.id;
+    // Return the execution ID immediately, streaming continues in background
+    return executionId;
   }
 
   private buildSystemPromptFromNewTemplate(template: any, context: AgentExecutionContext): string {

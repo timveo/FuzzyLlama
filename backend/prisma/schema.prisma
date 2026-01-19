@@ -39,6 +39,10 @@ model User {
   monthlyAgentExecutions Int @default(0)
   lastExecutionReset DateTime?
 
+  // Teaching/onboarding preferences
+  teachingLevel TeachingLevel?
+  onboardedAt   DateTime?      // When first-time onboarding was completed
+
   // Relations
   projects      Project[]
   organizations OrganizationMember[]
