@@ -4,6 +4,8 @@ export * from './projects';
 export * from './tasks';
 export * from './gates';
 export * from './documents';
+export * from './document-git';
+export * from './github';
 export * from './specifications';
 export * from './agents';
 export * from './metrics';

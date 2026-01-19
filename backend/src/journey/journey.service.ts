@@ -3,6 +3,8 @@ import { PrismaService } from '../common/prisma/prisma.service';
 
 // Gate metadata - static information about each gate (used as fallback)
 // Project-specific content will override description and deliverables
+// Gate metadata based on Multi-Agent-Product-Creator framework
+// G1-G9 are the approval gates, no G0 in the framework
 const GATE_METADATA: Record<
   number,
   {
@@ -14,101 +16,95 @@ const GATE_METADATA: Record<
     phase: 'plan' | 'dev' | 'ship';
   }
 > = {
-  0: {
-    name: 'The Vision Takes Shape',
+  1: {
+    name: 'Scope Approved',
     narrative: 'Every great product starts with a clear "why"',
-    description: 'Project vision and requirements captured through onboarding.',
+    description: 'Project scope approved through intake questionnaire.',
     deliverables: ['Project Intake document', 'Success criteria defined', 'Constraints identified'],
-    celebration: '🎯 Vision Set!',
+    celebration: '🎯 Scope Approved!',
     phase: 'plan',
   },
-  1: {
-    name: 'Requirements Crystallize',
+  2: {
+    name: 'PRD Approved',
     narrative: 'From ideas to actionable specifications',
     description: 'Product requirements fully documented. Every feature has a purpose.',
     deliverables: ['PRD document', 'User stories', 'Success metrics', 'Feature prioritization'],
     celebration: '📋 PRD Complete!',
     phase: 'plan',
   },
-  2: {
-    name: 'Architecture Emerges',
+  3: {
+    name: 'Architecture Approved',
     narrative: 'The skeleton that supports everything',
-    description:
-      'The skeleton of your application took form. Decisions made here echo through every feature.',
+    description: 'System architecture and tech stack approved.',
     deliverables: ['System design doc', 'Tech stack decision', 'Database schema', 'API contracts'],
-    celebration: '🏗️ Foundations Laid!',
+    celebration: '🏗️ Architecture Approved!',
     phase: 'plan',
   },
-  3: {
-    name: 'Design Takes Form',
+  4: {
+    name: 'Design Approved',
     narrative: 'Where user experience meets visual craft',
-    description: 'UX/UI design completed. Users will thank you for the attention to detail.',
+    description: 'UX/UI design completed and approved.',
     deliverables: ['Wireframes', 'Design system', 'User flows', 'Prototype'],
     celebration: '🎨 Design Approved!',
     phase: 'plan',
   },
-  4: {
-    name: 'Core Features Alive',
-    narrative: 'Ideas become reality, one function at a time',
-    description:
-      "You're breathing life into essential functionality. This is where ideas become real.",
-    deliverables: ['Core features', 'Basic UI', 'Database setup', 'API endpoints'],
-    celebration: '⚡ MVP Built!',
-    phase: 'dev',
-  },
   5: {
-    name: 'Feature Complete',
-    narrative: 'All the pieces come together',
-    description: 'All planned features implemented. Your product is taking its full shape.',
+    name: 'Feature Acceptance',
+    narrative: 'Ideas become reality, one function at a time',
+    description: 'Development complete. All features implemented.',
     deliverables: [
-      'All features built',
-      'Integration complete',
-      'Error handling',
-      'Edge cases covered',
+      'Core features',
+      'All user stories',
+      'Spec compliance',
+      'Technical debt documented',
     ],
-    celebration: '✨ Features Done!',
+    celebration: '⚡ Development Complete!',
     phase: 'dev',
   },
   6: {
-    name: 'Integration Harmony',
-    narrative: 'Making all systems sing together',
-    description: 'All systems integrated and working together seamlessly.',
+    name: 'Quality Sign-off',
+    narrative: 'Confidence through comprehensive testing',
+    description: 'QA testing passed. Quality metrics met.',
     deliverables: [
-      'Third-party integrations',
-      'Service connections',
-      'Data pipelines',
-      'Auth flow',
+      'Test results summary',
+      'Coverage metrics',
+      'Performance tests',
+      'Accessibility audit',
     ],
-    celebration: '🔗 All Connected!',
+    celebration: '🧪 QA Passed!',
     phase: 'dev',
   },
   7: {
-    name: 'Quality Assured',
-    narrative: 'Confidence through comprehensive testing',
-    description: 'Comprehensive testing passed. You can deploy with confidence.',
+    name: 'Security Acceptance',
+    narrative: 'Building trust through security',
+    description: 'Security review complete. No critical vulnerabilities.',
     deliverables: [
-      'Unit tests',
-      'Integration tests',
-      'E2E tests',
-      'Performance tests',
-      'Security audit',
+      'Security scan results',
+      'Vulnerability summary',
+      'Threat model',
+      'Remediation plan',
     ],
-    celebration: '🧪 Tests Pass!',
+    celebration: '🔒 Security Approved!',
     phase: 'ship',
   },
   8: {
-    name: 'Deploy Ready',
-    narrative: 'Production environment awaits',
-    description: 'Production environment prepared. The runway is clear for launch.',
-    deliverables: ['CI/CD pipeline', 'Monitoring setup', 'Logging configured', 'Backup strategy'],
+    name: 'Go/No-Go',
+    narrative: 'The runway is clear',
+    description: 'Pre-deployment review complete. Ready for production.',
+    deliverables: [
+      'Pre-deployment report',
+      'Deployment guide',
+      'Rollback plan',
+      'Lighthouse audits',
+    ],
     celebration: '🚀 Ready to Launch!',
     phase: 'ship',
   },
   9: {
-    name: 'Live & Learning',
+    name: 'Production Acceptance',
     narrative: 'Your creation meets the world',
-    description: 'Product successfully launched! Real users, real feedback, real impact.',
-    deliverables: ['Production deployment', 'User onboarding', 'Documentation', 'Support process'],
+    description: 'Product deployed and stable in production.',
+    deliverables: ['Smoke tests passed', 'Production metrics healthy', 'User acceptance'],
     celebration: '🎉 You Shipped!',
     phase: 'ship',
   },
@@ -236,13 +232,13 @@ export class JourneyService {
     });
 
     // Determine current gate from project state
-    const currentGateType = project.state?.currentGate || 'G0_PENDING';
+    const currentGateType = project.state?.currentGate || 'G1_PENDING';
     const currentGateNumber = this.parseGateNumber(currentGateType);
 
-    // Build gate journey data
+    // Build gate journey data (G1-G9, no G0 in the framework)
     const gatesData: GateJourneyData[] = [];
 
-    for (let gateNum = 0; gateNum <= 9; gateNum++) {
+    for (let gateNum = 1; gateNum <= 9; gateNum++) {
       const gateKey = `G${gateNum}`;
       const metadata = GATE_METADATA[gateNum];
 
@@ -254,11 +250,18 @@ export class JourneyService {
           g.gateType === `${gateKey}_PENDING`,
       );
 
-      // Determine gate status
+      // Determine gate status based on approval, not just gate number
+      // A gate is only "completed" if it has been approved (has approvedAt timestamp)
       let status: 'completed' | 'current' | 'upcoming';
-      if (gateNum < currentGateNumber) {
+      const isGateApproved = gateRecord?.approvedAt != null;
+
+      if (isGateApproved) {
         status = 'completed';
       } else if (gateNum === currentGateNumber) {
+        status = 'current';
+      } else if (gateNum < currentGateNumber) {
+        // Gate is before current but not approved - shouldn't normally happen
+        // but treat as current to draw attention
         status = 'current';
       } else {
         status = 'upcoming';
@@ -266,16 +269,15 @@ export class JourneyService {
 
       // Filter tasks for this gate (by phase mapping)
       const phaseMapping: Record<number, string[]> = {
-        0: ['vision', 'discovery'],
-        1: ['requirements', 'prd'],
-        2: ['architecture', 'design'],
-        3: ['ux', 'ui', 'design'],
-        4: ['core', 'mvp', 'development'],
-        5: ['features', 'implementation'],
-        6: ['integration', 'connect'],
-        7: ['testing', 'qa', 'quality'],
-        8: ['deployment', 'devops', 'infra'],
-        9: ['launch', 'production', 'release'],
+        1: ['intake', 'scope', 'discovery', 'vision'],
+        2: ['prd', 'requirements', 'planning'],
+        3: ['architecture', 'design', 'tech stack'],
+        4: ['ux', 'ui', 'wireframe', 'prototype'],
+        5: ['development', 'implementation', 'coding', 'features'],
+        6: ['testing', 'qa', 'quality', 'coverage'],
+        7: ['security', 'vulnerability', 'audit'],
+        8: ['deployment', 'devops', 'infra', 'pre-deploy'],
+        9: ['production', 'launch', 'release', 'smoke'],
       };
       const relevantPhases = phaseMapping[gateNum] || [];
       const gateTasks = tasks
@@ -361,9 +363,10 @@ export class JourneyService {
       });
     }
 
-    // Calculate current phase
+    // Calculate current phase based on gate number
+    // G1-G4 = Plan, G5-G6 = Dev, G7-G9 = Ship
     let currentPhase: 'plan' | 'dev' | 'ship';
-    if (currentGateNumber <= 3) {
+    if (currentGateNumber <= 4) {
       currentPhase = 'plan';
     } else if (currentGateNumber <= 6) {
       currentPhase = 'dev';
@@ -371,14 +374,17 @@ export class JourneyService {
       currentPhase = 'ship';
     }
 
+    // Count actually approved gates (G1-G9 = 9 total gates)
+    const completedGates = gatesData.filter((g) => g.status === 'completed').length;
+
     return {
       projectId,
       projectName: project.name,
       currentGate: currentGateNumber,
       currentPhase,
-      progressPercentage: Math.round((currentGateNumber / 10) * 100),
-      totalGates: 10,
-      completedGates: currentGateNumber,
+      progressPercentage: Math.round((completedGates / 9) * 100),
+      totalGates: 9,
+      completedGates,
       gates: gatesData,
     };
   }

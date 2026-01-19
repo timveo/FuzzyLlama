@@ -211,9 +211,9 @@ export const GATE_INFO: Record<number, GateInfo> = {
 // Tasks accomplished at each gate
 export const GATE_TASKS: Record<number, GateTask[]> = {
   0: [
-    { task: 'Identified target user personas', status: 'done' },
-    { task: 'Documented core problem statement', status: 'done' },
-    { task: 'Validated concept with stakeholders', status: 'done' },
+    { task: 'Captured project description', status: 'done' },
+    { task: 'Defined success criteria', status: 'done' },
+    { task: 'Identified constraints & deployment needs', status: 'done' },
   ],
   1: [
     { task: 'Wrote comprehensive PRD', status: 'done' },

@@ -162,6 +162,18 @@ export class AgentsController {
     return this.workflowCoordinator.executeNextTask(projectId, user.id);
   }
 
+  @Post('workflow/gate-approved/:projectId')
+  @ApiOperation({ summary: 'Handle gate approval - decompose tasks and start next phase' })
+  @ApiResponse({ status: 200, description: 'Gate approval processed successfully' })
+  async handleGateApproved(
+    @Param('projectId') projectId: string,
+    @Body() body: { gateType: string },
+    @CurrentUser() user: RequestUser,
+  ) {
+    await this.workflowCoordinator.onGateApproved(projectId, body.gateType, user.id);
+    return { success: true, message: 'Gate approval processed' };
+  }
+
   @Get('workflow/status/:projectId')
   @ApiOperation({ summary: 'Get workflow status for project' })
   @ApiResponse({ status: 200, description: 'Workflow status retrieved successfully' })

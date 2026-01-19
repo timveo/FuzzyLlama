@@ -154,7 +154,7 @@ export class StateSyncService {
 ## Current State
 
 **Phase**: ${state.currentPhase || 'Intake'}
-**Gate**: ${state.currentGate || 'G0_PENDING'}
+**Gate**: ${state.currentGate || 'G1_PENDING'}
 **Status**: ${state.status || 'active'}
 **Overall Progress**: ${this.calculateProgress(project)}%
 

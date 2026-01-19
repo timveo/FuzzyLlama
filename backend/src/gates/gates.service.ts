@@ -122,6 +122,10 @@ export class GatesService {
     });
   }
 
+  /**
+   * Approve or reject a gate.
+   * Delegates to GateStateMachineService to avoid duplicate updates.
+   */
   async approve(id: string, approveGateDto: ApproveGateDto, userId: string) {
     const gate = await this.prisma.gate.findUnique({
       where: { id },
@@ -150,30 +154,7 @@ export class GatesService {
       }
     }
 
-    const updateData: any = {
-      status: approveGateDto.approved ? 'APPROVED' : 'REJECTED',
-      reviewNotes: approveGateDto.reviewNotes,
-      approvedById: userId,
-      approvedAt: approveGateDto.approved ? new Date() : null,
-    };
-
-    if (!approveGateDto.approved && approveGateDto.rejectionReason) {
-      updateData.blockingReason = approveGateDto.rejectionReason;
-    }
-
-    const updatedGate = await this.prisma.gate.update({
-      where: { id },
-      data: updateData,
-      include: {
-        project: true,
-        proofArtifacts: true,
-        approvedBy: {
-          select: { id: true, name: true, email: true },
-        },
-      },
-    });
-
-    // If approved, use state machine to handle gate transition
+    // Delegate entirely to state machine to avoid duplicate gate updates
     if (approveGateDto.approved) {
       await this.stateMachine.approveGate(
         gate.projectId,
@@ -182,9 +163,17 @@ export class GatesService {
         'approved',
         approveGateDto.reviewNotes,
       );
+    } else {
+      await this.stateMachine.rejectGate(
+        gate.projectId,
+        gate.gateType,
+        userId,
+        approveGateDto.rejectionReason || 'Rejected by user',
+      );
     }
 
-    return updatedGate;
+    // Return the updated gate
+    return this.findOne(id, userId);
   }
 
   async delete(id: string, userId: string) {

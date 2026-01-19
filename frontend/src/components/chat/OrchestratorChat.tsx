@@ -50,9 +50,15 @@ interface OrchestratorChatProps {
   onViewDocument?: (documentName: string) => void;
 }
 
-// Helper to detect if message is a Project Intake document
+// Helper to detect if message contains a Project Intake document
 const isIntakeDocument = (content: string): boolean => {
-  return content.includes('# Project Intake:');
+  // Check for intake document in various formats (with or without code fence)
+  return (
+    content.includes('# Project Intake:') ||
+    content.includes('```markdown\n# Project Intake') ||
+    content.includes('## Discovery Answers') ||
+    (content.includes('## Project Description') && content.includes('### Existing Code'))
+  );
 };
 
 // Transform a message to handle intake completion
@@ -65,6 +71,47 @@ const transformMessageForDisplay = (msg: ChatMessage): ChatMessage => {
     };
   }
   return msg;
+};
+
+// Background agents that produce documents (don't show streaming in chat)
+const BACKGROUND_AGENTS = [
+  'PRODUCT_MANAGER',
+  'ARCHITECT',
+  'UX_UI_DESIGNER',
+  'FRONTEND_DEVELOPER',
+  'BACKEND_DEVELOPER',
+  'DATABASE_SPECIALIST',
+  'DEVOPS_ENGINEER',
+  'QA_ENGINEER',
+  'SECURITY_SPECIALIST',
+  'TECHNICAL_WRITER',
+  'ML_ENGINEER',
+  'DATA_ENGINEER',
+  'ORCHESTRATOR',
+];
+
+const isBackgroundAgent = (agentType: string): boolean => {
+  return BACKGROUND_AGENTS.includes(agentType);
+};
+
+// Get a user-friendly description for background agents
+const getBackgroundAgentMessage = (agentType: string): string => {
+  const messages: Record<string, string> = {
+    'PRODUCT_MANAGER': 'Creating your Product Requirements Document...',
+    'ARCHITECT': 'Designing the system architecture...',
+    'UX_UI_DESIGNER': 'Creating design mockups...',
+    'FRONTEND_DEVELOPER': 'Building the frontend...',
+    'BACKEND_DEVELOPER': 'Building the backend...',
+    'DATABASE_SPECIALIST': 'Designing the database schema...',
+    'DEVOPS_ENGINEER': 'Setting up infrastructure...',
+    'QA_ENGINEER': 'Creating test plans...',
+    'SECURITY_SPECIALIST': 'Performing security analysis...',
+    'TECHNICAL_WRITER': 'Writing documentation...',
+    'ML_ENGINEER': 'Building ML components...',
+    'DATA_ENGINEER': 'Setting up data pipelines...',
+    'ORCHESTRATOR': 'Coordinating project workflow...',
+  };
+  return messages[agentType] || 'Working on your project...';
 };
 
 export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
@@ -97,8 +144,8 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
       id: 'system-init',
       role: 'system',
       content: isNewProject
-        ? 'Product Manager is preparing your onboarding...'
-        : 'Agent Orchestrator online. Ready to coordinate your build.',
+        ? 'Starting project discovery...'
+        : 'Ready to coordinate your build.',
       timestamp: new Date(),
     };
     setMessages([systemMessage]);
@@ -284,15 +331,10 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
           <motion.div
             className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ${isDark ? 'border border-slate-800' : 'border border-teal-50'}`}
             animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            transition={{ duration: 4, repeat: Infinity }}
           />
         </div>
-        <span className={`font-semibold text-xs flex-1 ${isDark ? 'text-white' : 'text-teal-800'}`}>Product Manager</span>
-        {isNewProject && (
-          <span className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
-            Onboarding
-          </span>
-        )}
+        <span className={`font-semibold text-xs flex-1 ${isDark ? 'text-white' : 'text-teal-800'}`}>Project Orchestrator</span>
       </div>
 
       {/* Messages */}
@@ -347,9 +389,32 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
               </span>
               <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>working...</span>
             </div>
-            {/* Streaming content */}
+            {/* Streaming content or background work indicator */}
             <div className={`px-3 py-2 text-xs leading-relaxed ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {currentStreamingContent || streamingChunks.length > 0 ? (
+              {isBackgroundAgent(activeAgent.agentType) ? (
+                // Background agents: show friendly message, document will appear in Docs tab
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map((i) => (
+                        <motion.span
+                          key={i}
+                          className={`w-1.5 h-1.5 rounded-full ${isDark ? 'bg-teal-400' : 'bg-teal-600'}`}
+                          animate={{ y: [0, -4, 0] }}
+                          transition={{ duration: 0.5, delay: i * 0.1, repeat: Infinity }}
+                        />
+                      ))}
+                    </div>
+                    <span className={`text-[10px] ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>
+                      {getBackgroundAgentMessage(activeAgent.agentType)}
+                    </span>
+                  </div>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    The document will appear in the Docs tab when ready for your review.
+                  </p>
+                </div>
+              ) : currentStreamingContent || streamingChunks.length > 0 ? (
+                // Conversational agents: show streaming content
                 <div className="whitespace-pre-wrap">
                   {currentStreamingContent || streamingChunks.join('')}
                   <motion.span
@@ -359,6 +424,7 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
                   />
                 </div>
               ) : (
+                // Fallback loading state
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
                     {[0, 1, 2].map((i) => (
