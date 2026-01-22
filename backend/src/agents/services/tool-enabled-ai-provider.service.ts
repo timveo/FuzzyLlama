@@ -174,8 +174,9 @@ export class ToolEnabledAIProviderService {
 
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
-      let fullContent = '';
       let iterations = 0;
+      // Track content from each iteration separately to prevent duplication
+      const iterationContents: string[] = [];
 
       // Tool use loop with streaming
       while (iterations < this.MAX_TOOL_ITERATIONS) {
@@ -192,6 +193,8 @@ export class ToolEnabledAIProviderService {
         let currentToolUse: { id: string; name: string; input: string } | null = null;
         const responseContent: Anthropic.ContentBlock[] = [];
         let stopReason: string | null = null;
+        // Track text content for this iteration only
+        let iterationContent = '';
 
         for await (const event of stream) {
           if (event.type === 'message_start') {
@@ -208,7 +211,7 @@ export class ToolEnabledAIProviderService {
             }
           } else if (event.type === 'content_block_delta') {
             if (event.delta.type === 'text_delta') {
-              fullContent += event.delta.text;
+              iterationContent += event.delta.text;
               callback.onChunk(event.delta.text);
             } else if (event.delta.type === 'input_json_delta' && currentToolUse) {
               currentToolUse.input += event.delta.partial_json;
@@ -233,6 +236,11 @@ export class ToolEnabledAIProviderService {
             totalOutputTokens += event.usage.output_tokens;
             stopReason = event.delta.stop_reason;
           }
+        }
+
+        // Store this iteration's content
+        if (iterationContent.trim()) {
+          iterationContents.push(iterationContent);
         }
 
         // Process tool calls if any
@@ -280,6 +288,21 @@ export class ToolEnabledAIProviderService {
           break;
         }
       }
+
+      // Use the longest content from all iterations as the final output
+      // This handles cases where the main document is produced in one iteration
+      // and a brief summary/confirmation in another - we want the document
+      this.logger.log(`[Tool-Enabled] Total iterations: ${iterations}, content pieces: ${iterationContents.length}`);
+      iterationContents.forEach((content, i) => {
+        this.logger.log(`[Tool-Enabled] Iteration ${i + 1} content length: ${content.length}`);
+      });
+
+      const fullContent = iterationContents.reduce(
+        (longest, current) => (current.length > longest.length ? current : longest),
+        '',
+      );
+
+      this.logger.log(`[Tool-Enabled] Final content length: ${fullContent.length}`);
 
       callback.onComplete({
         content: fullContent,

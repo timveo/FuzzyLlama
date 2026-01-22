@@ -301,8 +301,8 @@ export class DocumentsService {
 
   /**
    * Generate documents from agent output
-   * Parses structured agent response and creates documents in database
-   * Optimized: Uses createMany + findMany for bulk operations (2 queries instead of N queries)
+   * Parses structured agent response and creates or updates documents in database
+   * Uses findFirst + update/create pattern to prevent duplicate documents
    */
   async generateFromAgentOutput(
     projectId: string,
@@ -327,40 +327,68 @@ export class DocumentsService {
     // Parse agent output for document sections
     const documents = this.parseAgentOutputForDocuments(agentType, agentOutput);
 
-    // Bulk insert all documents in a single query
-    const documentData = documents.map((doc) => ({
-      projectId,
-      agentId,
-      documentType: doc.type as any, // Type assertion for DocumentType enum
-      title: doc.title,
-      content: doc.content,
-      version: 1,
-      createdById: userId,
-    }));
+    // Skip if no documents to create
+    if (documents.length === 0) {
+      return [];
+    }
 
-    await this.prisma.document.createMany({
-      data: documentData,
-    });
+    // Use findFirst + update/create pattern to prevent duplicates
+    const upsertedDocuments: any[] = [];
 
-    // Fetch created documents with relations (single query with OR conditions)
-    const createdDocuments = await this.prisma.document.findMany({
-      where: {
-        projectId,
-        agentId,
-        createdById: userId,
-        documentType: { in: documents.map((d) => d.type as any) },
-      },
-      include: {
-        project: true,
-        createdBy: {
-          select: { id: true, name: true, email: true },
+    for (const doc of documents) {
+      // Check if document already exists
+      const existingDoc = await this.prisma.document.findFirst({
+        where: {
+          projectId,
+          documentType: doc.type as any,
+          title: doc.title,
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: documents.length,
-    });
+      });
 
-    return createdDocuments;
+      let result;
+      if (existingDoc) {
+        // Update existing document
+        result = await this.prisma.document.update({
+          where: { id: existingDoc.id },
+          data: {
+            content: doc.content,
+            agentId, // Update to latest agent that modified it
+            version: existingDoc.version + 1,
+            updatedAt: new Date(),
+          },
+          include: {
+            project: true,
+            createdBy: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        });
+        this.logger.log(`Updated existing document: ${doc.title} (v${result.version})`);
+      } else {
+        // Create new document
+        result = await this.prisma.document.create({
+          data: {
+            projectId,
+            agentId,
+            documentType: doc.type as any,
+            title: doc.title,
+            content: doc.content,
+            version: 1,
+            createdById: userId,
+          },
+          include: {
+            project: true,
+            createdBy: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        });
+        this.logger.log(`Created new document: ${doc.title}`);
+      }
+      upsertedDocuments.push(result);
+    }
+
+    return upsertedDocuments;
   }
 
   /**
@@ -374,69 +402,25 @@ export class DocumentsService {
 
     switch (agentType) {
       case 'PRODUCT_MANAGER':
-        // Extract PRD document
+        // Extract PRD document - User Stories should be included IN the PRD, not as separate doc
+        // The PRD document includes all sections: Executive Summary, User Stories, Features, etc.
         documents.push({
           type: 'REQUIREMENTS',
-          title: 'Product Requirements Document (PRD)',
-          content:
-            this.extractSection(output, ['# PRD', '# Product Requirements', '## PRD']) || output,
+          title: 'Product Requirements Document',
+          content: output, // Include full PRD output - User Stories are part of it
         });
-
-        // Extract user stories if present
-        const userStories = this.extractSection(output, [
-          '# User Stories',
-          '## User Stories',
-          '### User Stories',
-        ]);
-        if (userStories) {
-          documents.push({
-            type: 'USER_STORY',
-            title: 'User Stories',
-            content: userStories,
-          });
-        }
+        // NOTE: User Stories are NOT extracted as a separate document
+        // They are a section within the PRD as per standard PRD format
         break;
 
       case 'ARCHITECT':
-        // Extract architecture document
+        // Create single Architecture document with all specs included
+        // API specs and database schema are sections within the Architecture doc, not separate documents
         documents.push({
           type: 'ARCHITECTURE',
           title: 'System Architecture',
-          content:
-            this.extractSection(output, [
-              '# Architecture',
-              '# System Architecture',
-              '## Architecture',
-            ]) || output,
+          content: output, // Include full output - API specs and DB schema are embedded
         });
-
-        // Extract API spec section (reference, actual spec in Specification table)
-        const apiSection = this.extractSection(output, [
-          '# API Specification',
-          '## API Design',
-          '### OpenAPI',
-        ]);
-        if (apiSection) {
-          documents.push({
-            type: 'API_SPEC',
-            title: 'API Specification Overview',
-            content: apiSection,
-          });
-        }
-
-        // Extract database schema section (reference, actual schema in Specification table)
-        const dbSection = this.extractSection(output, [
-          '# Database Schema',
-          '## Data Model',
-          '### Prisma',
-        ]);
-        if (dbSection) {
-          documents.push({
-            type: 'DATABASE_SCHEMA',
-            title: 'Database Schema Overview',
-            content: dbSection,
-          });
-        }
         break;
 
       case 'QA_ENGINEER':
@@ -458,6 +442,16 @@ export class DocumentsService {
           content:
             this.extractSection(output, ['# Deployment', '# Deploy', '## Deployment Guide']) ||
             output,
+        });
+        break;
+
+      case 'UX_UI_DESIGNER':
+        // Extract design document with HTML prototypes
+        // The designer creates 3 design options as viewable HTML
+        documents.push({
+          type: 'DESIGN',
+          title: 'UX/UI Design System',
+          content: output,
         });
         break;
 

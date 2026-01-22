@@ -62,9 +62,8 @@ FuzzyLlama orchestrates specialized AI agents to guide users through the complet
 
 ```
 FuzzyLlama/
-├── backend/          # NestJS API server (17+ modules)
+├── backend/          # NestJS API server (17+ modules) - includes MCP tools
 ├── frontend/         # React 19 web application
-├── mcp-server/       # MCP state management server
 ├── agents/           # Agent prompt templates (reference)
 ├── constants/        # Protocols and definitions (reference)
 ├── templates/        # Project starter templates

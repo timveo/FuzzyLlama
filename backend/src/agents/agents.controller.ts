@@ -200,4 +200,16 @@ export class AgentsController {
   ) {
     return this.workflowCoordinator.sendOnboardingMessage(body.projectId, user.id, body.message);
   }
+
+  @Post('workflow/retry-gate/:projectId')
+  @ApiOperation({ summary: 'Retry failed agents for a gate' })
+  @ApiResponse({ status: 200, description: 'Gate agents restarted' })
+  async retryGateAgents(
+    @Param('projectId') projectId: string,
+    @Body() body: { gateType: string },
+    @CurrentUser() user: RequestUser,
+  ) {
+    await this.workflowCoordinator.retryGateAgents(projectId, body.gateType, user.id);
+    return { success: true, message: `Retrying agents for ${body.gateType}` };
+  }
 }

@@ -5,13 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CodeBracketIcon,
   ComputerDesktopIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  DocumentIcon,
-  ChevronRightIcon,
-  ChevronDownIcon,
+  DocumentTextIcon,
   CheckIcon,
   XMarkIcon,
+  ChevronRightIcon,
+  FolderIcon,
 } from '@heroicons/react/24/outline';
 import { projectsApi } from '../api/projects';
 import { metricsApi, type ProjectProgress, type WorkflowStatus, type ProjectCosts, type ProjectMetrics } from '../api/metrics';
@@ -37,6 +35,9 @@ interface FileTreeNode {
   path: string;
   children?: FileTreeNode[];
   content?: string;
+  updatedAt?: Date;  // For tracking recently changed files
+  documentId?: string;  // Reference to original document
+  documentType?: string;  // Document type for icon selection
 }
 
 type WorkspaceTab = 'ui' | 'docs' | 'code' | 'map';
@@ -186,45 +187,6 @@ const GATE_INFO: Record<number, {
   },
 };
 
-// Mock file tree for Code tab
-const mockFileTree: FileTreeNode[] = [
-  {
-    name: 'docs',
-    type: 'folder',
-    path: '/docs',
-    children: [
-      { name: 'README.md', type: 'file', path: '/docs/README.md', content: '# Project Documentation\n\nWelcome to the Fuzzy Llama project documentation.\n\n## Overview\n\nThis project uses a gated development process with 10 quality gates.\n\n## Getting Started\n\n1. Review the PRD\n2. Approve architecture decisions\n3. Begin development' },
-      { name: 'PRD.md', type: 'file', path: '/docs/PRD.md', content: '# Product Requirements Document\n\n## Vision\n\nBuild a comprehensive AI-powered development platform.\n\n## Goals\n\n- Automate repetitive coding tasks\n- Ensure quality through gates\n- Provide transparency in decisions\n\n## User Stories\n\n### As a developer\n- I want to see agent progress in real-time\n- I want to approve decisions at each gate' },
-      { name: 'ARCHITECTURE.md', type: 'file', path: '/docs/ARCHITECTURE.md', content: '# System Architecture\n\n## Overview\n\nMicroservices architecture with event-driven communication.\n\n## Components\n\n### Frontend\n- React with TypeScript\n- Tailwind CSS\n- Framer Motion\n\n### Backend\n- FastAPI (Python)\n- PostgreSQL\n- Redis for caching\n\n### AI Agents\n- 14 specialized agents\n- Orchestrator for coordination' },
-      { name: 'API.md', type: 'file', path: '/docs/API.md', content: '# API Documentation\n\n## Endpoints\n\n### Projects\n\n`GET /api/projects` - List all projects\n\n`POST /api/projects` - Create new project\n\n`GET /api/projects/:id` - Get project details\n\n### Agents\n\n`POST /api/agents/execute` - Run an agent\n\n`GET /api/agents/status` - Get agent status' },
-    ],
-  },
-  {
-    name: 'src',
-    type: 'folder',
-    path: '/src',
-    children: [
-      {
-        name: 'components',
-        type: 'folder',
-        path: '/src/components',
-        children: [
-          { name: 'README.md', type: 'file', path: '/src/components/README.md', content: '# Components\n\nReusable UI components for the application.\n\n## Structure\n\n- `ui/` - Base UI components (Button, Card, Input)\n- `layout/` - Layout components (MainLayout)\n- `gates/` - Gate-related components' },
-        ],
-      },
-      {
-        name: 'pages',
-        type: 'folder',
-        path: '/src/pages',
-        children: [
-          { name: 'README.md', type: 'file', path: '/src/pages/README.md', content: '# Pages\n\nApplication pages and routes.\n\n## Dashboard Variants\n\n1. **Mission Control** - NASA-inspired command center\n2. **Journey Map** - Story-driven progress\n3. **Living Canvas** - Organic ecosystem view\n4. **Unified Dashboard** - Combined experience' },
-        ],
-      },
-    ],
-  },
-  { name: 'CHANGELOG.md', type: 'file', path: '/CHANGELOG.md', content: '# Changelog\n\n## v0.3.0\n\n- Added biomorphic dashboard design\n- Integrated all 14 AI agents\n- Implemented real-time agent streaming\n\n## v0.2.0\n\n- Added gate approval workflow\n- Created proof artifact viewer\n- Implemented WebSocket connections\n\n## v0.1.0\n\n- Initial project setup\n- Basic dashboard structure\n- Authentication system' },
-  { name: 'CONTRIBUTING.md', type: 'file', path: '/CONTRIBUTING.md', content: '# Contributing Guide\n\n## Development Setup\n\n1. Clone the repository\n2. Install dependencies: `npm install`\n3. Start dev server: `npm run dev`\n\n## Code Style\n\n- Use TypeScript for all new code\n- Follow the existing patterns\n- Add tests for new features\n\n## Pull Requests\n\n- Create feature branches\n- Write clear commit messages\n- Request review from maintainers' },
-];
 
 // GitHub Icon SVG Component
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -607,7 +569,7 @@ const GitHubPopup = ({ isOpen, onClose, theme, projectId }: { isOpen: boolean; o
 
 const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId, autoSelectDocumentKey }: {
   activeTab: WorkspaceTab;
-  onTabChange: (tab: WorkspaceTab) => void;
+  onTabChange: (tab: WorkspaceTab, documentId?: string) => void;
   theme: ThemeMode;
   projectId: string | null;
   autoSelectDocumentKey?: string | null;
@@ -653,10 +615,12 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId, autoSelectDo
               exit={{ opacity: 0, y: -10 }}
               className="h-full"
             >
-              {activeTab === 'ui' && <UIPreviewContent theme={theme} />}
+              {activeTab === 'ui' && <UIPreviewContent theme={theme} projectId={projectId} />}
               {activeTab === 'docs' && <DocsContent theme={theme} projectId={projectId} autoSelectDocumentKey={autoSelectDocumentKey} />}
               {activeTab === 'code' && <CodeContent theme={theme} projectId={projectId} />}
-              {activeTab === 'map' && <JourneyContent theme={theme} projectId={projectId} onViewDocument={() => onTabChange('docs')} />}
+              {activeTab === 'map' && <JourneyContent theme={theme} projectId={projectId} onViewDocument={(docId) => {
+                onTabChange('docs', docId);
+              }} />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -665,14 +629,117 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId, autoSelectDo
   );
 };
 
-const UIPreviewContent = ({ theme }: { theme: ThemeMode }) => {
-  const [selectedView, setSelectedView] = useState('dashboard');
-  const views = ['dashboard', 'login', 'settings', 'profile'];
+const UIPreviewContent = ({ theme, projectId }: { theme: ThemeMode; projectId: string | null }) => {
+  const [selectedDesignIndex, setSelectedDesignIndex] = useState(0);
   const isDark = theme === 'dark';
+
+  // Fetch DESIGN type documents for this project
+  // Fetch all docs and filter client-side to avoid type issues with new DESIGN type
+  const { data: designDocuments, isLoading } = useQuery({
+    queryKey: ['preview-designs', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      // Fetch all documents and filter for DESIGN type
+      const allDocs = await documentsApi.list(projectId);
+      const designDocs = allDocs.filter((d: { documentType: string }) => d.documentType === 'DESIGN');
+      return designDocs;
+    },
+    enabled: !!projectId,
+    staleTime: 30000, // Cache for 30 seconds
+  });
+
+  // Get the design document (usually "UX/UI Design System")
+  const designDoc = designDocuments?.[0];
+  const designContent = designDoc?.content;
+
+  // Parse design options from the document content
+  // The UX/UI Designer creates multiple design options as HTML blocks
+  const designOptions = useMemo(() => {
+    if (!designContent) return [];
+
+    const options: Array<{ name: string; html: string }> = [];
+
+    // Look for HTML blocks in the content - try multiple patterns
+    // Pattern 1: ```html blocks with Option headers
+    const htmlBlockRegex = /(?:#+\s*(?:Option|Design)\s*(\d+)[^\n]*\n)?```html\s*\n([\s\S]*?)```/gi;
+    let match;
+    let optionNum = 1;
+
+    while ((match = htmlBlockRegex.exec(designContent)) !== null) {
+      const num = match[1] || optionNum;
+      options.push({
+        name: `Design ${num}`,
+        html: match[2].trim(),
+      });
+      optionNum++;
+    }
+
+    // Pattern 2: If no ```html blocks, look for full HTML documents
+    if (options.length === 0) {
+      const htmlDocRegex = /<html[\s\S]*?<\/html>/gi;
+      while ((match = htmlDocRegex.exec(designContent)) !== null) {
+        options.push({
+          name: `Design ${options.length + 1}`,
+          html: match[0],
+        });
+      }
+    }
+
+    // Pattern 3: If still no matches, treat the whole content as HTML if it looks like HTML
+    if (options.length === 0 && designContent.includes('<') && designContent.includes('>')) {
+      options.push({
+        name: 'Design Preview',
+        html: designContent,
+      });
+    }
+
+    return options;
+  }, [designContent]);
+
+  const currentDesign = designOptions[selectedDesignIndex];
+
+  // Show placeholder if no designs yet
+  if (!projectId || isLoading) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className={`flex-1 rounded-2xl overflow-hidden ${isDark ? 'border bg-slate-900/50 border-slate-700/50' : 'border border-slate-200 bg-white'}`}>
+          <div className={`h-full flex items-center justify-center p-8`}>
+            <div className="text-center">
+              <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${isDark ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
+                <ComputerDesktopIcon className={`w-10 h-10 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
+              </div>
+              <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-slate-700'}`}>Loading...</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!designDoc || designOptions.length === 0) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className={`flex-1 rounded-2xl overflow-hidden ${isDark ? 'border bg-slate-900/50 border-slate-700/50' : 'border border-slate-200 bg-white'}`}>
+          <div className={`h-full flex items-center justify-center p-8`}>
+            <div className="text-center">
+              <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${isDark ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
+                <ComputerDesktopIcon className={`w-10 h-10 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
+              </div>
+              <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-slate-700'}`}>UI Preview</h3>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Design previews will appear here after the UX/UI Designer agent runs (G4).
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
       <div className={`flex-1 rounded-2xl overflow-hidden ${isDark ? 'border bg-slate-900/50 border-slate-700/50' : 'border border-slate-200 bg-white'}`}>
+        {/* Browser chrome header */}
         <div className={`flex items-center gap-3 px-4 py-3 ${isDark ? 'border-b bg-slate-800/50 border-slate-700/50' : 'border-b border-slate-200 bg-slate-50'}`}>
           <div className="flex gap-1.5">
             <div className="w-3 h-3 rounded-full bg-red-400" />
@@ -680,28 +747,37 @@ const UIPreviewContent = ({ theme }: { theme: ThemeMode }) => {
             <div className="w-3 h-3 rounded-full bg-emerald-400" />
           </div>
           <div className={`flex-1 rounded-lg px-4 py-2 flex items-center justify-center ${isDark ? 'bg-slate-900/50' : 'bg-white border border-slate-200'}`}>
-            <span className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>localhost:3000/</span>
-            <select
-              value={selectedView}
-              onChange={(e) => setSelectedView(e.target.value)}
-              className={`text-sm font-medium bg-transparent border-none outline-none cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}
-            >
-              {views.map((view) => (
-                <option key={view} value={view} className={isDark ? 'bg-slate-800' : 'bg-white'}>
-                  {view}
-                </option>
-              ))}
-            </select>
+            <span className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>preview://</span>
+            {designOptions.length > 1 ? (
+              <select
+                value={selectedDesignIndex}
+                onChange={(e) => setSelectedDesignIndex(Number(e.target.value))}
+                className={`text-sm font-medium bg-transparent border-none outline-none cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}
+              >
+                {designOptions.map((option, idx) => (
+                  <option key={idx} value={idx} className={isDark ? 'bg-slate-800' : 'bg-white'}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                {currentDesign?.name || 'Design Preview'}
+              </span>
+            )}
           </div>
         </div>
-        <div className={`h-full flex items-center justify-center p-8 ${isDark ? '' : 'bg-white'}`}>
-          <div className="text-center">
-            <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${isDark ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
-              <ComputerDesktopIcon className={`w-10 h-10 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
-            </div>
-            <h3 className={`text-lg font-semibold mb-2 capitalize ${isDark ? 'text-white' : 'text-slate-700'}`}>{selectedView} Preview</h3>
-            <p className={`text-sm ${isDark ? 'text-teal-300' : 'text-slate-500'}`}>Live UI preview appears here after G4.</p>
-          </div>
+
+        {/* Design preview iframe */}
+        <div className="h-[calc(100%-60px)] w-full bg-white">
+          {currentDesign && (
+            <iframe
+              srcDoc={currentDesign.html}
+              title={currentDesign.name}
+              className="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          )}
         </div>
       </div>
     </div>
@@ -729,12 +805,26 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
     'post launch',
     'orchestrator output',
     'orchestrator',  // Also match just "ORCHESTRATOR Output"
+    'agent log',     // Agent logs are not approvable documents
+    'agent activity',
+  ];
+
+  // Document types that should NOT be shown in the Docs tab (non-approvable)
+  const NON_APPROVABLE_DOC_TYPES = [
+    'CODE',          // Code implementation notes - not an approvable document
+    'DESIGN',        // Design documents are shown in Preview tab, not Docs tab
+    'OTHER',         // Catch-all type - usually internal
+    'USER_STORY',    // User stories should be part of PRD, not separate
   ];
 
   const isInternalDocument = useCallback((doc: Document): boolean => {
-    return INTERNAL_DOC_TITLES.some(title =>
+    // Check by title
+    const titleMatch = INTERNAL_DOC_TITLES.some(title =>
       doc.title.toLowerCase().includes(title.toLowerCase())
     );
+    // Check by document type (non-approvable types)
+    const typeMatch = NON_APPROVABLE_DOC_TYPES.includes(doc.documentType);
+    return titleMatch || typeMatch;
   }, []);
 
   // Filter to only show user-facing documents (gate summaries, PRD, Architecture, etc.)
@@ -743,9 +833,21 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
     [apiDocuments, isInternalDocument]
   );
 
-  // Auto-select document when prop changes (from gate approval)
+  // Auto-select document when prop changes (from gate approval or Journey click)
   useEffect(() => {
-    if (autoSelectDocumentKey === 'intake' && userFacingDocuments?.length) {
+    if (!autoSelectDocumentKey || !userFacingDocuments?.length) return;
+
+    // Check if it's a document ID (UUID format) or a special key like 'intake'
+    const isDocumentId = autoSelectDocumentKey.includes('-') && autoSelectDocumentKey.length > 20;
+
+    if (isDocumentId) {
+      // Direct document ID - find and select it
+      const targetDoc = userFacingDocuments.find((d: Document) => d.id === autoSelectDocumentKey);
+      if (targetDoc) {
+        const timer = setTimeout(() => setSelectedDocId(targetDoc.id), 0);
+        return () => clearTimeout(timer);
+      }
+    } else if (autoSelectDocumentKey === 'intake') {
       // For G1, prefer the G1 Summary doc, fallback to intake
       const g1SummaryDoc = userFacingDocuments.find((d: Document) =>
         d.title.includes('G1 Summary')
@@ -781,9 +883,11 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
     if (doc.title === 'Project Intake') return 0;
 
     const typeToGate: Record<string, number> = {
-      'REQUIREMENTS': 0,
+      'REQUIREMENTS': 2,  // PRD is G2
       'PRD': 2,
       'ARCHITECTURE': 3,
+      'API_SPEC': 3,      // Part of Architecture (G3)
+      'DATABASE_SCHEMA': 3, // Part of Architecture (G3)
       'DESIGN': 4,
       'TECHNICAL': 5,
       'TEST': 6,
@@ -794,13 +898,16 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
     return typeToGate[doc.documentType] ?? 0;
   };
 
-  // Group documents by gate
-  const groupedDocs = userFacingDocuments.reduce((acc: Record<number, Document[]>, doc: Document) => {
-    const gate = getGateForDoc(doc);
-    if (!acc[gate]) acc[gate] = [];
-    acc[gate].push(doc);
-    return acc;
-  }, {});
+  // Group documents by gate, sorted chronologically within each gate
+  const groupedDocs = userFacingDocuments
+    .slice()
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .reduce((acc: Record<number, Document[]>, doc: Document) => {
+      const gate = getGateForDoc(doc);
+      if (!acc[gate]) acc[gate] = [];
+      acc[gate].push(doc);
+      return acc;
+    }, {});
 
   if (!projectId) {
     return (
@@ -879,10 +986,14 @@ const DocsContent = ({ theme, projectId, autoSelectDocumentKey }: { theme: Theme
   );
 };
 
+// Compute "recently modified" cutoff once at module load time (not during render)
+// This avoids Date.now() calls during React render which violates purity rules
+const FIVE_MINUTES_AGO = new Date(Date.now() - 5 * 60 * 1000);
+
 const CodeContent = ({ theme, projectId }: { theme: ThemeMode; projectId: string | null }) => {
   const isDark = theme === 'dark';
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/docs', '/src']));
   const [selectedFile, setSelectedFile] = useState<FileTreeNode | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/docs', '/.fuzzyllama']));
 
   // Fetch real documents from API
   const { data: apiDocuments, isLoading } = useQuery({
@@ -891,141 +1002,230 @@ const CodeContent = ({ theme, projectId }: { theme: ThemeMode; projectId: string
     enabled: !!projectId,
   });
 
-  // Filter out internal/tracking documents (same as Docs tab)
-  const INTERNAL_DOC_TITLES = [
-    'feedback log', 'cost log', 'project context', 'change requests',
-    'post launch', 'orchestrator output', 'orchestrator',
-  ];
-  const userFacingDocuments = useMemo(() => {
-    if (!apiDocuments) return [];
-    return apiDocuments.filter((doc: Document) =>
-      !INTERNAL_DOC_TITLES.some(title => doc.title.toLowerCase().includes(title))
-    );
-  }, [apiDocuments]);
+  // Code tab shows ALL documents (working tree) - no filtering
+  const allDocuments = useMemo(() => apiDocuments || [], [apiDocuments]);
 
-  // Build file tree from documents
-  const buildFileTree = useCallback((documents: Document[]): FileTreeNode[] => {
-    const docsFolder: FileTreeNode = {
-      name: 'docs',
-      type: 'folder',
-      path: '/docs',
-      children: [],
-    };
+  // Map document types and titles to folder structure
+  const getDocumentFolder = (doc: Document): string => {
+    const titleLower = doc.title.toLowerCase();
 
-    // Group documents by type for organization
-    const typeToFolder: Record<string, string> = {
-      'REQUIREMENTS': 'discovery',
-      'PRD': 'product',
-      'ARCHITECTURE': 'architecture',
-      'DESIGN': 'design',
-      'TECHNICAL': 'technical',
-      'TEST': 'testing',
-      'SECURITY': 'security',
-      'DEPLOYMENT': 'deployment',
-      'OTHER': 'other',
-    };
-
-    // Create subfolders based on document types present
-    const subfolders: Record<string, FileTreeNode> = {};
-
-    documents.forEach((doc) => {
-      const folderName = typeToFolder[doc.documentType] || 'other';
-      const folderPath = `/docs/${folderName}`;
-
-      if (!subfolders[folderName]) {
-        subfolders[folderName] = {
-          name: folderName,
-          type: 'folder',
-          path: folderPath,
-          children: [],
-        };
-      }
-
-      // Convert document title to filename
-      const fileName = `${doc.title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-')}.md`;
-      const filePath = `${folderPath}/${fileName}`;
-
-      subfolders[folderName].children!.push({
-        name: fileName,
-        type: 'file',
-        path: filePath,
-        content: doc.content || '',
-      });
-    });
-
-    // Add subfolders to docs folder (sorted)
-    docsFolder.children = Object.values(subfolders).sort((a, b) => a.name.localeCompare(b.name));
-
-    // If no documents, return empty state with placeholder
-    if (documents.length === 0) {
-      return mockFileTree; // Fall back to mock tree when no real documents
+    // Internal/system files go in .fuzzyllama folder
+    if (titleLower.includes('cost-log') || titleLower.includes('cost log') ||
+        titleLower.includes('feedback-log') || titleLower.includes('feedback log') ||
+        titleLower.includes('agent-log') || titleLower.includes('agent log') ||
+        titleLower.includes('orchestrator-output') || titleLower.includes('orchestrator output') ||
+        titleLower.includes('project-context') || titleLower.includes('project context')) {
+      return '/.fuzzyllama';
     }
 
-    // Merge with src folder from mock (for now, until we have real code files)
-    const srcFolder = mockFileTree.find(n => n.name === 'src');
-    const result: FileTreeNode[] = [docsFolder];
-    if (srcFolder) result.push(srcFolder);
-
-    return result;
-  }, []);
-
-  const fileTree = userFacingDocuments.length > 0 ? buildFileTree(userFacingDocuments) : mockFileTree;
-
-  const toggleFolder = (path: string) => {
-    const newExpanded = new Set(expandedFolders);
-    if (newExpanded.has(path)) newExpanded.delete(path);
-    else newExpanded.add(path);
-    setExpandedFolders(newExpanded);
+    // Main documents go in /docs
+    return '/docs';
   };
 
-  const renderTreeNode = (node: FileTreeNode, depth: number = 0) => {
+  // Convert title to filename
+  const toFileName = (title: string): string => {
+    return `${title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-')}.md`;
+  };
+
+  // Build hierarchical file tree from documents
+  const buildFileTree = useCallback((documents: Document[]): FileTreeNode[] => {
+    if (documents.length === 0) {
+      return [];
+    }
+
+    // Group documents by folder
+    const folderMap = new Map<string, Document[]>();
+    for (const doc of documents) {
+      const folder = getDocumentFolder(doc);
+      if (!folderMap.has(folder)) {
+        folderMap.set(folder, []);
+      }
+      folderMap.get(folder)!.push(doc);
+    }
+
+    // Build tree structure
+    const tree: FileTreeNode[] = [];
+
+    // Create /docs folder if it has documents
+    const docsFolder = folderMap.get('/docs');
+    if (docsFolder && docsFolder.length > 0) {
+      const docsChildren = docsFolder.map((doc) => ({
+        name: toFileName(doc.title),
+        type: 'file' as const,
+        path: `/docs/${toFileName(doc.title)}`,
+        content: doc.content || '',
+        updatedAt: new Date(doc.updatedAt),
+        documentId: doc.id,
+        documentType: doc.documentType,
+      }));
+
+      // Sort by document type priority then name
+      docsChildren.sort((a, b) => {
+        const priorityOrder = ['REQUIREMENTS', 'ARCHITECTURE', 'DESIGN', 'CODE', 'TEST', 'SECURITY', 'DEPLOYMENT'];
+        const priorityA = priorityOrder.indexOf(a.documentType || '') === -1 ? 99 : priorityOrder.indexOf(a.documentType || '');
+        const priorityB = priorityOrder.indexOf(b.documentType || '') === -1 ? 99 : priorityOrder.indexOf(b.documentType || '');
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        return a.name.localeCompare(b.name);
+      });
+
+      tree.push({
+        name: 'docs',
+        type: 'folder',
+        path: '/docs',
+        children: docsChildren,
+      });
+    }
+
+    // Create /.fuzzyllama folder for internal files
+    const internalFolder = folderMap.get('/.fuzzyllama');
+    if (internalFolder && internalFolder.length > 0) {
+      const internalChildren = internalFolder.map((doc) => ({
+        name: toFileName(doc.title),
+        type: 'file' as const,
+        path: `/.fuzzyllama/${toFileName(doc.title)}`,
+        content: doc.content || '',
+        updatedAt: new Date(doc.updatedAt),
+        documentId: doc.id,
+        documentType: doc.documentType,
+      }));
+
+      // Sort alphabetically
+      internalChildren.sort((a, b) => a.name.localeCompare(b.name));
+
+      tree.push({
+        name: '.fuzzyllama',
+        type: 'folder',
+        path: '/.fuzzyllama',
+        children: internalChildren,
+      });
+    }
+
+    return tree;
+  }, []);
+
+  const fileTree = buildFileTree(allDocuments);
+
+  // Check if a file was recently modified (uses module-level constant)
+  const checkRecentlyModified = (updatedAt: Date | undefined): boolean => {
+    return updatedAt ? updatedAt > FIVE_MINUTES_AGO : false;
+  };
+
+  // Count modified files in tree (for folder badge)
+  const countModifiedInFolder = (node: FileTreeNode): number => {
+    if (node.type === 'file') {
+      return checkRecentlyModified(node.updatedAt) ? 1 : 0;
+    }
+    return node.children?.reduce((sum, child) => sum + countModifiedInFolder(child), 0) || 0;
+  };
+
+  // Toggle folder expansion
+  const toggleFolder = (path: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
+
+  // Get file icon based on document type
+  const getFileIcon = (node: FileTreeNode) => {
+    const docType = node.documentType;
+    const iconColors: Record<string, string> = {
+      'REQUIREMENTS': isDark ? 'text-blue-400' : 'text-blue-600',
+      'ARCHITECTURE': isDark ? 'text-purple-400' : 'text-purple-600',
+      'DESIGN': isDark ? 'text-pink-400' : 'text-pink-600',
+      'TECHNICAL': isDark ? 'text-cyan-400' : 'text-cyan-600',
+      'CODE': isDark ? 'text-green-400' : 'text-green-600',
+      'TEST': isDark ? 'text-yellow-400' : 'text-yellow-600',
+      'SECURITY': isDark ? 'text-red-400' : 'text-red-600',
+      'DEPLOYMENT': isDark ? 'text-orange-400' : 'text-orange-600',
+      'OTHER': isDark ? 'text-slate-400' : 'text-slate-500',
+    };
+    const color = docType ? iconColors[docType] || iconColors['OTHER'] : (isDark ? 'text-slate-400' : 'text-slate-500');
+    return <DocumentTextIcon className={`w-4 h-4 ${color}`} />;
+  };
+
+  // Render a folder node
+  const renderFolderNode = (node: FileTreeNode, depth: number = 0) => {
     const isExpanded = expandedFolders.has(node.path);
-    const isMarkdown = node.name.endsWith('.md');
-    const isSelected = selectedFile?.path === node.path;
+    const modifiedCount = countModifiedInFolder(node);
+    const paddingLeft = depth * 12;
 
     return (
       <div key={node.path}>
         <button
-          onClick={() => {
-            if (node.type === 'folder') toggleFolder(node.path);
-            else if (isMarkdown) setSelectedFile(node);
-          }}
-          className={`w-full flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all ${
-            isSelected
-              ? isDark ? 'bg-teal-950/20 text-teal-300' : 'bg-teal-100 text-teal-700'
-              : isDark ? 'hover:bg-slate-700/30' : 'hover:bg-slate-100'
+          onClick={() => toggleFolder(node.path)}
+          className={`w-full flex items-center gap-1.5 py-1 px-2 rounded text-left transition-all ${
+            isDark ? 'hover:bg-slate-800/50 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
           }`}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          style={{ paddingLeft: `${paddingLeft + 8}px` }}
         >
-          {node.type === 'folder' ? (
-            <>
-              {isExpanded
-                ? <ChevronDownIcon className={`w-3 h-3 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
-                : <ChevronRightIcon className={`w-3 h-3 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />}
-              {isExpanded
-                ? <FolderOpenIcon className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-500'}`} />
-                : <FolderIcon className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-500'}`} />}
-            </>
-          ) : (
-            <>
-              <span className="w-3" />
-              <DocumentIcon className={`w-4 h-4 ${isMarkdown ? (isDark ? 'text-blue-400' : 'text-blue-500') : (isDark ? 'text-teal-500' : 'text-teal-600')}`} />
-            </>
+          {/* Chevron */}
+          <ChevronRightIcon
+            className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''} ${
+              isDark ? 'text-slate-500' : 'text-slate-400'
+            }`}
+          />
+          {/* Folder icon */}
+          <FolderIcon className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-500'}`} />
+          <span className="text-xs flex-1">{node.name}</span>
+          {/* Modified count badge */}
+          {modifiedCount > 0 && (
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+              isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-600'
+            }`}>
+              {modifiedCount}M
+            </span>
           )}
-          <span className={`text-xs ${
-            isSelected
-              ? isDark ? 'text-teal-300 font-medium' : 'text-teal-700 font-medium'
-              : isMarkdown
-                ? isDark ? 'text-teal-100' : 'text-slate-700'
-                : isDark ? 'text-teal-400' : 'text-slate-500'
-          }`}>
-            {node.name}
-          </span>
         </button>
-        {node.type === 'folder' && isExpanded && node.children && (
-          <div>{node.children.map(child => renderTreeNode(child, depth + 1))}</div>
+        {/* Children */}
+        {isExpanded && node.children && (
+          <div>
+            {node.children.map(child =>
+              child.type === 'folder'
+                ? renderFolderNode(child, depth + 1)
+                : renderFileNode(child, depth + 1)
+            )}
+          </div>
         )}
       </div>
+    );
+  };
+
+  // Render a file node
+  const renderFileNode = (node: FileTreeNode, depth: number = 0) => {
+    const isSelected = selectedFile?.path === node.path;
+    const isRecentlyModified = checkRecentlyModified(node.updatedAt);
+    const paddingLeft = depth * 12 + 20; // Extra indent for files under folders
+
+    return (
+      <button
+        key={node.path}
+        onClick={() => setSelectedFile(node)}
+        className={`w-full flex items-center gap-2 py-1 px-2 rounded text-left transition-all ${
+          isSelected
+            ? isDark ? 'bg-teal-900/30 text-teal-300' : 'bg-teal-100 text-teal-700'
+            : isDark ? 'hover:bg-slate-800/50 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+        }`}
+        style={{ paddingLeft: `${paddingLeft}px` }}
+      >
+        {getFileIcon(node)}
+        <span className={`text-xs flex-1 truncate ${isSelected ? 'font-medium' : ''}`}>
+          {node.name}
+        </span>
+        {/* Modified indicator */}
+        {isRecentlyModified && (
+          <span className={`text-[10px] font-semibold ${
+            isDark ? 'text-green-400' : 'text-green-600'
+          }`} title="Modified this gate">
+            M
+          </span>
+        )}
+      </button>
     );
   };
 
@@ -1058,14 +1258,20 @@ const CodeContent = ({ theme, projectId }: { theme: ThemeMode; projectId: string
           <CodeBracketIcon className={`w-4 h-4 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
           <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>Files</span>
         </div>
-        <div className="space-y-0.5">{fileTree.map(node => renderTreeNode(node))}</div>
+        <div className="space-y-0.5">
+          {fileTree.map(node =>
+            node.type === 'folder'
+              ? renderFolderNode(node)
+              : renderFileNode(node)
+          )}
+        </div>
       </div>
       <div className={`flex-1 rounded-2xl overflow-hidden border ${isDark ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         {selectedFile ? (
           <>
             <div className={`flex items-center gap-2 px-4 py-2 border-b ${isDark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
-              <DocumentIcon className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-500'}`} />
-              <span className={`text-xs font-mono ${isDark ? 'text-white' : 'text-slate-700'}`}>{selectedFile.path}</span>
+              {getFileIcon(selectedFile)}
+              <span className={`text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{selectedFile.path}</span>
             </div>
             <div className={`p-5 overflow-auto h-full ${isDark ? '' : 'bg-white'}`}>
               <pre className={`whitespace-pre-wrap text-sm leading-relaxed font-mono ${isDark ? 'text-teal-200' : 'text-slate-600'}`}>
@@ -1076,7 +1282,7 @@ const CodeContent = ({ theme, projectId }: { theme: ThemeMode; projectId: string
         ) : (
           <div className={`h-full flex items-center justify-center ${isDark ? '' : 'bg-white'}`}>
             <div className="text-center">
-              <DocumentIcon className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-teal-600' : 'text-teal-400'}`} />
+              <DocumentTextIcon className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-teal-600' : 'text-teal-400'}`} />
               <p className={`text-sm ${isDark ? 'text-teal-400' : 'text-slate-500'}`}>Select a file to view</p>
             </div>
           </div>
@@ -2646,6 +2852,7 @@ export default function UnifiedDashboard() {
   const [isAgentWorking, setIsAgentWorking] = useState(false);
   const [isStreamingDocument, setIsStreamingDocument] = useState(false);
   const [agentEvents, setAgentEvents] = useState<Array<{ agentId: string; result?: unknown; timestamp: string }>>([]);
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; role: 'assistant' | 'system'; content: string; timestamp: string }>>([]);
 
   // Document-producing agents that work in background (don't stream reasoning to chat)
   // These agents create documents that appear in the Docs tab for review
@@ -2774,6 +2981,15 @@ export default function UnifiedDashboard() {
     }
   }, [currentProjectId, queryClient, searchParams]);
 
+  const handleChatMessage = useCallback((event: { id: string; role: 'assistant' | 'system'; content: string; timestamp: string }) => {
+    console.log('Chat message received:', event);
+    setChatMessages(prev => {
+      // Don't add duplicates
+      if (prev.some(m => m.id === event.id)) return prev;
+      return [...prev, event];
+    });
+  }, []);
+
   // Connect to WebSocket when we have a project
   useWebSocket(currentProjectId || undefined, {
     onAgentStarted: handleAgentStarted,
@@ -2782,6 +2998,7 @@ export default function UnifiedDashboard() {
     onAgentFailed: handleAgentFailed,
     onGateReady: handleGateReady,
     onDocumentCreated: handleDocumentCreated,
+    onChatMessage: handleChatMessage,
   });
 
   // Handle URL parameters for project selection
@@ -2920,7 +3137,7 @@ export default function UnifiedDashboard() {
         >
           <div className="text-center mb-6">
             <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${isDark ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
-              <FolderIcon className={`w-8 h-8 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
+              <DocumentTextIcon className={`w-8 h-8 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
             </div>
             <h2 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Welcome Back!
@@ -3139,6 +3356,7 @@ export default function UnifiedDashboard() {
               streamingChunks={streamingChunks}
               isAgentWorking={isAgentWorking}
               agentEvents={agentEvents}
+              incomingMessages={chatMessages}
               onApproveGate={handleGateApprove}
               onViewDocument={() => {
                 setActiveTab('docs');
@@ -3171,7 +3389,12 @@ export default function UnifiedDashboard() {
           <div className="flex-1 min-w-[380px]">
             <WorkspacePanel
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              onTabChange={(tab, documentId) => {
+                setActiveTab(tab);
+                if (documentId) {
+                  setAutoSelectDocumentKey(documentId);
+                }
+              }}
               theme={theme}
               projectId={currentProjectId}
               autoSelectDocumentKey={autoSelectDocumentKey}

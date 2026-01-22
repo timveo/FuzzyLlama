@@ -141,14 +141,15 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
     });
   }
 
-  emitAgentCompleted(projectId: string, agentId: string, result: any) {
+  emitAgentCompleted(projectId: string, agentId: string, result: any, agentType?: string) {
     this.server.to(`project:${projectId}`).emit('agent:completed', {
       agentId,
+      agentType,
       result,
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log(`Agent completed: ${agentId} for project ${projectId}`);
+    this.logger.log(`Agent completed: ${agentId} (${agentType || 'unknown'}) for project ${projectId}`);
   }
 
   emitAgentFailed(projectId: string, agentId: string, error: string) {
@@ -159,6 +160,37 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
     });
 
     this.logger.error(`Agent failed: ${agentId} for project ${projectId} - ${error}`);
+  }
+
+  /**
+   * Emit a chat message to be displayed in the orchestrator chat
+   * Used for important system messages like gate approval requests
+   * Also persists the message to ProjectEvent for history restoration
+   */
+  emitChatMessage(projectId: string, messageId: string, content: string, role: 'assistant' | 'system' = 'assistant') {
+    const timestamp = new Date().toISOString();
+
+    this.server.to(`project:${projectId}`).emit('chat:message', {
+      id: messageId,
+      role,
+      content,
+      timestamp,
+    });
+
+    // Persist to ProjectEvent for history restoration when returning to project
+    this.prisma.projectEvent.create({
+      data: {
+        id: messageId,
+        projectId,
+        eventType: 'ChatMessage',
+        eventData: { role, content },
+        metadata: { source: 'orchestrator' },
+      },
+    }).catch(err => {
+      this.logger.warn(`Failed to persist chat message ${messageId}: ${err.message}`);
+    });
+
+    this.logger.log(`Chat message emitted for project ${projectId}: ${messageId}`);
   }
 
   emitGateReady(projectId: string, gateId: string, gateType: string, artifacts: any[]) {

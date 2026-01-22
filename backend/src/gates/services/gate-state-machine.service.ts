@@ -79,6 +79,7 @@ export class GateStateMachineService {
 
   /**
    * Get current active gate for a project
+   * Returns the highest numbered gate that has work in progress or is pending review
    */
   async getCurrentGate(projectId: string): Promise<any> {
     const gates = await this.prisma.gate.findMany({
@@ -86,10 +87,18 @@ export class GateStateMachineService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Find the first non-approved gate
-    const currentGate = gates.find((g) => g.status !== 'APPROVED');
+    if (gates.length === 0) return null;
 
-    return currentGate || gates[gates.length - 1]; // Return last gate if all approved
+    // Prioritize gates that are IN_REVIEW (work is done, awaiting approval)
+    const inReviewGate = gates.filter((g) => g.status === 'IN_REVIEW').pop();
+    if (inReviewGate) return inReviewGate;
+
+    // Then look for PENDING gates (work in progress)
+    const pendingGate = gates.filter((g) => g.status === 'PENDING').pop();
+    if (pendingGate) return pendingGate;
+
+    // If all gates are approved, return the last one
+    return gates[gates.length - 1];
   }
 
   /**
@@ -282,26 +291,39 @@ export class GateStateMachineService {
       },
     });
 
-    // Update project state
-    await this.prisma.project.update({
-      where: { id: projectId },
-      data: {
-        state: {
-          update: {
-            currentGate: gateType,
-          },
-        },
-      },
-    });
-
     // Lock documents if applicable
     await this.lockDocumentsForGate(projectId, gateType);
 
-    // Create next gate
+    // Create next gate and update project state to point to it
     const nextGateType = this.getNextGateType(gateType);
     if (nextGateType) {
       await this.createNextGate(projectId, nextGateType);
+
+      // Update project state to the next gate (not the approved one)
+      await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+          state: {
+            update: {
+              currentGate: nextGateType,
+            },
+          },
+        },
+      });
+
       return { success: true, nextGate: nextGateType };
+    } else {
+      // No next gate - update to the approved gate
+      await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+          state: {
+            update: {
+              currentGate: gateType,
+            },
+          },
+        },
+      });
     }
 
     // Mark project as complete if this was G9_COMPLETE
@@ -379,15 +401,21 @@ export class GateStateMachineService {
     // Get gate configuration from centralized config
     const config = getGateConfig(projectType, gateType);
 
+    // _COMPLETE gates are auto-approved markers (they follow _PENDING approval)
+    // _PENDING gates start in PENDING status requiring user action
+    const isCompleteGate = gateType.endsWith('_COMPLETE');
+    const initialStatus = isCompleteGate ? 'APPROVED' : 'PENDING';
+
     // Create the gate
     await this.prisma.gate.create({
       data: {
         projectId,
         gateType,
-        status: 'PENDING',
+        status: initialStatus,
         description: config?.description || `Gate ${gateType}`,
         passingCriteria: config?.passingCriteria || 'Complete gate requirements',
         requiresProof: config?.requiresProof ?? false,
+        ...(isCompleteGate && { approvedAt: new Date() }),
       },
     });
 
@@ -418,6 +446,21 @@ export class GateStateMachineService {
     // TODO: Add document locking when schema supports it
     // Documents and specifications will be locked after gate approval
     // to prevent modifications without re-approval
+  }
+
+  /**
+   * Ensure a gate exists, creating it if necessary
+   * This handles race conditions and recovery from failed operations
+   */
+  async ensureGateExists(projectId: string, gateType: string): Promise<void> {
+    const existingGate = await this.prisma.gate.findFirst({
+      where: { projectId, gateType },
+    });
+
+    if (!existingGate) {
+      console.log(`[GateStateMachine] Creating missing gate: ${gateType}`);
+      await this.createNextGate(projectId, gateType);
+    }
   }
 
   /**

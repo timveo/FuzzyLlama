@@ -25,9 +25,8 @@ FuzzyLlama takes these concepts and builds them into a **user-facing product** w
 
 ```
 FuzzyLlama/
-├── backend/          # NestJS API (17 modules)
+├── backend/          # NestJS API (17 modules) - includes MCP tools via backend/src/mcp/
 ├── frontend/         # React + Vite application
-├── mcp-server/       # MCP state management server
 ├── agents/           # Agent prompt templates (from framework)
 ├── constants/        # Protocols and definitions (from framework)
 ├── templates/        # Project starter templates
@@ -57,7 +56,7 @@ All agent framework capabilities must become FuzzyLlama features:
 
 - The `agents/` and `constants/` directories contain reference material from the framework
 - When implementing features, translate protocol definitions into actual code
-- The MCP server provides state management tools for agent interactions
+- MCP tools are implemented in `backend/src/mcp/` and use PostgreSQL via Prisma (single source of truth)
 - Use the existing Prisma schema as the source of truth for data models
 
 ## Current Status
