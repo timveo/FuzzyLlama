@@ -57,4 +57,17 @@ export const projectsApi = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/projects/${id}`);
   },
+
+  // Get project events (for chat history)
+  getEvents: async (id: string, eventType?: string): Promise<Array<{
+    id: string;
+    eventType: string;
+    eventData: Record<string, unknown>;
+    metadata: Record<string, unknown>;
+    createdAt: string;
+  }>> => {
+    const params = eventType ? `?eventType=${eventType}` : '';
+    const response = await apiClient.get(`/projects/${id}/events${params}`);
+    return response.data;
+  },
 };

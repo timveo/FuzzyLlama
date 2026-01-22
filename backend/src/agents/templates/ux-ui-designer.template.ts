@@ -136,7 +136,7 @@ Create \`docs/DESIGN_SYSTEM.md\` with:
 `,
 
   defaultModel: 'claude-sonnet-4-20250514',
-  maxTokens: 8000,
+  maxTokens: 32000, // Need high token limit for 3 complete HTML designs
 
   handoffFormat: {
     phase: 'G4_COMPLETE',

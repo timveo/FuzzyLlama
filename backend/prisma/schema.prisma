@@ -52,6 +52,7 @@ model User {
   gatesApproved Gate[]
   tasksAssigned Task[] @relation("TaskAssignedTo")
   tasksCreated  Task[] @relation("TaskCreatedBy")
+  feedback      UserFeedback[] @relation("UserFeedback")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -157,6 +158,7 @@ model Project {
   specifications   Specification[] @relation("ProjectSpecifications")
   gates            Gate[] @relation("ProjectGates")
   events           ProjectEvent[] @relation("ProjectEvents")
+  feedback         UserFeedback[] @relation("ProjectFeedback")
   // codeEmbeddings   CodeEmbedding[] @relation("ProjectCodeEmbeddings") // Temporarily disabled
 
   createdAt DateTime @default(now())
@@ -1175,6 +1177,8 @@ model Document {
   @@index([documentType])
   @@index([agentId])
   @@index([gateId])
+  // Unique constraint to prevent duplicate documents of the same type with same title
+  @@unique([projectId, documentType, title], name: "unique_project_document")
 }
 
 enum DocumentType {
@@ -1186,6 +1190,7 @@ enum DocumentType {
   TEST_PLAN
   DEPLOYMENT_GUIDE
   CODE
+  DESIGN
   OTHER
 }
 
@@ -1260,6 +1265,70 @@ enum GateStatus {
   APPROVED
   REJECTED
   BLOCKED
+}
+
+// ============================================================================
+// USER FEEDBACK TRACKING
+// ============================================================================
+
+model UserFeedback {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation("ProjectFeedback", fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId       String?
+  user         User?    @relation("UserFeedback", fields: [userId], references: [id], onDelete: SetNull)
+
+  gateType     String          // Which gate the feedback was for (G2_PENDING, G3_PENDING, etc.)
+  gateNumber   Int             // Gate number (2, 3, 4, etc.)
+  documentType String?         // REQUIREMENTS, ARCHITECTURE, DESIGN, etc.
+
+  feedbackType FeedbackType    // Type of feedback
+  content      String   @db.Text // The actual feedback content
+  sentiment    FeedbackSentiment? // Positive, negative, neutral
+
+  // What action was taken
+  actionTaken  FeedbackAction?
+  revisedDocId String?         // If document was revised, link to new version
+
+  // Metadata
+  wasIncorporated Boolean @default(false) // Was this feedback incorporated?
+  incorporatedAt  DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([gateType])
+  @@index([feedbackType])
+  @@index([createdAt])
+}
+
+enum FeedbackType {
+  CHANGE_REQUEST      // User wants to change something
+  CLARIFICATION       // User asking for clarification
+  APPROVAL            // User approving the document
+  REJECTION           // User rejecting/disagreeing
+  SUGGESTION          // User suggesting improvements
+  QUESTION            // User asking a question
+  PREFERENCE          // User stating a preference
+  BUG_REPORT          // User reporting an issue
+  OTHER
+}
+
+enum FeedbackSentiment {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
+}
+
+enum FeedbackAction {
+  DOCUMENT_REVISED    // Document was updated based on feedback
+  ACKNOWLEDGED        // Feedback was acknowledged but no action needed
+  DEFERRED            // Feedback noted for later
+  REJECTED            // Feedback was not incorporated (with reason)
+  PENDING             // Awaiting action
 }
 
 // ============================================================================

@@ -32,6 +32,156 @@ export class WorkflowCoordinatorService {
   ) {}
 
   /**
+   * Generate a gate transition message using the Orchestrator agent
+   * This replaces hardcoded messages with dynamic, context-aware responses
+   */
+  private async generateOrchestratorMessage(
+    projectId: string,
+    userId: string,
+    transitionType: 'gate_approved' | 'gate_ready' | 'document_ready',
+    context: {
+      gateNumber?: number;
+      gateType?: string;
+      documentTitle?: string;
+      nextGate?: string;
+    },
+  ): Promise<void> {
+    // Gather project context
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { state: true },
+    });
+
+    if (!project) return;
+
+    // Get user's teaching level for appropriate messaging
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { teachingLevel: true },
+    });
+
+    // Get current documents to understand project state
+    const documents = await this.prisma.document.findMany({
+      where: { projectId },
+      select: { title: true, documentType: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    });
+
+    // Get current gate status
+    const currentGate = await this.gateStateMachine.getCurrentGate(projectId);
+
+    // Build context for the Orchestrator
+    const recentDocs = documents.map((d) => `- ${d.title} (${d.documentType})`).join('\n');
+    const teachingLevel = user?.teachingLevel || 'INTERMEDIATE';
+
+    // Check for key documents to make state explicit
+    const hasPRD = documents.some(
+      (d) => d.title === 'Product Requirements Document',
+    );
+
+    let situationDescription: string;
+    let taskInstructions: string;
+
+    switch (transitionType) {
+      case 'gate_approved':
+        situationDescription = `Gate ${context.gateType} has just been APPROVED by the user.`;
+        // For G1, give explicit instructions based on whether PRD exists
+        if (context.gateNumber === 1) {
+          if (hasPRD) {
+            taskInstructions = `G1 (Project Scope) is approved. The PRD already exists in the Docs tab.
+Tell the user their project scope is approved and the PRD is ready for review.
+They should review the PRD in the Docs tab and type "approve" to proceed to G3 (Architecture).
+Mention that all project files are visible in the Code tab (recently modified files marked with "M").`;
+          } else {
+            // PRD doesn't exist yet - it's being auto-created now
+            taskInstructions = `G1 (Project Scope) is approved. Now moving to G2 (Product Requirements).
+The Product Manager agent is NOW creating the PRD (Product Requirements Document).
+Be enthusiastic and action-oriented. Tell them:
+- The PRD is being generated right now
+- It will include user stories, feature prioritization, and success metrics
+- They'll see it appear in the Docs tab shortly
+- They can ask questions while waiting
+Keep it brief and forward-moving.`;
+          }
+        } else {
+          taskInstructions = `Confirm the gate approval and explain what happens next.
+For this gate, explain what the next phase involves and that work is starting automatically.
+Mention that all project files are visible in the Code tab (recently modified files marked with "M").`;
+        }
+        break;
+
+      case 'gate_ready':
+        situationDescription = `Gate ${context.gateType} work is COMPLETE and ready for user review.`;
+        taskInstructions = `Inform the user that the deliverables are ready for review in the Docs tab.
+Explain what they should look for when reviewing.
+Tell them to type "approve" when ready to proceed, or ask questions if they need clarification.
+Mention that all project files are visible in the Code tab (recently modified files marked with "M").`;
+        break;
+
+      case 'document_ready':
+        situationDescription = `The "${context.documentTitle}" document has been created/updated.`;
+        taskInstructions = `Inform the user the document is ready for review in the Docs tab.
+Briefly explain what the document contains and why it's important.
+Tell them to type "approve" when ready to proceed, or ask questions if they need clarification.
+Mention that all project files are visible in the Code tab (recently modified files marked with "M").`;
+        break;
+    }
+
+    const prompt = `You are the Project Orchestrator for "${project.name}".
+
+**Situation:** ${situationDescription}
+
+**Current Project State:**
+- Current gate: ${currentGate?.gateType || 'Unknown'} (${currentGate?.status || 'Unknown'})
+- Project phase: ${project.state?.currentPhase || 'Unknown'}
+- Recent documents:
+${recentDocs || '  (none yet)'}
+
+**User's Experience Level:** ${teachingLevel}
+${teachingLevel === 'NOVICE' ? '(Explain things clearly, be encouraging, avoid jargon)' : ''}
+${teachingLevel === 'EXPERT' ? '(Be concise and technical, skip basic explanations)' : ''}
+
+**Your Task:** ${taskInstructions}
+
+Keep your response concise and helpful. Use markdown formatting.`;
+
+    // Execute the Orchestrator agent with streaming
+    const agentExecutionId = await this.agentExecution.executeAgentStream(
+      {
+        projectId,
+        agentType: 'ORCHESTRATOR',
+        userPrompt: prompt,
+        model: undefined, // Use template default
+      },
+      userId,
+      {
+        onChunk: (chunk: string) => {
+          this.wsGateway.emitAgentChunk(projectId, agentExecutionId, chunk);
+        },
+        onComplete: async (response) => {
+          this.wsGateway.emitAgentCompleted(projectId, agentExecutionId, {
+            content: response.content,
+            usage: response.usage,
+            finishReason: response.finishReason,
+          });
+
+          // Emit as a chat message so it appears in the conversation
+          // Use a unique message ID based on transition type and timestamp
+          const messageId = `orchestrator-${transitionType}-${Date.now()}`;
+          this.wsGateway.emitChatMessage(projectId, messageId, response.content);
+        },
+        onError: (error) => {
+          console.error('Orchestrator message generation error:', error);
+          this.wsGateway.emitAgentFailed(projectId, agentExecutionId, error.message);
+        },
+      },
+    );
+
+    this.wsGateway.emitAgentStarted(projectId, agentExecutionId, 'ORCHESTRATOR', 'Updating you on progress');
+  }
+
+  /**
    * Extract a concise project name from user requirements using LLM
    */
   private async extractProjectName(requirements: string): Promise<string> {
@@ -231,6 +381,21 @@ Begin by warmly acknowledging their project idea, then ask your FIRST question a
       } else if (currentGate.status === 'PENDING' || currentGate.status === 'IN_REVIEW') {
         console.log(`Processing gate approval for ${gateType} on project:`, projectId);
 
+        // Store the user's approval message in an agent execution record
+        // This ensures it appears in the chat history reconstruction
+        const approvalRecord = await this.prisma.agent.create({
+          data: {
+            projectId,
+            agentType: 'ORCHESTRATOR',
+            status: 'COMPLETED',
+            inputPrompt: `User approval for ${gateType}`,
+            model: 'user-input',
+            contextData: { userMessage: message },
+            outputResult: '', // Will be filled by generateOrchestratorMessage
+            completedAt: new Date(),
+          },
+        });
+
         // Transition to review if needed
         if (currentGate.status !== 'IN_REVIEW') {
           await this.gateStateMachine.transitionToReview(projectId, gateType, {
@@ -250,19 +415,26 @@ Begin by warmly acknowledging their project idea, then ask your FIRST question a
         // Trigger post-approval processing
         await this.onGateApproved(projectId, gateType, userId);
 
-        // Generate gate-specific confirmation message
-        const confirmationMessage = this.getGateApprovalConfirmation(gateNumber, gateType);
-
-        const eventId = `g${gateNumber}-approved`;
-        this.wsGateway.emitAgentChunk(projectId, eventId, confirmationMessage);
-        this.wsGateway.emitAgentCompleted(projectId, eventId, {
-          content: confirmationMessage,
-          usage: { inputTokens: 0, outputTokens: 0 },
-          finishReason: 'end_turn',
+        // Generate gate-specific confirmation message via Orchestrator agent
+        await this.generateOrchestratorMessage(projectId, userId, 'gate_approved', {
+          gateNumber,
+          gateType,
         });
 
-        return { agentExecutionId: `g${gateNumber}-approval-processed`, gateApproved: true };
+        return { agentExecutionId: approvalRecord.id, gateApproved: true };
       }
+    }
+
+    // ============================================================
+    // CHECK FOR STUCK GATES - Auto-retry failed agents
+    // If a gate has failed agents and user sends any message, retry
+    // ============================================================
+    const stuckGate = await this.checkAndRetryStuckGate(projectId, userId);
+    if (stuckGate) {
+      return {
+        agentExecutionId: `retry-${stuckGate}`,
+        gateApproved: false,
+      };
     }
 
     // ============================================================
@@ -508,7 +680,7 @@ Keep your response concise and helpful. Don't be pushy about approval.`;
 
   /**
    * Handle user messages after G1 is approved
-   * Uses AI to evaluate intent and respond appropriately
+   * Dynamically detects current gate and builds appropriate context
    */
   private async handlePostG1Message(
     projectId: string,
@@ -524,17 +696,73 @@ Keep your response concise and helpful. Don't be pushy about approval.`;
       where: { projectId, title: 'Project Intake' },
     });
 
+    // Get the ACTUAL current gate dynamically
+    const currentGate = await this.gateStateMachine.getCurrentGate(projectId);
+    const currentGateType = currentGate?.gateType || 'G2_PENDING';
+    const currentGateNumber = this.extractGateNumber(currentGateType);
+
+    console.log(`[handlePostG1Message] Current gate: ${currentGateType}, status: ${currentGate?.status}`);
+
+    // Get relevant documents for context
+    const documents = await this.prisma.document.findMany({
+      where: { projectId },
+      select: { title: true, documentType: true, content: true },
+    });
+
+    const prdDoc = documents.find((d) => d.title === 'Product Requirements Document');
+    const archDoc = documents.find((d) => d.title === 'System Architecture' || d.title === 'System Architecture Document' || d.documentType === 'ARCHITECTURE');
+    const designDoc = documents.find((d) => d.title === 'Design System Document' || d.title === 'Design System');
+
     const projectContext = intakeDocument?.content || project?.name || 'the project';
+
+    // Check if any agent is currently running for this project
+    const runningAgent = await this.prisma.agent.findFirst({
+      where: { projectId, status: 'RUNNING' },
+    });
+
+    // Check if this is feedback for the current gate's document
+    // Only trigger revision if:
+    // 1. Gate is IN_REVIEW (document exists)
+    // 2. No agents are currently running
+    // 3. Message contains feedback
+    const isInReview = currentGate?.status === 'IN_REVIEW';
+    const hasFeedback = this.isFeedbackMessage(message);
+    const hasRelevantDoc = (currentGateNumber === 2 && prdDoc) ||
+                           (currentGateNumber === 3 && archDoc) ||
+                           (currentGateNumber === 4 && designDoc);
+
+    if (isInReview && !runningAgent && hasFeedback && hasRelevantDoc && currentGateNumber >= 2 && currentGateNumber <= 4) {
+      console.log(`[handlePostG1Message] Detected feedback for G${currentGateNumber} document, triggering revision`);
+
+      // Log feedback to Change Requests document
+      await this.logFeedbackToChangeRequests(projectId, currentGateNumber, message, userId);
+
+      // Trigger document revision with the feedback
+      const { agentExecutionId } = await this.reviseDocumentWithFeedback(
+        projectId,
+        userId,
+        currentGateType,
+        message,
+      );
+
+      return { agentExecutionId, gateApproved: false };
+    }
+
+    // Build context based on actual current gate
+    const { currentStateDescription, userTaskInstructions } = this.buildGateContext(
+      currentGateType,
+      currentGate?.status || 'PENDING',
+      { prdDoc, archDoc, designDoc },
+    );
 
     // Build the prompt for the orchestrator to evaluate the user's intent
     const userPrompt = `You are the Project Orchestrator for "${project?.name}".
 
-The user has completed G1 (Project Scope Approval). Their Project Intake has been approved.
+**Current Gate:** G${currentGateNumber} - ${this.getGateName(currentGateNumber)}
+**Gate Status:** ${currentGate?.status || 'PENDING'}
 
 **Current State:**
-- G1 is APPROVED
-- Tasks have been created for all agents
-- Ready to start G2 (Product Requirements Document creation)
+${currentStateDescription}
 
 **Project Summary:**
 ${projectContext.substring(0, 2000)}
@@ -543,10 +771,7 @@ ${projectContext.substring(0, 2000)}
 "${message}"
 
 **Your Task:**
-Respond to the user's message naturally. You can:
-1. Answer questions about the project or process
-2. If they indicate they want to proceed/continue/start G2, respond with enthusiasm and confirm you're starting PRD creation. Include the exact phrase "STARTING_G2_PRD_CREATION" at the end of your response (this is a system trigger).
-3. If they have concerns or want changes, address them helpfully
+${userTaskInstructions}
 
 Keep your response concise and helpful.`;
 
@@ -557,7 +782,7 @@ Keep your response concise and helpful.`;
         agentType: 'ORCHESTRATOR',
         userPrompt,
         model: undefined,
-        context: { userMessage: message },
+        context: { userMessage: message, currentGate: currentGateType },
       },
       userId,
       {
@@ -570,15 +795,9 @@ Keep your response concise and helpful.`;
             usage: response.usage,
             finishReason: response.finishReason,
           });
-
-          // Check if the agent indicated to start G2
-          if (response.content.includes('STARTING_G2_PRD_CREATION')) {
-            console.log('Starting G2 PRD creation for project:', projectId);
-            await this.startProductManagerAgent(projectId, userId);
-          }
         },
         onError: (error) => {
-          console.error('Post-G1 message error:', error);
+          console.error('Post-approval message error:', error);
           this.wsGateway.emitAgentFailed(projectId, agentExecutionId, error.message);
         },
       },
@@ -595,9 +814,426 @@ Keep your response concise and helpful.`;
   }
 
   /**
+   * Revise a document based on user feedback
+   * Re-runs the appropriate agent with the feedback incorporated
+   */
+  private async reviseDocumentWithFeedback(
+    projectId: string,
+    userId: string,
+    gateType: string,
+    feedback: string,
+  ): Promise<{ agentExecutionId: string }> {
+    const gateNumber = this.extractGateNumber(gateType);
+
+    // Map gate to agent type
+    const gateToAgent: Record<number, string> = {
+      2: 'PRODUCT_MANAGER',
+      3: 'ARCHITECT',
+      4: 'UX_DESIGNER',
+    };
+
+    const agentType = gateToAgent[gateNumber];
+    if (!agentType) {
+      throw new Error(`No agent configured for revision at gate ${gateType}`);
+    }
+
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    // Get the existing document to include as context
+    const existingDoc = await this.prisma.document.findFirst({
+      where: {
+        projectId,
+        documentType: gateNumber === 2 ? 'REQUIREMENTS' : gateNumber === 3 ? 'ARCHITECTURE' : 'OTHER',
+        title: { not: 'Project Intake' },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    // Get handoff context
+    const handoffContext = await this.getHandoffContext(projectId, gateType);
+
+    // Build revision prompt with feedback
+    const revisionPrompt = `You are revising the existing document based on user feedback.
+
+**EXISTING DOCUMENT:**
+${existingDoc?.content || 'No existing document found'}
+
+**USER FEEDBACK:**
+${feedback}
+
+**INSTRUCTIONS:**
+1. Review the existing document above
+2. Incorporate ALL the user's feedback into a revised version
+3. Maintain the same structure and format
+4. Output the COMPLETE revised document (not just the changes)
+
+**CONTEXT:**
+${handoffContext}
+
+Generate the complete revised document now.`;
+
+    console.log(`[WorkflowCoordinator] Revising ${agentType} document with user feedback`);
+
+    // Emit a message to let the user know we're revising
+    const messageId = `revision-${gateType}-${Date.now()}`;
+    this.wsGateway.emitChatMessage(
+      projectId,
+      messageId,
+      `I'm updating the ${gateNumber === 2 ? 'PRD' : gateNumber === 3 ? 'Architecture' : 'Design'} document based on your feedback. This will just take a moment...`,
+    );
+
+    // Execute the agent with revision prompt
+    const agentExecutionId = await this.agentExecution.executeAgentStream(
+      {
+        projectId,
+        agentType,
+        userPrompt: revisionPrompt,
+        model: undefined,
+        context: { revision: true, feedback },
+      },
+      userId,
+      {
+        onChunk: (chunk: string) => {
+          this.wsGateway.emitAgentChunk(projectId, agentExecutionId, chunk);
+        },
+        onComplete: async (response) => {
+          this.wsGateway.emitAgentCompleted(projectId, agentExecutionId, {
+            content: response.content,
+            usage: response.usage,
+            finishReason: response.finishReason,
+          });
+
+          // Log the revision
+          await this.eventStore.appendEvent(projectId, {
+            type: 'DocumentRevised',
+            data: {
+              agentType,
+              gateType,
+              feedback: feedback.substring(0, 500),
+            },
+            userId,
+          });
+
+          // Emit completion message
+          const completionMessageId = `revision-complete-${Date.now()}`;
+          this.wsGateway.emitChatMessage(
+            projectId,
+            completionMessageId,
+            `The ${gateNumber === 2 ? 'PRD' : gateNumber === 3 ? 'Architecture' : 'Design'} document has been updated with your feedback. Please review it in the Docs tab.\n\nIf you're satisfied with the changes, type **"approve"** to proceed to the next gate. Otherwise, feel free to provide more feedback.`,
+          );
+        },
+        onError: (error) => {
+          console.error('Document revision error:', error);
+          this.wsGateway.emitAgentFailed(projectId, agentExecutionId, error.message);
+        },
+      },
+    );
+
+    this.wsGateway.emitAgentStarted(
+      projectId,
+      agentExecutionId,
+      agentType,
+      `Revising document with feedback`,
+    );
+
+    return { agentExecutionId };
+  }
+
+  /**
+   * Log feedback to database (structured) and Change Requests document (human-readable)
+   */
+  private async logFeedbackToChangeRequests(
+    projectId: string,
+    gateNumber: number,
+    feedback: string,
+    userId?: string,
+  ): Promise<string> {
+    const gateName = this.getGateName(gateNumber);
+    const timestamp = new Date().toISOString();
+    const gateType = `G${gateNumber}_PENDING`;
+
+    // Determine document type based on gate
+    const gateToDocType: Record<number, string> = {
+      2: 'REQUIREMENTS',
+      3: 'ARCHITECTURE',
+      4: 'DESIGN',
+    };
+
+    // Determine feedback type based on content analysis
+    const feedbackType = this.classifyFeedbackType(feedback);
+
+    // Store in structured UserFeedback table
+    const feedbackRecord = await this.prisma.userFeedback.create({
+      data: {
+        projectId,
+        userId,
+        gateType,
+        gateNumber,
+        documentType: gateToDocType[gateNumber] || 'OTHER',
+        feedbackType: feedbackType as any,
+        content: feedback,
+        sentiment: this.analyzeSentiment(feedback) as any,
+        actionTaken: 'PENDING',
+      },
+    });
+
+    console.log(`[WorkflowCoordinator] Created feedback record: ${feedbackRecord.id}`);
+
+    // Also append to Change Requests document for human-readable log
+    const changeRequestsDoc = await this.prisma.document.findFirst({
+      where: { projectId, title: 'Change Requests' },
+    });
+
+    const newEntry = `\n\n## G${gateNumber} - ${gateName} Feedback (${timestamp})\n**Type:** ${feedbackType}\n${feedback}`;
+
+    if (changeRequestsDoc) {
+      await this.prisma.document.update({
+        where: { id: changeRequestsDoc.id },
+        data: {
+          content: (changeRequestsDoc.content || '') + newEntry,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await this.prisma.document.create({
+        data: {
+          projectId,
+          title: 'Change Requests',
+          documentType: 'OTHER',
+          content: `# Change Requests Log\n\nThis document tracks all feedback and change requests made during the project.${newEntry}`,
+          version: 1,
+          createdById: userId,
+        },
+      });
+    }
+
+    console.log(`[WorkflowCoordinator] Logged feedback for G${gateNumber} to Change Requests`);
+    return feedbackRecord.id;
+  }
+
+  /**
+   * Classify the type of feedback based on content
+   */
+  private classifyFeedbackType(feedback: string): string {
+    const lower = feedback.toLowerCase();
+
+    if (lower.includes('change') || lower.includes('update') || lower.includes('modify') || lower.includes('use ') || lower.includes('switch')) {
+      return 'CHANGE_REQUEST';
+    }
+    if (lower.includes('prefer') || lower.includes('would like') || lower.includes('want to')) {
+      return 'PREFERENCE';
+    }
+    if (lower.includes('suggest') || lower.includes('recommend') || lower.includes('consider')) {
+      return 'SUGGESTION';
+    }
+    if (lower.includes('?') || lower.includes('what') || lower.includes('how') || lower.includes('why')) {
+      return 'QUESTION';
+    }
+    if (lower.includes('approve') || lower.includes('looks good') || lower.includes('lgtm')) {
+      return 'APPROVAL';
+    }
+    if (lower.includes('reject') || lower.includes('don\'t') || lower.includes('wrong') || lower.includes('incorrect')) {
+      return 'REJECTION';
+    }
+    if (lower.includes('bug') || lower.includes('error') || lower.includes('issue') || lower.includes('broken')) {
+      return 'BUG_REPORT';
+    }
+    if (lower.includes('clarify') || lower.includes('explain') || lower.includes('understand')) {
+      return 'CLARIFICATION';
+    }
+
+    return 'OTHER';
+  }
+
+  /**
+   * Simple sentiment analysis based on keywords
+   */
+  private analyzeSentiment(feedback: string): string {
+    const lower = feedback.toLowerCase();
+
+    const positiveWords = ['good', 'great', 'love', 'like', 'approve', 'excellent', 'perfect', 'thanks', 'helpful'];
+    const negativeWords = ['bad', 'wrong', 'incorrect', 'don\'t', 'hate', 'terrible', 'issue', 'problem', 'bug', 'error'];
+
+    const positiveCount = positiveWords.filter(w => lower.includes(w)).length;
+    const negativeCount = negativeWords.filter(w => lower.includes(w)).length;
+
+    if (positiveCount > negativeCount) return 'POSITIVE';
+    if (negativeCount > positiveCount) return 'NEGATIVE';
+    return 'NEUTRAL';
+  }
+
+  /**
+   * Detect if a message contains feedback/revision requests
+   */
+  private isFeedbackMessage(message: string): boolean {
+    const feedbackIndicators = [
+      'change', 'update', 'modify', 'revise', 'edit',
+      'use ', 'switch to', 'instead', 'prefer',
+      'add ', 'remove', 'include', 'don\'t', 'do not',
+      'should be', 'needs to', 'want to', 'would like',
+      'microservices', 'docker', 'railway', 'vercel', 'aws',
+      'feedback', 'suggestion', 'recommendation',
+    ];
+
+    const lowerMessage = message.toLowerCase();
+    return feedbackIndicators.some(indicator => lowerMessage.includes(indicator));
+  }
+
+  /**
+   * Build context description and instructions based on current gate
+   */
+  private buildGateContext(
+    gateType: string,
+    gateStatus: string,
+    docs: { prdDoc?: { content: string | null }; archDoc?: { content: string | null }; designDoc?: { content: string | null } },
+  ): { currentStateDescription: string; userTaskInstructions: string } {
+    const gateNumber = this.extractGateNumber(gateType);
+    const isInReview = gateStatus === 'IN_REVIEW';
+
+    // G2 - PRD Review
+    if (gateNumber === 2) {
+      if (docs.prdDoc && isInReview) {
+        return {
+          currentStateDescription: `- G1 (Scope) is APPROVED
+- PRD has been created and is ready for review
+- G2 gate status: ${gateStatus}`,
+          userTaskInstructions: `Respond to the user's message naturally. You can:
+1. Answer questions about the project, PRD, or process
+2. If they want to review the PRD, remind them it's in the Docs tab
+3. If they want to approve and proceed to G3 (Architecture), they can type "approve"
+4. If they have concerns or want changes to the PRD, address them helpfully`,
+        };
+      } else if (docs.prdDoc) {
+        return {
+          currentStateDescription: `- G1 (Scope) is APPROVED
+- PRD has been created
+- Ready for G2 approval`,
+          userTaskInstructions: `Respond to the user's message naturally. You can:
+1. Answer questions about the project or PRD
+2. Remind them the PRD is available in the Docs tab for review
+3. If they want to approve, they can type "approve" to proceed to G3 (Architecture)`,
+        };
+      } else {
+        return {
+          currentStateDescription: `- G1 (Scope) is APPROVED
+- The Product Manager agent is currently creating the PRD
+- PRD will appear in the Docs tab when complete`,
+          userTaskInstructions: `The PRD is being created. Keep your response brief:
+1. Acknowledge the user's message
+2. Let them know the document is being created and will be ready shortly
+3. Do NOT ask for preferences or feedback - just answer their question briefly
+NOTE: Do NOT prompt for feedback while an agent is working.`,
+        };
+      }
+    }
+
+    // G3 - Architecture Review
+    if (gateNumber === 3) {
+      if (docs.archDoc && isInReview) {
+        return {
+          currentStateDescription: `- G1 (Scope) is APPROVED
+- G2 (PRD) is APPROVED
+- Architecture Document has been created and is ready for review
+- G3 gate status: ${gateStatus}`,
+          userTaskInstructions: `The Architecture document is ready for review. Respond naturally:
+1. Answer questions about the architecture, technology choices, or design decisions
+2. If they want to review it, remind them it's in the Docs tab
+3. If they want to approve and proceed to G4 (Design), they can type "approve"
+4. If they provide feedback or want changes, acknowledge it - the document will be updated with their feedback`,
+        };
+      } else if (docs.archDoc) {
+        return {
+          currentStateDescription: `- G1 (Scope) is APPROVED
+- G2 (PRD) is APPROVED
+- Architecture Document has been created
+- Ready for G3 approval`,
+          userTaskInstructions: `Respond naturally:
+1. Answer questions about the architecture
+2. Remind them the Architecture document is available in the Docs tab
+3. If they want to approve, they can type "approve" to proceed to G4 (Design)
+4. If they provide feedback, acknowledge it`,
+        };
+      } else {
+        return {
+          currentStateDescription: `- G1 (Scope) is APPROVED
+- G2 (PRD) is APPROVED
+- The Architect agent is currently designing the system architecture
+- Architecture document will appear in the Docs tab when complete`,
+          userTaskInstructions: `The Architecture document is being created. Keep your response brief:
+1. Acknowledge the user's message
+2. Let them know the document is being created and will be ready shortly
+3. Do NOT ask for preferences or feedback while the agent is working
+NOTE: Do NOT prompt for feedback while an agent is working.`,
+        };
+      }
+    }
+
+    // G4 - Design Review
+    if (gateNumber === 4) {
+      if (docs.designDoc && isInReview) {
+        return {
+          currentStateDescription: `- G1-G3 are APPROVED
+- Design System Document has been created and is ready for review
+- G4 gate status: ${gateStatus}`,
+          userTaskInstructions: `The Design document is ready for review. Respond naturally:
+1. Answer questions about the UI/UX design or component library
+2. If they want to review it, remind them it's in the Docs tab
+3. If they want to approve and proceed to G5 (Development), they can type "approve"
+4. If they provide feedback, acknowledge it - the document will be updated`,
+        };
+      } else {
+        return {
+          currentStateDescription: `- G1-G3 are APPROVED
+- The UX Designer agent is currently creating the Design System
+- Design document will appear in the Docs tab when complete`,
+          userTaskInstructions: `The Design document is being created. Keep your response brief:
+1. Acknowledge the user's message
+2. Let them know the document is being created and will be ready shortly
+3. Do NOT ask for preferences or feedback while the agent is working`,
+        };
+      }
+    }
+
+    // Default for other gates (G5+)
+    return {
+      currentStateDescription: `- Current gate: G${gateNumber} (${this.getGateName(gateNumber)})
+- Gate status: ${gateStatus}`,
+      userTaskInstructions: `Respond to the user's message naturally. Answer their questions about the project or current stage.
+If they want to approve the current gate, they can type "approve".`,
+    };
+  }
+
+  /**
    * Start the Product Manager agent to create the PRD for G2
    */
   private async startProductManagerAgent(projectId: string, userId: string): Promise<string> {
+    console.log(`[PRD Creation] Starting Product Manager agent for project: ${projectId}`);
+
+    // Guard: Check if PRD already exists (prevent double creation)
+    const existingPRD = await this.prisma.document.findFirst({
+      where: { projectId, title: 'Product Requirements Document' },
+    });
+    if (existingPRD) {
+      console.log(`[PRD Creation] PRD already exists for project ${projectId}, skipping creation`);
+      return 'skipped-prd-exists';
+    }
+
+    // Guard: Check if Product Manager is already running for this project
+    const runningPM = await this.prisma.agent.findFirst({
+      where: {
+        projectId,
+        agentType: 'PRODUCT_MANAGER',
+        status: 'RUNNING',
+      },
+    });
+    if (runningPM) {
+      console.log(`[PRD Creation] Product Manager already running for project ${projectId}, skipping`);
+      return runningPM.id;
+    }
+
     // Get project and intake document for context
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -607,26 +1243,12 @@ Keep your response concise and helpful.`;
       where: { projectId, title: 'Project Intake' },
     });
 
-    const userPrompt = `Create a comprehensive Product Requirements Document (PRD) for the project "${project?.name}".
+    const userPrompt = `Create the PRD for "${project?.name}" based on the following intake document.
 
-**Project Intake Document:**
+**Project Intake:**
 ${intakeDocument?.content || 'No intake document found'}
 
-**Your Task:**
-Create a detailed PRD that includes:
-
-1. **Executive Summary** - Brief overview of the product
-2. **Problem Statement** - What problem does this solve?
-3. **Goals and Objectives** - Measurable success criteria
-4. **User Stories** - Detailed user stories with acceptance criteria in the format:
-   - As a [user type], I want [goal] so that [benefit]
-   - Acceptance Criteria: [specific testable criteria]
-5. **Feature Prioritization** - MVP features vs Phase 2 features
-6. **Non-Functional Requirements** - Performance, security, scalability
-7. **Success Metrics** - KPIs to measure success
-8. **Timeline Considerations** - Based on user's constraints
-
-Output the complete PRD document in markdown format.`;
+Create a single, complete PRD document. Do NOT repeat sections. Output only the PRD in markdown format.`;
 
     const agentExecutionId = await this.agentExecution.executeAgentStream(
       {
@@ -646,6 +1268,14 @@ Output the complete PRD document in markdown format.`;
             usage: response.usage,
             finishReason: response.finishReason,
           });
+
+          // Debug: Log content length and check for obvious duplication
+          console.log(`[PRD Debug] Content length: ${response.content.length}`);
+          const execSummaryCount = (response.content.match(/Executive Summary/gi) || []).length;
+          console.log(`[PRD Debug] "Executive Summary" occurrences: ${execSummaryCount}`);
+          if (execSummaryCount > 1) {
+            console.warn(`[PRD Debug] WARNING: Content appears duplicated ${execSummaryCount} times!`);
+          }
 
           // Save the PRD as a document
           await this.savePRDDocument(projectId, userId, response.content);
@@ -669,25 +1299,50 @@ Output the complete PRD document in markdown format.`;
 
   /**
    * Save the PRD document and notify the user it's ready for G2 review
+   * Uses upsert logic to update existing PRD or create new one
    */
   private async savePRDDocument(
     projectId: string,
     userId: string,
     prdContent: string,
   ): Promise<void> {
-    console.log('Saving PRD document for project:', projectId);
+    console.log(`[PRD Save] Saving PRD document for project: ${projectId}, content length: ${prdContent.length}`);
 
-    // Save PRD as document
-    const document = await this.prisma.document.create({
-      data: {
+    // Check if PRD already exists (to update instead of creating duplicate)
+    const existingPRD = await this.prisma.document.findFirst({
+      where: {
         projectId,
-        title: 'Product Requirements Document',
         documentType: 'REQUIREMENTS',
-        content: prdContent,
-        version: 1,
-        createdById: userId,
+        title: 'Product Requirements Document',
       },
     });
+
+    let document;
+    if (existingPRD) {
+      // Update existing PRD
+      document = await this.prisma.document.update({
+        where: { id: existingPRD.id },
+        data: {
+          content: prdContent,
+          version: existingPRD.version + 1,
+          updatedAt: new Date(),
+        },
+      });
+      console.log(`Updated existing PRD (v${document.version})`);
+    } else {
+      // Create new PRD
+      document = await this.prisma.document.create({
+        data: {
+          projectId,
+          title: 'Product Requirements Document',
+          documentType: 'REQUIREMENTS',
+          content: prdContent,
+          version: 1,
+          createdById: userId,
+        },
+      });
+      console.log('Created new PRD document');
+    }
 
     // Notify frontend about new document
     this.wsGateway.emitDocumentCreated(projectId, {
@@ -706,18 +1361,11 @@ Output the complete PRD document in markdown format.`;
       console.error('Failed to transition G2 gate:', error);
     }
 
-    // Send notification that PRD is ready
-    const readyMessage = `## PRD Ready for Review
-
-Your **Product Requirements Document** is now available in the Docs tab.
-
-Please review the PRD and type **"approve"** to proceed to G3 (Architecture), or let me know if you'd like any changes.`;
-
-    this.wsGateway.emitAgentChunk(projectId, 'g2-ready', readyMessage);
-    this.wsGateway.emitAgentCompleted(projectId, 'g2-ready', {
-      content: readyMessage,
-      usage: { inputTokens: 0, outputTokens: 0 },
-      finishReason: 'end_turn',
+    // Send notification that PRD is ready via Orchestrator agent
+    await this.generateOrchestratorMessage(projectId, userId, 'document_ready', {
+      documentTitle: 'Product Requirements Document',
+      gateNumber: 2,
+      gateType: 'G2_PENDING',
     });
   }
 
@@ -751,17 +1399,41 @@ Please review the PRD and type **"approve"** to proceed to G3 (Architecture), or
 
     console.log('Creating Project Intake document, content length:', intakeContent.length);
 
-    // Save intake as document (for reference in Docs tab)
-    const document = await this.prisma.document.create({
-      data: {
+    // Check if intake document already exists (to update instead of creating duplicate)
+    const existingIntake = await this.prisma.document.findFirst({
+      where: {
         projectId,
-        title: 'Project Intake',
         documentType: 'REQUIREMENTS',
-        content: intakeContent,
-        version: 1,
-        createdById: userId,
+        title: 'Project Intake',
       },
     });
+
+    let document;
+    if (existingIntake) {
+      // Update existing intake document
+      document = await this.prisma.document.update({
+        where: { id: existingIntake.id },
+        data: {
+          content: intakeContent,
+          version: existingIntake.version + 1,
+          updatedAt: new Date(),
+        },
+      });
+      console.log(`Updated existing Project Intake (v${document.version})`);
+    } else {
+      // Create new intake document
+      document = await this.prisma.document.create({
+        data: {
+          projectId,
+          title: 'Project Intake',
+          documentType: 'REQUIREMENTS',
+          content: intakeContent,
+          version: 1,
+          createdById: userId,
+        },
+      });
+      console.log('Created new Project Intake document');
+    }
 
     // Notify frontend that Project Intake document was created
     this.wsGateway.emitDocumentCreated(projectId, {
@@ -770,16 +1442,11 @@ Please review the PRD and type **"approve"** to proceed to G3 (Architecture), or
       documentType: document.documentType,
     });
 
-    // Simple message asking user to review and approve the intake document
-    const approvalMessage = `Your **Project Intake** document is ready for review in the Docs tab.
-
-Please review it and type **"approve"** to proceed, or let me know if you'd like any changes.`;
-
-    this.wsGateway.emitAgentChunk(projectId, 'onboarding-complete', approvalMessage);
-    this.wsGateway.emitAgentCompleted(projectId, 'onboarding-complete', {
-      content: approvalMessage,
-      usage: { inputTokens: 0, outputTokens: 0 },
-      finishReason: 'end_turn',
+    // Notify user that Project Intake is ready via Orchestrator agent
+    await this.generateOrchestratorMessage(projectId, userId, 'document_ready', {
+      documentTitle: 'Project Intake',
+      gateNumber: 1,
+      gateType: 'G1_PENDING',
     });
   }
 
@@ -1036,6 +1703,41 @@ Please review it and type **"approve"** to proceed, or let me know if you'd like
             });
           }
         }
+
+        // Auto-start PRD creation after G1 approval (no need for user to type "continue")
+        // Check if PRD already exists to avoid re-creating it
+        const existingPRD = await this.prisma.document.findFirst({
+          where: {
+            projectId,
+            title: 'Product Requirements Document',
+          },
+        });
+
+        if (!existingPRD) {
+          console.log('Auto-starting PRD creation after G1 approval');
+
+          // Emit agent starting event IMMEDIATELY so user sees feedback in chat
+          // Generate a placeholder ID - the real one comes when agent actually starts
+          const placeholderAgentId = `prd-starting-${Date.now()}`;
+          this.wsGateway.emitAgentStarted(
+            projectId,
+            placeholderAgentId,
+            'PRODUCT_MANAGER',
+            'Creating Product Requirements Document',
+          );
+
+          // Use setTimeout to allow the G1 approval message to be sent first
+          // The agent will emit its own started event with the real ID
+          setTimeout(() => {
+            this.startProductManagerAgent(projectId, userId).catch((error) => {
+              console.error('Failed to auto-start PRD creation:', error);
+              // Emit failure so UI can update
+              this.wsGateway.emitAgentFailed(projectId, placeholderAgentId, error.message);
+            });
+          }, 500);
+        } else {
+          console.log('PRD already exists, skipping auto-creation');
+        }
       } else if (gateType === 'G2_PENDING') {
         // G2 (PRD) approved - create post-G2 documents and start G3 (Architecture)
         console.log('G2 approved - creating post-G2 documents and starting G3 agents');
@@ -1274,134 +1976,6 @@ Please review it and type **"approve"** to proceed, or let me know if you'd like
     return match ? parseInt(match[1], 10) : 0;
   }
 
-  /**
-   * Get gate-specific approval confirmation message
-   */
-  private getGateApprovalConfirmation(gateNumber: number, gateType: string): string {
-    const confirmations: Record<number, string> = {
-      1: `## G1 Approved - Project Scope Confirmed
-
-Your project scope has been approved and tasks have been created for all agents.
-
-**Ready for G2 - Product Requirements**
-
-The Product Manager agent can now create your **Product Requirements Document (PRD)** which includes:
-- User stories and acceptance criteria
-- Feature prioritization
-- Success metrics
-
-Type **"continue"** to start PRD creation, or ask me any questions about the project.`,
-
-      2: `## G2 Approved - Product Requirements Complete
-
-Your Product Requirements Document has been approved.
-
-**Ready for G3 - Architecture**
-
-The Architect agent will now design the system architecture including:
-- API specifications (OpenAPI)
-- Database schema (Prisma)
-- System architecture documentation
-
-The architecture work is starting automatically.`,
-
-      3: `## G3 Approved - Architecture Complete
-
-Your system architecture has been approved.
-
-**Ready for G4 - Design**
-
-The UX/UI Designer agent will now create:
-- Design system and component library
-- UI mockups and wireframes
-- User flow diagrams
-
-The design work is starting automatically.`,
-
-      4: `## G4 Approved - Design Complete
-
-Your design system and UI mockups have been approved.
-
-**Ready for G5 - Development**
-
-The development phase is starting with **parallel execution**:
-- Frontend Developer - Building the UI
-- Backend Developer - Building the API
-
-Development work is starting automatically.`,
-
-      5: `## G5 Approved - Development Complete
-
-Your frontend and backend implementation have been approved.
-
-**Ready for G6 - Testing**
-
-The QA Engineer agent will now:
-- Create comprehensive test plans
-- Execute unit, integration, and E2E tests
-- Ensure >80% code coverage
-
-Testing work is starting automatically.`,
-
-      6: `## G6 Approved - Testing Complete
-
-All tests have passed and coverage requirements are met.
-
-**Ready for G7 - Security Audit**
-
-The Security Engineer agent will now:
-- Perform OWASP security audit
-- Run vulnerability scans
-- Review authentication and authorization
-
-Security audit is starting automatically.`,
-
-      7: `## G7 Approved - Security Audit Complete
-
-Your security audit has passed.
-
-**Ready for G8 - Staging Deployment**
-
-The DevOps Engineer will now:
-- Set up CI/CD pipelines
-- Deploy to staging environment
-- Configure monitoring and alerting
-
-Staging deployment is starting automatically.`,
-
-      8: `## G8 Approved - Staging Deployment Complete
-
-Your staging environment is live and tested.
-
-**Ready for G9 - Production Deployment**
-
-The final deployment phase will:
-- Deploy to production environment
-- Enable production monitoring
-- Complete post-launch checklist
-
-Production deployment is starting automatically.`,
-
-      9: `## 🎉 G9 Approved - Project Complete!
-
-Congratulations! Your project has been successfully deployed to production.
-
-**Project Summary:**
-- All 9 gates completed
-- All deliverables approved
-- Production deployment live
-
-You can view all documentation and artifacts in the Docs tab.`,
-    };
-
-    return (
-      confirmations[gateNumber] ||
-      `## ${gateType} Approved
-
-The gate has been approved and the next phase is starting.`
-    );
-  }
-
   // ============================================================
   // PARALLEL AGENT EXECUTION (G2-G9 Workflow)
   // ============================================================
@@ -1421,6 +1995,18 @@ The gate has been approved and the next phase is starting.`
     }
 
     const projectType = project.type || 'traditional';
+
+    // Ensure gate exists before executing agents
+    // This handles race conditions and recovery from previous failed attempts
+    const existingGate = await this.prisma.gate.findFirst({
+      where: { projectId, gateType },
+    });
+
+    if (!existingGate) {
+      console.log(`[WorkflowCoordinator] Gate ${gateType} doesn't exist, creating it`);
+      // Use gateStateMachine to create the gate properly (with deliverables)
+      await this.gateStateMachine.ensureGateExists(projectId, gateType);
+    }
 
     // Get agents for this gate based on project type
     const agents = getAgentsForGate(projectType, gateType);
@@ -1554,6 +2140,31 @@ The gate has been approved and the next phase is starting.`
             },
             userId,
           });
+
+          // Auto-retry on transient errors (up to 2 retries)
+          const isTransientError =
+            error.message.includes('model:') ||
+            error.message.includes('rate_limit') ||
+            error.message.includes('timeout') ||
+            error.message.includes('503') ||
+            error.message.includes('502');
+
+          if (isTransientError) {
+            const retryCount = await this.getAgentRetryCount(projectId, agentType, gateType);
+            if (retryCount < 2) {
+              console.log(
+                `[WorkflowCoordinator] Auto-retrying ${agentType} (attempt ${retryCount + 1}/2) after transient error`,
+              );
+              // Wait a bit before retrying
+              setTimeout(async () => {
+                try {
+                  await this.executeSingleAgent(projectId, agentType, gateType, userId, handoffContext);
+                } catch (retryError) {
+                  console.error(`[WorkflowCoordinator] Retry failed for ${agentType}:`, retryError);
+                }
+              }, 3000);
+            }
+          }
         },
       },
     );
@@ -1780,16 +2391,11 @@ If you need to create documents, use markdown code fences with the document titl
         },
       ]);
 
-      // Also send a chat message for gate-ready notification
+      // Also send a chat message for gate-ready notification via Orchestrator agent
       const gateNumber = this.extractGateNumber(gateType);
-      const chatMessage = this.getGateReadyMessage(gateNumber, gateType);
-      const eventId = `g${gateNumber}-ready`;
-
-      this.wsGateway.emitAgentChunk(projectId, eventId, chatMessage);
-      this.wsGateway.emitAgentCompleted(projectId, eventId, {
-        content: chatMessage,
-        usage: { inputTokens: 0, outputTokens: 0 },
-        finishReason: 'end_turn',
+      await this.generateOrchestratorMessage(projectId, userId, 'gate_ready', {
+        gateNumber,
+        gateType,
       });
     }
   }
@@ -1913,67 +2519,120 @@ This is an automatic checkpoint commit created after gate approval.`;
   }
 
   /**
-   * Get gate-ready message for chat display
+   * Check if a gate is stuck (has failed agents) and retry if so
+   * Returns the gate type if retry was triggered, null otherwise
    */
-  private getGateReadyMessage(gateNumber: number, gateType: string): string {
-    const messages: Record<number, string> = {
-      2: `## PRD Ready for Review
+  private async checkAndRetryStuckGate(
+    projectId: string,
+    userId: string,
+  ): Promise<string | null> {
+    // Find gates that are PENDING (work should be in progress)
+    const pendingGates = await this.prisma.gate.findMany({
+      where: {
+        projectId,
+        status: 'PENDING',
+        gateType: { endsWith: '_PENDING' },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-Your **Product Requirements Document** is now available in the Docs tab.
+    for (const gate of pendingGates) {
+      // Check if there are failed agents for this gate with no running agents
+      const [failedAgents, runningAgents] = await Promise.all([
+        this.prisma.agent.findMany({
+          where: {
+            projectId,
+            status: 'FAILED',
+            contextData: {
+              path: ['currentGate'],
+              equals: gate.gateType,
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        }),
+        this.prisma.agent.findFirst({
+          where: {
+            projectId,
+            status: 'RUNNING',
+          },
+        }),
+      ]);
 
-Please review the PRD and type **"approve"** to proceed to G3 (Architecture), or let me know if you'd like any changes.`,
+      // If we have failed agents and nothing running, the gate is stuck
+      if (failedAgents.length > 0 && !runningAgents) {
+        console.log(
+          `[WorkflowCoordinator] Gate ${gate.gateType} is stuck with failed agents, auto-retrying`,
+        );
 
-      3: `## Architecture Ready for Review
+        // Emit a message to let the user know we're retrying
+        const messageId = `retry-${gate.gateType}-${Date.now()}`;
+        this.wsGateway.emitChatMessage(
+          projectId,
+          messageId,
+          `I noticed the previous attempt failed. Let me retry the ${gate.gateType.replace('_PENDING', '')} work...`,
+        );
 
-Your **System Architecture** documents are now available in the Docs tab, including:
-- API Specification (OpenAPI)
-- Database Schema (Prisma)
-- Architecture Documentation
+        // Execute gate agents (retry)
+        this.executeGateAgents(projectId, gate.gateType, userId).catch((error) => {
+          console.error(`[WorkflowCoordinator] Retry failed for ${gate.gateType}:`, error);
+        });
 
-Please review and type **"approve"** to proceed to G4 (Design), or let me know if you'd like any changes.`,
+        return gate.gateType;
+      }
+    }
 
-      4: `## Design Ready for Review
-
-Your **Design System** and **UI Mockups** are now available in the Docs tab.
-
-Please review and type **"approve"** to proceed to G5 (Development), or let me know if you'd like any changes.`,
-
-      5: `## Development Complete - Ready for Review
-
-Your **Frontend** and **Backend** implementations are complete. Code and documentation are available in the Docs tab.
-
-Please review and type **"approve"** to proceed to G6 (Testing), or let me know if you'd like any changes.`,
-
-      6: `## Testing Complete - Ready for Review
-
-Your **Test Results** and **Coverage Reports** are available in the Docs tab.
-
-Please review and type **"approve"** to proceed to G7 (Security Audit), or let me know if you'd like any changes.`,
-
-      7: `## Security Audit Complete - Ready for Review
-
-Your **Security Audit Report** is available in the Docs tab.
-
-Please review and type **"approve"** to proceed to G8 (Staging Deployment), or let me know if you'd like any changes.`,
-
-      8: `## Staging Deployment Complete - Ready for Review
-
-Your application has been **deployed to staging**. Deployment details are available in the Docs tab.
-
-Please review the staging environment and type **"approve"** to proceed to G9 (Production Deployment), or let me know if you'd like any changes.`,
-
-      9: `## Production Deployment Ready for Review
-
-Your application is ready for **production deployment**.
-
-Please review the deployment plan and type **"approve"** to complete the project, or let me know if you'd like any changes.`,
-    };
-
-    return (
-      messages[gateNumber] ||
-      `## ${gateType} Ready for Review
-
-All deliverables are complete. Please review and type **"approve"** to proceed.`
-    );
+    return null;
   }
+
+  /**
+   * Get retry count for an agent at a specific gate
+   * Used to limit auto-retries on transient errors
+   */
+  private async getAgentRetryCount(
+    projectId: string,
+    agentType: string,
+    gateType: string,
+  ): Promise<number> {
+    // Count recent failed executions for this agent/gate (within last 10 minutes)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const failedCount = await this.prisma.agent.count({
+      where: {
+        projectId,
+        agentType,
+        status: 'FAILED',
+        createdAt: { gte: tenMinutesAgo },
+        contextData: {
+          path: ['currentGate'],
+          equals: gateType,
+        },
+      },
+    });
+    return failedCount;
+  }
+
+  /**
+   * Retry failed agents for a gate
+   * This is useful when agents fail due to transient errors (e.g., model not found)
+   */
+  async retryGateAgents(projectId: string, gateType: string, userId: string): Promise<void> {
+    console.log(`[WorkflowCoordinator] Retrying agents for gate ${gateType} on project ${projectId}`);
+
+    // Verify project exists and user has access
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    if (project.ownerId !== userId) {
+      throw new Error('Access denied');
+    }
+
+    // Execute gate agents (this will start fresh agent executions)
+    await this.executeGateAgents(projectId, gateType, userId);
+  }
+
 }

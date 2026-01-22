@@ -149,7 +149,7 @@ if (resource.userId !== req.user.id) {
 **Ready to secure the application. Share the codebase for audit.**
 `,
 
-  defaultModel: 'claude-3-opus-20240229', // Security requires best model
+  defaultModel: 'claude-sonnet-4-20250514', // Security requires capable model
   maxTokens: 8000,
 
   handoffFormat: {

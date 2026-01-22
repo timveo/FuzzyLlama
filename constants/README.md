@@ -6,6 +6,20 @@
 
 ---
 
+## FuzzyLlama Implementation Note
+
+These files are **reference documentation** from the Multi-Agent-Product-Creator framework. FuzzyLlama implements these concepts differently:
+
+| Framework Reference | FuzzyLlama Implementation |
+|---------------------|---------------------------|
+| `mcp-server/` with SQLite | `backend/src/mcp/` with PostgreSQL via Prisma |
+| `.truth/truth.json` files | PostgreSQL database (single source of truth) |
+| Standalone MCP server | MCP tools integrated into NestJS backend |
+
+When implementing features, translate the protocol concepts into FuzzyLlama's PostgreSQL-backed architecture.
+
+---
+
 ## Directory Structure
 
 ```

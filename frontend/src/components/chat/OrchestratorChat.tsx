@@ -6,6 +6,7 @@ import { workflowApi } from '../../api/workflow';
 import { agentsApi } from '../../api/agents';
 import { gatesApi } from '../../api/gates';
 import { documentsApi } from '../../api/documents';
+import { projectsApi } from '../../api/projects';
 
 type ThemeMode = 'dark' | 'light';
 
@@ -34,6 +35,13 @@ interface PendingGateApproval {
   documentName?: string;
 }
 
+interface IncomingChatMessage {
+  id: string;
+  role: 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+}
+
 interface OrchestratorChatProps {
   theme: ThemeMode;
   isNewProject?: boolean;
@@ -45,6 +53,8 @@ interface OrchestratorChatProps {
   streamingChunks?: string[];
   isAgentWorking?: boolean;
   agentEvents?: AgentStreamEvent[];
+  // Incoming chat messages from WebSocket
+  incomingMessages?: IncomingChatMessage[];
   // Gate approval props
   pendingGateApproval?: PendingGateApproval | null;
   onApproveGate?: () => void;
@@ -61,6 +71,28 @@ const isIntakeDocument = (content: string): boolean => {
     content.includes('## Discovery Answers') ||
     (content.includes('## Project Description') && content.includes('### Existing Code'))
   );
+};
+
+// Helper to detect if message contains raw MCP XML tool calls
+// These should not be displayed in the chat - they're internal agent operations
+const hasMcpToolCalls = (content: string): boolean => {
+  return (
+    content.includes('<mcp:function_calls>') ||
+    content.includes('<mcp:function_result>') ||
+    content.includes('<invoke name=') ||
+    content.includes('</invoke>')
+  );
+};
+
+// Simple string similarity check (Jaccard-like)
+// Returns a value between 0 and 1
+const getSimilarity = (a: string, b: string): number => {
+  const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+  const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  const intersection = new Set([...wordsA].filter(x => wordsB.has(x)));
+  const union = new Set([...wordsA, ...wordsB]);
+  return intersection.size / union.size;
 };
 
 // Mark intake documents so they can be filtered out from display
@@ -131,6 +163,7 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
   streamingChunks = [],
   isAgentWorking = false,
   agentEvents = [],
+  incomingMessages = [],
   pendingGateApproval,
   onApproveGate,
   onDenyGate,
@@ -151,10 +184,9 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
   const hasFetchedInitialResponse = useRef(false);
 
   // Initialize with a simple system message only when projectId changes
-  // Don't reset if we've already loaded history
+  // The history loading effect will replace this once data is loaded
   useEffect(() => {
-    if (hasFetchedInitialResponse.current) return; // Don't reset if history loaded
-
+    // Only show loading message, history effect will handle actual content
     const systemMessage: ChatMessage = {
       id: 'system-init',
       role: 'system',
@@ -163,7 +195,8 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
         : 'Loading conversation...',
       timestamp: new Date(),
     };
-    setMessages([systemMessage]);
+    // Only set if we don't have messages yet (avoids overwriting loaded history)
+    setMessages(prev => prev.length <= 1 ? [systemMessage] : prev);
   }, [projectId, isNewProject]);
 
   // Listen for special agent events (onboarding-complete, gate approvals, guidance, gate-ready, etc.)
@@ -220,12 +253,31 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
     }
   }, [agentEvents]);
 
+  // Listen for incoming chat messages from WebSocket (orchestrator messages, etc.)
+  useEffect(() => {
+    if (!incomingMessages || incomingMessages.length === 0) return;
+
+    // Add any new messages that aren't already in the chat
+    for (const msg of incomingMessages) {
+      setMessages((prev) => {
+        // Don't add duplicates
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, {
+          id: msg.id,
+          role: msg.role as 'assistant' | 'system',
+          content: msg.content,
+          timestamp: new Date(msg.timestamp),
+        }];
+      });
+    }
+  }, [incomingMessages]);
+
   // Fetch full conversation history from agent executions
   // This restores the chat state when returning to a project
   useEffect(() => {
     if (!projectId) return;
 
-    // Reset for new project
+    // Reset flag when projectId changes so we fetch fresh history
     hasFetchedInitialResponse.current = false;
 
     let cancelled = false;
@@ -236,27 +288,50 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
       if (cancelled || hasFetchedInitialResponse.current) return;
 
       try {
-        // Fetch history, documents, and gates in parallel
-        const [history, documents, gates] = await Promise.all([
+        // Fetch history, documents, gates, and persisted chat events in parallel
+        const [history, documents, gates, chatEvents] = await Promise.all([
           agentsApi.getHistory(projectId),
           documentsApi.list(projectId).catch(() => []),
           gatesApi.list(projectId).catch(() => []),
+          projectsApi.getEvents(projectId, 'ChatMessage').catch(() => []),
         ]);
 
-        // Get all COMPLETED onboarding executions with results
-        const completedOnboarding = history.filter(
-          exec => exec.agentType === 'PRODUCT_MANAGER_ONBOARDING' &&
+        // Get all COMPLETED executions with results (onboarding + orchestrator)
+        const conversationalAgents = ['PRODUCT_MANAGER_ONBOARDING', 'ORCHESTRATOR'];
+        const completedExecutions = history.filter(
+          exec => conversationalAgents.includes(exec.agentType) &&
                   exec.status === 'COMPLETED' &&
                   exec.outputResult
         );
 
-        if (completedOnboarding.length > 0 && !cancelled) {
+        // Debug logging
+        console.log('[ChatHistory] Total history items:', history.length);
+        console.log('[ChatHistory] Conversational agents found:', completedExecutions.length);
+        console.log('[ChatHistory] Chat events found:', chatEvents.length);
+
+        // Also check if we have persisted chat events (for returning to project)
+        const hasChatHistory = completedExecutions.length > 0 || chatEvents.length > 0;
+
+        if (hasChatHistory && !cancelled) {
           hasFetchedInitialResponse.current = true;
 
           // Build full conversation history from all executions
           const historyMessages: ChatMessage[] = [];
 
-          for (const exec of completedOnboarding) {
+          // Add persisted chat messages first
+          for (const event of chatEvents) {
+            const eventData = event.eventData as { role?: string; content?: string };
+            if (eventData.content) {
+              historyMessages.push({
+                id: event.id,
+                role: (eventData.role as 'assistant' | 'system') || 'assistant',
+                content: eventData.content,
+                timestamp: new Date(event.createdAt),
+              });
+            }
+          }
+
+          for (const exec of completedExecutions) {
             // Extract user message from contextData if available
             const contextData = exec.contextData as { userMessage?: string } | null;
             if (contextData?.userMessage) {
@@ -268,8 +343,8 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
               });
             }
 
-            // Add assistant response (always add if outputResult exists)
-            if (exec.outputResult) {
+            // Add assistant response (skip raw intake documents and MCP tool calls)
+            if (exec.outputResult && !isIntakeDocument(exec.outputResult) && !hasMcpToolCalls(exec.outputResult)) {
               historyMessages.push({
                 id: `history-${exec.id}`,
                 role: 'assistant' as const,
@@ -279,45 +354,123 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
             }
           }
 
-          // Check if intake document exists - add the approval request message
+          // Check document and gate status
           const hasIntakeDoc = documents.some(d => d.title === 'Project Intake');
-          if (hasIntakeDoc) {
-            historyMessages.push({
-              id: 'intake-ready',
-              role: 'assistant' as const,
-              content: `Your **Project Intake** document is ready for review in the Docs tab.\n\nPlease review it and type **"approve"** to proceed, or let me know if you'd like any changes.`,
-              timestamp: new Date(),
-            });
+          const hasPRD = documents.some(d => d.title === 'Product Requirements Document');
+
+          const g1Gate = gates.find(g => g.gateType === 'G1_PENDING');
+          const g2Gate = gates.find(g => g.gateType === 'G2_PENDING');
+          const g3Gate = gates.find(g => g.gateType === 'G3_PENDING');
+
+          const isG1Approved = g1Gate?.status === 'APPROVED';
+          const isG2Approved = g2Gate?.status === 'APPROVED';
+          const isG3Approved = g3Gate?.status === 'APPROVED';
+
+          // Add contextual status messages based on current state
+          // These fill gaps where WebSocket messages weren't stored
+
+          // If intake exists but G1 not approved, prompt for approval
+          if (hasIntakeDoc && !isG1Approved) {
+            // Check if we already have an intake-ready message
+            const hasIntakeReadyMsg = historyMessages.some(m =>
+              m.content.includes('Project Intake') && m.content.includes('approve')
+            );
+            if (!hasIntakeReadyMsg) {
+              historyMessages.push({
+                id: 'intake-ready',
+                role: 'assistant' as const,
+                content: `Your **Project Intake** document is ready for review in the Docs tab.\n\nPlease review it and type **"approve"** to proceed, or let me know if you'd like any changes.`,
+                timestamp: new Date(),
+              });
+            }
           }
 
-          // Check if G1 is approved - add the confirmation message
-          const g1Gate = gates.find(g => g.gateType === 'G1_PENDING' || g.gateType === 'G1_COMPLETE');
-          const isG1Approved = g1Gate?.status === 'APPROVED' || gates.some(g => g.gateType === 'G1_COMPLETE');
+          // If G1 approved and PRD exists but G2 not approved, prompt for G2 approval
+          if (isG1Approved && hasPRD && !isG2Approved) {
+            // Check if we already have a G2 ready message
+            const hasG2ReadyMsg = historyMessages.some(m =>
+              m.content.includes('PRD') && m.content.includes('approve') && m.content.includes('G3')
+            );
+            if (!hasG2ReadyMsg) {
+              historyMessages.push({
+                id: 'prd-ready-history',
+                role: 'assistant' as const,
+                content: `## G2 Ready for Review - PRD Complete
 
-          if (isG1Approved) {
-            // Remove the intake-ready message since G1 is already approved
-            const intakeReadyIndex = historyMessages.findIndex(m => m.id === 'intake-ready');
-            if (intakeReadyIndex !== -1) {
-              historyMessages.splice(intakeReadyIndex, 1);
+The **Product Requirements Document** is ready in the **Docs tab**.
+
+Please review it and type **"approve"** to proceed to G3 (Architecture), or ask questions about the requirements.`,
+                timestamp: new Date(),
+              });
             }
+          }
 
-            // Add user's approval message and confirmation
-            historyMessages.push({
-              id: 'user-approval',
-              role: 'user' as const,
-              content: 'approve',
-              timestamp: new Date(),
-            });
-            historyMessages.push({
-              id: 'g1-approved-history',
-              role: 'assistant' as const,
-              content: `## G1 Approved - Project Scope Confirmed\n\nYour project scope has been approved and tasks have been created for all agents.\n\n**Ready for G2 - Product Requirements**\n\nThe Product Manager agent can now create your **Product Requirements Document (PRD)** which includes:\n- User stories and acceptance criteria\n- Feature prioritization\n- Success metrics\n\nType **"continue"** to start PRD creation, or ask me any questions about the project.`,
-              timestamp: new Date(),
-            });
+          // If G2 approved but G3 work not complete, show G3 status
+          if (isG2Approved && !isG3Approved) {
+            const hasArchDoc = documents.some(d => d.title === 'System Architecture' || d.title === 'Architecture Document' || d.documentType === 'ARCHITECTURE');
+            const isG3InReview = g3Gate?.status === 'IN_REVIEW';
+            // Check for specific G3 ready message (not just any message mentioning G3/Architecture)
+            const hasG3ReadyMsg = historyMessages.some(m =>
+              m.content.includes('G3 Ready') ||
+              (m.content.includes('Architecture') && m.content.includes('approve') && m.content.includes('G4'))
+            );
+            if (!hasG3ReadyMsg) {
+              // If architecture doc exists OR gate is IN_REVIEW, show ready message
+              if (hasArchDoc || isG3InReview) {
+                historyMessages.push({
+                  id: 'g3-ready-history',
+                  role: 'assistant' as const,
+                  content: `## G3 Ready for Review - Architecture Complete
+
+The **System Architecture** document is ready in the **Docs tab**.
+
+Please review it and type **"approve"** to proceed to G4 (Design), or ask questions about the architecture.`,
+                  timestamp: new Date(),
+                });
+              } else {
+                historyMessages.push({
+                  id: 'g3-in-progress',
+                  role: 'assistant' as const,
+                  content: `## G3 In Progress - Architecture
+
+The **Architect agent** is designing the system architecture. This includes:
+- OpenAPI specification
+- Database schema (Prisma)
+- Zod validation schemas
+- Architecture documentation
+
+Check the **Docs tab** for progress.`,
+                  timestamp: new Date(),
+                });
+              }
+            }
           }
 
           if (historyMessages.length > 0) {
-            setMessages(historyMessages);
+            // Sort messages by timestamp
+            historyMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+            // Deduplicate similar consecutive messages
+            // This handles cases where similar status updates were sent multiple times
+            const deduplicatedMessages: ChatMessage[] = [];
+            for (const msg of historyMessages) {
+              const lastMsg = deduplicatedMessages[deduplicatedMessages.length - 1];
+              // Skip if this message is very similar to the last one (same role, similar content)
+              if (lastMsg && lastMsg.role === msg.role) {
+                const similarity = getSimilarity(lastMsg.content, msg.content);
+                if (similarity > 0.8) {
+                  // Keep the longer/more detailed message
+                  if (msg.content.length > lastMsg.content.length) {
+                    deduplicatedMessages[deduplicatedMessages.length - 1] = msg;
+                  }
+                  continue;
+                }
+              }
+              deduplicatedMessages.push(msg);
+            }
+
+            console.log('[ChatHistory] Final message count after dedup:', deduplicatedMessages.length);
+            setMessages(deduplicatedMessages);
           }
           return; // Stop polling
         }

@@ -296,10 +296,10 @@ export class AgentExecutionService {
     const systemPrompt = this.buildSystemPromptFromNewTemplate(template, context, teachingLevel);
 
     // Determine if this agent should use tool-enabled execution
-    // Agents that benefit from MCP tools: ARCHITECT (spec registration), PRODUCT_MANAGER (decisions)
+    // Note: PRODUCT_MANAGER and ARCHITECT removed - document generation doesn't need tools
+    // and the tool loop was causing issues (incomplete output, hanging)
+    // These agents work better with direct generation + post-processing
     const toolEnabledAgents = [
-      'ARCHITECT',
-      'PRODUCT_MANAGER',
       'FRONTEND_DEVELOPER',
       'BACKEND_DEVELOPER',
       'QA_ENGINEER',
@@ -766,16 +766,26 @@ ${template.prompt.context}
     userId: string,
   ): Promise<void> {
     // 1. Generate documents from agent output
-    try {
-      await this.documentsService.generateFromAgentOutput(
-        projectId,
-        agentExecutionId,
-        agentType,
-        agentOutput,
-        userId,
-      );
-    } catch (error) {
-      console.error('Document generation error:', error);
+    // Skip for agents that have custom document handling in workflow-coordinator
+    // to prevent duplicate document creation
+    const agentsWithCustomDocHandling = [
+      'PRODUCT_MANAGER', // PRD saved via savePRDDocument in workflow-coordinator
+      'PRODUCT_MANAGER_ONBOARDING', // Intake saved via handleOnboardingComplete
+      'ORCHESTRATOR', // Output saved to ORCHESTRATOR-Output log, not as separate docs
+    ];
+
+    if (!agentsWithCustomDocHandling.includes(agentType)) {
+      try {
+        await this.documentsService.generateFromAgentOutput(
+          projectId,
+          agentExecutionId,
+          agentType,
+          agentOutput,
+          userId,
+        );
+      } catch (error) {
+        console.error('Document generation error:', error);
+      }
     }
 
     // 2. Extract and write code files (NEW)

@@ -152,6 +152,7 @@ export type DocumentType =
   | 'TEST_PLAN'
   | 'DEPLOYMENT_GUIDE'
   | 'CODE'
+  | 'DESIGN'
   | 'OTHER';
 
 export interface Document {

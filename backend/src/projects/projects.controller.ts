@@ -139,4 +139,18 @@ export class ProjectsController {
       body.percentComplete,
     );
   }
+
+  @Get(':id/events')
+  @ApiOperation({ summary: 'Get project events (for chat history)' })
+  @ApiQuery({ name: 'eventType', required: false, description: 'Filter by event type' })
+  @ApiResponse({ status: 200, description: 'List of project events' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  async getEvents(
+    @Param('id') id: string,
+    @Query('eventType') eventType: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.projectsService.getEvents(id, user.id, eventType);
+  }
 }

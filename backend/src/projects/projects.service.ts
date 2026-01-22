@@ -338,4 +338,29 @@ export class ProjectsService {
 
     return state;
   }
+
+  /**
+   * Get project events for chat history restoration
+   */
+  async getEvents(id: string, userId: string, eventType?: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException('You do not have permission to access this project');
+    }
+
+    return this.prisma.projectEvent.findMany({
+      where: {
+        projectId: id,
+        ...(eventType && { eventType }),
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
 }

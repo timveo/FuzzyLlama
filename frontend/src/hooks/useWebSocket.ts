@@ -13,6 +13,13 @@ interface AgentEvent {
   timestamp: string;
 }
 
+interface ChatMessageEvent {
+  id: string;
+  role: 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+}
+
 interface WebSocketEvents {
   onAgentStarted?: (event: AgentEvent) => void;
   onAgentChunk?: (event: AgentEvent) => void;
@@ -23,6 +30,7 @@ interface WebSocketEvents {
   onTaskCreated?: (event: any) => void;
   onDocumentCreated?: (event: any) => void;
   onNotification?: (event: any) => void;
+  onChatMessage?: (event: ChatMessageEvent) => void;
 }
 
 export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
@@ -160,6 +168,11 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
 
     socket.on('notification', (event) => {
       eventsRef.current?.onNotification?.(event);
+    });
+
+    socket.on('chat:message', (event) => {
+      console.log('Received chat:message event:', event);
+      eventsRef.current?.onChatMessage?.(event);
     });
 
     // Cleanup on unmount
