@@ -25,6 +25,19 @@ export class ToolEnabledAIProviderService {
   // Maximum tool call iterations to prevent infinite loops
   private readonly MAX_TOOL_ITERATIONS = 10;
 
+  // Tool timeout configuration (in milliseconds)
+  // Different tools may need different timeouts based on their typical execution time
+  private readonly TOOL_TIMEOUTS: Record<string, number> = {
+    write_file: 30000, // 30 seconds
+    read_file: 15000, // 15 seconds
+    run_validation: 120000, // 2 minutes - build validation takes longer
+    execute_build: 180000, // 3 minutes - builds can be slow
+    execute_tests: 180000, // 3 minutes - test suites can take time
+    create_project: 60000, // 1 minute
+    update_project: 30000, // 30 seconds
+    default: 30000, // 30 seconds default for unspecified tools
+  };
+
   constructor(
     private config: ConfigService,
     private mcpTools: McpToolsService,
@@ -321,8 +334,8 @@ export class ToolEnabledAIProviderService {
   }
 
   /**
-   * Execute a tool call via McpToolsService
-   * All business logic is centralized there
+   * Execute a tool call via McpToolsService with timeout protection
+   * All business logic is centralized in McpToolsService
    */
   private async executeToolCall(
     toolName: string,
@@ -338,14 +351,41 @@ export class ToolEnabledAIProviderService {
       fromAgent: agentType,
     };
 
-    this.logger.debug(`Executing tool ${toolName} with args:`, argsWithContext);
+    // Get timeout for this specific tool, or use default
+    const timeoutMs = this.TOOL_TIMEOUTS[toolName] ?? this.TOOL_TIMEOUTS.default;
+
+    this.logger.debug(
+      `Executing tool ${toolName} with timeout ${timeoutMs}ms and args:`,
+      argsWithContext,
+    );
 
     try {
-      // All tool execution is handled by McpToolsService
-      return await this.mcpTools.executeTool(toolName, argsWithContext);
+      // Race between tool execution and timeout
+      const result = await Promise.race([
+        this.mcpTools.executeTool(toolName, argsWithContext),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Tool ${toolName} timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+          ),
+        ),
+      ]);
+      return result;
     } catch (error) {
-      this.logger.error(`Tool ${toolName} failed: ${(error as Error).message}`);
-      return { error: (error as Error).message, success: false };
+      const errorMessage = (error as Error).message;
+      const timedOut = errorMessage.includes('timed out');
+
+      if (timedOut) {
+        this.logger.warn(`Tool ${toolName} timed out after ${timeoutMs}ms`);
+      } else {
+        this.logger.error(`Tool ${toolName} failed: ${errorMessage}`);
+      }
+
+      return {
+        error: errorMessage,
+        success: false,
+        timedOut,
+      };
     }
   }
 }
