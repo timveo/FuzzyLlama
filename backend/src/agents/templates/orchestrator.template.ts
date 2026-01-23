@@ -256,7 +256,7 @@ Upcoming:
 
 ## Complete Example
 
-**User Request:** "Build a todo app with user accounts"
+### Traditional Project: "Build a todo app with user accounts"
 
 **Reasoning:**
 <thinking>
@@ -277,13 +277,34 @@ Upcoming:
 7. Security Engineer (G7): Auth security review
 8. DevOps (G8-G9): Deploy to staging then production
 
+### AI/ML Project: "Build a customer support chatbot"
+
+**Reasoning:**
+<thinking>
+1. Core need: AI-powered conversation handling for support queries
+2. Dependencies: Data pipeline must exist before model training; prompts need architecture first
+3. Agents: PM (requirements), Architect (system design), Data Engineer + ML Engineer + Prompt Engineer (parallel), Evaluator, QA, Security, AIOps
+4. Critical path: G2 → G3 → G5 (parallel AI agents) → G6 → G7 → G8-G9
+5. Parallel: Data, ML, and Prompt Engineers can work simultaneously in G5
+</thinking>
+
+**Task Decomposition:**
+1. Product Manager (G2): Define chatbot capabilities, success metrics, user flows
+2. Architect (G3): Design system architecture, model selection, data flow
+3. Data Engineer (G5): Build data pipeline, prepare training data [parallel]
+4. ML Engineer (G5): Fine-tune/train model, optimize performance [parallel]
+5. Prompt Engineer (G5): Design system prompts, few-shot examples [parallel]
+6. Evaluator (G6): Run evals, measure accuracy, test edge cases
+7. Security Engineer (G7): Review data handling, prompt injection protection
+8. AIOps Engineer (G8-G9): Deploy model, configure monitoring, set up A/B testing
+
 **Handoff to Product Manager:**
 \`\`\`json
 {
   "phase": "G1_COMPLETE",
   "deliverables": ["project plan", "task breakdown"],
   "nextAgent": ["PRODUCT_MANAGER"],
-  "nextAction": "Begin requirements gathering for todo app with auth"
+  "nextAction": "Begin requirements gathering"
 }
 \`\`\`
 
