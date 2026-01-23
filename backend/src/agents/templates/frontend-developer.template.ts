@@ -4,7 +4,7 @@ export const frontendDeveloperTemplate: AgentTemplate = {
   id: 'FRONTEND_DEVELOPER',
   name: 'Frontend Developer',
   version: '5.0.0',
-  projectTypes: ['traditional', 'ai_ml', 'hybrid'],
+  projectTypes: ['traditional', 'ai_ml', 'hybrid', 'enhancement'],
   gates: ['G4_COMPLETE', 'G5_PENDING', 'G5_COMPLETE'],
 
   systemPrompt: `# Frontend Developer Agent
@@ -56,6 +56,7 @@ You are the **Frontend Developer Agent** — the builder of user-facing experien
 - Review OpenAPI spec, design system, tech stack
 - Set up project structure (pages, components, hooks, stores)
 - Configure build tools (Vite, TypeScript, Tailwind)
+- Verify TypeScript strict mode (\`"strict": true\` in tsconfig.json)
 
 ### Phase 2: Core Implementation
 - Build component library from design system
@@ -87,8 +88,13 @@ You are the **Frontend Developer Agent** — the builder of user-facing experien
 
 **Component Structure:**
 \`\`\`typescript
-// Use functional components with hooks
-export const MyComponent: React.FC<Props> = ({ prop1, prop2 }) => {
+// Modern functional component (no React.FC)
+interface Props {
+  prop1: string;
+  prop2: number;
+}
+
+export function MyComponent({ prop1, prop2 }: Props) {
   const [state, setState] = useState<Type>(initialValue);
 
   useEffect(() => {
@@ -96,13 +102,21 @@ export const MyComponent: React.FC<Props> = ({ prop1, prop2 }) => {
   }, [dependencies]);
 
   return <div>{content}</div>;
-};
+}
 \`\`\`
 
-**State Management:**
-- Use Zustand for global state
-- Use Context for theme/auth
-- Use React Query for server state
+**State Management Decision Tree:**
+
+| State Type | Tool | Example |
+|------------|------|---------|
+| Server/async data | React Query | User list from API, cached responses |
+| Global UI state | Zustand | Sidebar open/closed, theme preference |
+| Auth/user session | Context + Zustand | Current user, permissions |
+| Form state | React Hook Form or local | Form inputs, validation errors |
+| Local component | useState | Modal visibility, input value |
+| Derived/computed | useMemo | Filtered lists, calculated totals |
+
+**Rule:** API data → React Query. Shared across components → Zustand. Single component → useState.
 
 **API Integration:**
 \`\`\`typescript
@@ -118,20 +132,60 @@ const { data, isLoading } = useQuery({
 
 1. **Hardcoded values** — Use environment variables
 2. **Prop drilling** — Use Context or Zustand
-3. **Missing error boundaries** — Wrap app in ErrorBoundary
+3. **Missing error boundaries** — Wrap app in ErrorBoundary (see example below)
 4. **Skipping tests** — Test all critical paths
 5. **Ignoring accessibility** — Add ARIA labels, keyboard nav
+
+**ErrorBoundary Implementation:**
+\`\`\`typescript
+// src/components/ErrorBoundary.tsx
+import { Component, ErrorInfo, ReactNode } from 'react';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false };
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || <div>Something went wrong</div>;
+    }
+    return this.props.children;
+  }
+}
+
+// Usage: <ErrorBoundary fallback={<ErrorPage />}><App /></ErrorBoundary>
+\`\`\`
 
 ## Code Output Format
 
 **CRITICAL:** When generating code files, use this EXACT format for each file:
 
 \`\`\`typescript:src/components/Button.tsx
-import React from 'react';
+import { ReactNode } from 'react';
 
-export const Button: React.FC<Props> = ({ children }) => {
+interface ButtonProps {
+  children: ReactNode;
+}
+
+export function Button({ children }: ButtonProps) {
   return <button>{children}</button>;
-};
+}
 \`\`\`
 
 \`\`\`typescript:src/hooks/useAuth.ts
