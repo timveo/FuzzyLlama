@@ -5,6 +5,41 @@
  * they produce, and supports parallel agent execution for gates like G5.
  */
 
+import { ProofType } from '@prisma/client';
+
+/**
+ * Required proof types for each gate that requires proof artifacts.
+ * Gates not listed here either don't require proofs or have no specific requirements.
+ *
+ * This ensures that gate approval validates ALL required proof types are present
+ * with passing status, not just "any proof exists".
+ */
+export const GATE_REQUIRED_PROOFS: Record<string, ProofType[]> = {
+  // G3: Architecture gate requires spec validation
+  G3_PENDING: ['spec_validation'],
+
+  // G5: Development gate requires build and lint output
+  G5_PENDING: ['build_output', 'lint_output'],
+
+  // G6: Testing gate requires test output and coverage report
+  G6_PENDING: ['test_output', 'coverage_report'],
+
+  // G7: Security gate requires security scan
+  G7_PENDING: ['security_scan'],
+
+  // G8: Staging deployment gate requires deployment log and smoke test
+  G8_PENDING: ['deployment_log', 'smoke_test'],
+
+  // G9: Production deployment gate requires deployment log, smoke test, and manual verification
+  G9_PENDING: ['deployment_log', 'smoke_test', 'manual_verification'],
+};
+
+/**
+ * Minimum coverage threshold for G6 (Testing gate)
+ * Coverage must be at least this percentage to pass
+ */
+export const COVERAGE_THRESHOLD_PERCENT = 80;
+
 export interface GateDeliverable {
   name: string;
   owner: string;

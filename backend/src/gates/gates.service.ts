@@ -10,6 +10,8 @@ import { GateStateMachineService } from './services/gate-state-machine.service';
 import { CreateGateDto } from './dto/create-gate.dto';
 import { UpdateGateDto } from './dto/update-gate.dto';
 import { ApproveGateDto } from './dto/approve-gate.dto';
+import { GATE_REQUIRED_PROOFS, COVERAGE_THRESHOLD_PERCENT } from './gate-config';
+import { ProofArtifact, ProofType } from '@prisma/client';
 
 @Injectable()
 export class GatesService {
@@ -134,6 +136,92 @@ export class GatesService {
   }
 
   /**
+   * Validate that all required proof artifacts are present and passing for a gate.
+   * Returns validation result with list of missing proof types if any.
+   */
+  validateProofArtifacts(
+    gateType: string,
+    proofArtifacts: ProofArtifact[],
+  ): { valid: boolean; missing: ProofType[] } {
+    const requiredTypes = GATE_REQUIRED_PROOFS[gateType] || [];
+
+    // If no specific requirements, just check that at least one artifact passes
+    if (requiredTypes.length === 0) {
+      const hasAnyPassing = proofArtifacts.some((a) => a.passFail === 'pass');
+      return { valid: hasAnyPassing, missing: [] };
+    }
+
+    // Get all passing artifact types
+    const passedArtifacts = proofArtifacts.filter((a) => a.passFail === 'pass');
+    const passedTypes = new Set(passedArtifacts.map((a) => a.proofType));
+
+    // Find which required types are missing
+    const missing = requiredTypes.filter((type) => !passedTypes.has(type));
+
+    return {
+      valid: missing.length === 0,
+      missing,
+    };
+  }
+
+  /**
+   * Parse coverage percentage from a coverage report artifact.
+   * Looks for patterns like "Coverage: 85%" or "85% coverage" or just "85.5%"
+   */
+  parseCoveragePercentage(contentSummary: string | null): number | null {
+    if (!contentSummary) return null;
+
+    // Try to find coverage percentage in various formats
+    const patterns = [
+      /coverage[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Coverage: 85%" or "coverage 85%"
+      /(\d+(?:\.\d+)?)\s*%\s*coverage/i, // "85% coverage"
+      /total[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Total: 85%"
+      /lines[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Lines: 85%"
+      /statements[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Statements: 85%"
+      /"coverage"[:\s]*(\d+(?:\.\d+)?)/i, // JSON format: "coverage": 85
+      /(\d+(?:\.\d+)?)\s*%/, // Fallback: any percentage
+    ];
+
+    for (const pattern of patterns) {
+      const match = contentSummary.match(pattern);
+      if (match) {
+        return parseFloat(match[1]);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate coverage threshold for G6 (Testing gate).
+   * Returns validation result with actual coverage if found.
+   */
+  validateCoverageThreshold(
+    proofArtifacts: ProofArtifact[],
+  ): { valid: boolean; coverage: number | null; threshold: number } {
+    const coverageArtifact = proofArtifacts.find(
+      (a) => a.proofType === 'coverage_report' && a.passFail === 'pass',
+    );
+
+    if (!coverageArtifact) {
+      return { valid: false, coverage: null, threshold: COVERAGE_THRESHOLD_PERCENT };
+    }
+
+    const coverage = this.parseCoveragePercentage(coverageArtifact.contentSummary);
+
+    // If we can't parse coverage, we'll allow it (artifact was already marked as pass)
+    if (coverage === null) {
+      return { valid: true, coverage: null, threshold: COVERAGE_THRESHOLD_PERCENT };
+    }
+
+    return {
+      valid: coverage >= COVERAGE_THRESHOLD_PERCENT,
+      coverage,
+      threshold: COVERAGE_THRESHOLD_PERCENT,
+    };
+  }
+
+  /**
    * Approve or reject a gate.
    * Delegates to GateStateMachineService to avoid duplicate updates.
    */
@@ -163,21 +251,57 @@ export class GatesService {
       approved: approveGateDto.approved,
     });
 
-    // Check if proof artifacts are required and present
+    // Check if proof artifacts are required and validate completeness
     if (gate.requiresProof) {
-      const approvedArtifacts = gate.proofArtifacts.filter(
-        (artifact) => artifact.passFail === 'pass',
+      const { valid, missing } = this.validateProofArtifacts(
+        gate.gateType,
+        gate.proofArtifacts,
       );
 
-      if (approvedArtifacts.length === 0) {
-        this.logger.warn({
-          message: 'Gate approval denied - missing proof artifacts',
-          gateId: id,
-          gateType: gate.gateType,
-          projectId: gate.projectId,
-          userId,
-        });
-        throw new BadRequestException('Cannot approve gate: No approved proof artifacts found');
+      if (!valid) {
+        if (missing.length > 0) {
+          this.logger.warn({
+            message: 'Gate approval denied - missing required proof artifacts',
+            gateId: id,
+            gateType: gate.gateType,
+            projectId: gate.projectId,
+            userId,
+            missingProofTypes: missing,
+          });
+          throw new BadRequestException(
+            `Cannot approve gate: Missing required proof artifacts: ${missing.join(', ')}`,
+          );
+        } else {
+          this.logger.warn({
+            message: 'Gate approval denied - no approved proof artifacts',
+            gateId: id,
+            gateType: gate.gateType,
+            projectId: gate.projectId,
+            userId,
+          });
+          throw new BadRequestException(
+            'Cannot approve gate: No approved proof artifacts found',
+          );
+        }
+      }
+
+      // Additional validation for G6 (Testing gate): check coverage threshold
+      if (gate.gateType === 'G6_PENDING') {
+        const coverageValidation = this.validateCoverageThreshold(gate.proofArtifacts);
+        if (!coverageValidation.valid && coverageValidation.coverage !== null) {
+          this.logger.warn({
+            message: 'Gate approval denied - coverage below threshold',
+            gateId: id,
+            gateType: gate.gateType,
+            projectId: gate.projectId,
+            userId,
+            coverage: coverageValidation.coverage,
+            threshold: coverageValidation.threshold,
+          });
+          throw new BadRequestException(
+            `Cannot approve gate: Code coverage ${coverageValidation.coverage}% is below the required ${coverageValidation.threshold}% threshold`,
+          );
+        }
       }
     }
 
