@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { Prisma, ProofType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   getGateConfig,
   getDeliverablesForGate,
