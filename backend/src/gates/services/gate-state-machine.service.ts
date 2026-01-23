@@ -1,7 +1,12 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { getGateConfig, getDeliverablesForGate } from '../gate-config';
+import {
+  getGateConfig,
+  getDeliverablesForGate,
+  GATE_REQUIRED_PROOFS,
+  COVERAGE_THRESHOLD_PERCENT,
+} from '../gate-config';
 
 // Transaction client type for passing to helper methods
 type TransactionClient = Prisma.TransactionClient;
@@ -165,17 +170,57 @@ export class GateStateMachineService {
       }
     }
 
-    // Check if proof artifacts are required and present
+    // Check if proof artifacts are required and validate completeness
     if (gate.requiresProof) {
-      const proofCount = await this.prisma.proofArtifact.count({
+      const proofArtifacts = await this.prisma.proofArtifact.findMany({
         where: { gateId: gate.id },
       });
 
-      if (proofCount === 0) {
+      if (proofArtifacts.length === 0) {
         return {
           canTransition: false,
           reason: 'Gate requires proof artifacts before approval',
         };
+      }
+
+      // Validate that all required proof types are present and passing
+      const requiredTypes = GATE_REQUIRED_PROOFS[gateType] || [];
+      if (requiredTypes.length > 0) {
+        const passedArtifacts = proofArtifacts.filter((a) => a.passFail === 'pass');
+        const passedTypes = new Set(passedArtifacts.map((a) => a.proofType));
+        const missingTypes = requiredTypes.filter((type) => !passedTypes.has(type));
+
+        if (missingTypes.length > 0) {
+          return {
+            canTransition: false,
+            reason: `Gate requires additional proof artifacts: ${missingTypes.join(', ')}`,
+          };
+        }
+      } else {
+        // No specific requirements - check that at least one artifact passes
+        const hasAnyPassing = proofArtifacts.some((a) => a.passFail === 'pass');
+        if (!hasAnyPassing) {
+          return {
+            canTransition: false,
+            reason: 'Gate requires at least one approved proof artifact',
+          };
+        }
+      }
+
+      // Additional validation for G6 (Testing gate): check coverage threshold
+      if (gateType === 'G6_PENDING') {
+        const coverageArtifact = proofArtifacts.find(
+          (a) => a.proofType === 'coverage_report' && a.passFail === 'pass',
+        );
+        if (coverageArtifact) {
+          const coverage = this.parseCoveragePercentage(coverageArtifact.contentSummary);
+          if (coverage !== null && coverage < COVERAGE_THRESHOLD_PERCENT) {
+            return {
+              canTransition: false,
+              reason: `Code coverage ${coverage}% is below the required ${COVERAGE_THRESHOLD_PERCENT}% threshold`,
+            };
+          }
+        }
       }
     }
 
@@ -559,5 +604,33 @@ export class GateStateMachineService {
         },
       },
     });
+  }
+
+  /**
+   * Parse coverage percentage from a coverage report artifact.
+   * Looks for patterns like "Coverage: 85%" or "85% coverage" or just "85.5%"
+   */
+  private parseCoveragePercentage(contentSummary: string | null): number | null {
+    if (!contentSummary) return null;
+
+    // Try to find coverage percentage in various formats
+    const patterns = [
+      /coverage[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Coverage: 85%" or "coverage 85%"
+      /(\d+(?:\.\d+)?)\s*%\s*coverage/i, // "85% coverage"
+      /total[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Total: 85%"
+      /lines[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Lines: 85%"
+      /statements[:\s]+(\d+(?:\.\d+)?)\s*%/i, // "Statements: 85%"
+      /"coverage"[:\s]*(\d+(?:\.\d+)?)/i, // JSON format: "coverage": 85
+      /(\d+(?:\.\d+)?)\s*%/, // Fallback: any percentage
+    ];
+
+    for (const pattern of patterns) {
+      const match = contentSummary.match(pattern);
+      if (match) {
+        return parseFloat(match[1]);
+      }
+    }
+
+    return null;
   }
 }
