@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMutation } from '@tanstack/react-query';
@@ -16,7 +16,6 @@ import {
   MessageCircle,
   ArrowRight,
   Plus,
-  Paperclip,
   Palette,
   GraduationCap,
   Users,
@@ -26,8 +25,20 @@ import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
 import { SettingsModal } from '../components/SettingsModal';
 import { CreateProjectModal } from '../components/CreateProjectModal';
+import { AttachmentMenu } from '../components/uploads/AttachmentMenu';
+import { AttachedFilesList } from '../components/uploads/AttachedFilesList';
+import type { AttachedFile } from '../components/uploads/AttachedFilesList';
+import { FileUploadZone } from '../components/uploads/FileUploadZone';
+import { GitHubImportModal } from '../components/uploads/GitHubImportModal';
+import { AnalysisProgress } from '../components/planning';
 import { projectsApi } from '../api/projects';
 import { workflowApi } from '../api/workflow';
+import { assetsApi } from '../api/assets';
+import type { TempImportResult } from '../api/github';
+import {
+  universalInputApi,
+  useAnalysisStatus,
+} from '../api/universal-input';
 import FuzzyLlamaLogo from '../assets/Llamalogo.png';
 import FuzzyLlamaLogoTransparent from '../assets/Llamalogo-transparent.png';
 
@@ -62,6 +73,176 @@ const HomePage = () => {
   const [promptValue, setPromptValue] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  // File upload state
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [showUploadZone, setShowUploadZone] = useState(false);
+  const [showGitHubModal, setShowGitHubModal] = useState(false);
+  const [gitHubModalMode, setGitHubModalMode] = useState<'connected' | 'url'>('connected');
+  const [sessionId] = useState(() => crypto.randomUUID());
+
+  // Universal Input Handler state
+  const [analysisSessionId, setAnalysisSessionId] = useState<string | null>(null);
+  const [showAnalysisProgress, setShowAnalysisProgress] = useState(false);
+  const [pendingRequirements, setPendingRequirements] = useState<string>('');
+
+  // Query for analysis status (polls while analysis is in progress)
+  const { data: analysisStatus } = useAnalysisStatus(
+    analysisSessionId,
+    showAnalysisProgress
+  );
+
+  // When analysis completes, automatically create project with intelligent decisions
+  useEffect(() => {
+    if (analysisStatus?.status === 'complete' && analysisSessionId && pendingRequirements) {
+      // Auto-proceed with intelligent gate decisions
+      handleAnalysisComplete();
+    } else if (analysisStatus?.status === 'failed') {
+      setShowAnalysisProgress(false);
+      toast.error(analysisStatus.error || 'Analysis failed');
+      setIsCreating(false);
+    }
+  }, [analysisStatus?.status]);
+
+  // Handle analysis completion - create project with auto-generated GateContext
+  const handleAnalysisComplete = async () => {
+    if (!analysisSessionId) return;
+
+    try {
+      // Get the gate plan with AI-generated decisions (use recommended actions)
+      const planResult = await universalInputApi.getGatePlan(analysisSessionId);
+
+      if (!planResult.success || !planResult.plan) {
+        throw new Error(planResult.error || 'Failed to generate gate plan');
+      }
+
+      // Auto-accept all AI recommendations
+      const decisions = planResult.plan.recommendations.map(rec => ({
+        gate: rec.gate,
+        action: rec.recommendedAction,
+      }));
+
+      // Confirm the plan and get GateContext
+      const confirmResult = await universalInputApi.confirmGatePlan(analysisSessionId, decisions);
+
+      if (!confirmResult.success || !confirmResult.context) {
+        throw new Error(confirmResult.error || 'Failed to confirm gate plan');
+      }
+
+      // Create the project
+      const project = await projectsApi.create({
+        name: extractProjectName(pendingRequirements),
+        type: inferProjectType(pendingRequirements),
+        description: pendingRequirements,
+      });
+
+      // Associate uploaded files with the project
+      const tempKeys = attachedFiles
+        .filter(f => f.tempKey && !f.error)
+        .map(f => f.tempKey!);
+
+      if (tempKeys.length > 0) {
+        await assetsApi.associateWithProject(project.id, tempKeys);
+      }
+
+      // Start workflow with GateContext - assumptions will be shown in chat
+      await workflowApi.startWithContext({
+        projectId: project.id,
+        requirements: pendingRequirements,
+        gateContext: confirmResult.context,
+      });
+
+      // Clear state and navigate
+      setAttachedFiles([]);
+      setShowAnalysisProgress(false);
+      setAnalysisSessionId(null);
+      setPendingRequirements('');
+      navigate(`/workspace?project=${project.id}&new=true`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create project');
+      setShowAnalysisProgress(false);
+      setIsCreating(false);
+    }
+  };
+
+  // File upload handlers
+  const handleFilesSelected = useCallback(async (files: File[]) => {
+    for (const file of files) {
+      const tempId = crypto.randomUUID();
+
+      // Add to list with uploading state
+      setAttachedFiles(prev => [
+        ...prev,
+        {
+          id: tempId,
+          filename: file.name,
+          size: file.size,
+          source: 'LOCAL_UPLOAD',
+          isUploading: true,
+        },
+      ]);
+
+      try {
+        // Upload to temp storage
+        const result = await assetsApi.uploadTemp(file, sessionId);
+
+        // Update with success
+        setAttachedFiles(prev =>
+          prev.map(f =>
+            f.id === tempId
+              ? {
+                  ...f,
+                  tempKey: result.tempKey,
+                  previewUrl: result.signedUrl,
+                  isUploading: false,
+                }
+              : f
+          )
+        );
+      } catch (error) {
+        // Update with error
+        setAttachedFiles(prev =>
+          prev.map(f =>
+            f.id === tempId
+              ? {
+                  ...f,
+                  isUploading: false,
+                  error: error instanceof Error ? error.message : 'Upload failed',
+                }
+              : f
+          )
+        );
+      }
+    }
+    setShowUploadZone(false);
+  }, [sessionId]);
+
+  const handleRemoveFile = useCallback(async (id: string) => {
+    const file = attachedFiles.find(f => f.id === id);
+    if (file?.tempKey) {
+      try {
+        await assetsApi.deleteTempUpload(file.tempKey);
+      } catch (error) {
+        console.error('Failed to delete temp upload:', error);
+      }
+    }
+    setAttachedFiles(prev => prev.filter(f => f.id !== id));
+  }, [attachedFiles]);
+
+  // GitHub import handler
+  const handleGitHubImport = useCallback((imports: TempImportResult[]) => {
+    const newFiles: AttachedFile[] = imports.map(imp => ({
+      id: crypto.randomUUID(),
+      tempKey: imp.tempKey,
+      filename: imp.filename,
+      size: imp.size,
+      previewUrl: imp.signedUrl,
+      source: 'GITHUB',
+      githubPath: imp.githubPath,
+      isUploading: false,
+    }));
+    setAttachedFiles(prev => [...prev, ...newFiles]);
+  }, []);
+
   // Mutation for creating project and starting workflow
   const createProjectMutation = useMutation({
     mutationFn: async (description: string) => {
@@ -75,6 +256,15 @@ const HomePage = () => {
         type: inferProjectType(description),
         description,
       });
+
+      // Associate any uploaded files with the project
+      const tempKeys = attachedFiles
+        .filter(f => f.tempKey && !f.error)
+        .map(f => f.tempKey!);
+
+      if (tempKeys.length > 0) {
+        await assetsApi.associateWithProject(project.id, tempKeys);
+      }
 
       // Start the workflow
       await workflowApi.start({
@@ -91,6 +281,8 @@ const HomePage = () => {
       return project;
     },
     onSuccess: (project) => {
+      // Clear attached files
+      setAttachedFiles([]);
       // Navigate to workspace with new project
       navigate(`/workspace?project=${project.id}&new=true`);
     },
@@ -105,7 +297,58 @@ const HomePage = () => {
     if (!prompt) return;
 
     setIsCreating(true);
-    createProjectMutation.mutate(prompt);
+
+    // Check if we have code files attached (trigger Universal Input Handler)
+    const codeFiles = attachedFiles.filter(f =>
+      !f.error && f.tempKey && (
+        f.filename.endsWith('.ts') ||
+        f.filename.endsWith('.tsx') ||
+        f.filename.endsWith('.js') ||
+        f.filename.endsWith('.jsx') ||
+        f.filename.endsWith('.py') ||
+        f.filename.endsWith('.prisma') ||
+        f.filename.endsWith('.yaml') ||
+        f.filename.endsWith('.yml') ||
+        f.filename.endsWith('.json') ||
+        f.filename.endsWith('.md')
+      )
+    );
+
+    if (codeFiles.length > 0) {
+      // Use Universal Input Handler flow
+      try {
+        setPendingRequirements(prompt);
+
+        // Associate files with temp session first
+        const tempKeys = attachedFiles
+          .filter(f => f.tempKey && !f.error)
+          .map(f => f.tempKey!);
+
+        // Start analysis with the uploaded assets
+        const analysisResult = await universalInputApi.startAnalysis(
+          sessionId,
+          tempKeys,
+          { includeSecurityScan: true, includeQualityMetrics: true }
+        );
+
+        setAnalysisSessionId(analysisResult.sessionId);
+        setShowAnalysisProgress(true);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to start analysis');
+        setIsCreating(false);
+      }
+    } else {
+      // Standard flow without file analysis
+      createProjectMutation.mutate(prompt);
+    }
+  };
+
+  // Handle analysis cancellation
+  const handleCancelAnalysis = () => {
+    setShowAnalysisProgress(false);
+    setAnalysisSessionId(null);
+    setPendingRequirements('');
+    setIsCreating(false);
   };
 
   const handleCreateFromModal = () => {
@@ -121,10 +364,41 @@ const HomePage = () => {
         onClose={() => setShowCreateModal(false)}
         onProjectCreated={handleCreateFromModal}
       />
+      <GitHubImportModal
+        isOpen={showGitHubModal}
+        onClose={() => setShowGitHubModal(false)}
+        onImportComplete={handleGitHubImport}
+        sessionId={sessionId}
+        initialMode={gitHubModalMode}
+      />
 
-      {/* Creating overlay */}
+      {/* Analysis Progress overlay */}
       <AnimatePresence>
-        {isCreating && (
+        {showAnalysisProgress && analysisStatus && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-lg"
+            >
+              <AnalysisProgress
+                status={analysisStatus}
+                onCancel={handleCancelAnalysis}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Standard creating overlay (no analysis) */}
+      <AnimatePresence>
+        {isCreating && !showAnalysisProgress && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -350,6 +624,23 @@ const HomePage = () => {
                   className="w-full bg-transparent outline-none text-lg text-white placeholder-slate-500"
                   onKeyDown={(e) => e.key === 'Enter' && handlePromptSubmit()}
                 />
+
+                {/* Attached Files */}
+                <AttachedFilesList
+                  files={attachedFiles}
+                  onRemove={handleRemoveFile}
+                  className="mt-3"
+                />
+
+                {/* Upload Zone (shown when triggered) */}
+                {showUploadZone && (
+                  <div className="mt-3">
+                    <FileUploadZone
+                      onFilesSelected={handleFilesSelected}
+                      disabled={isCreating}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Action Bar */}
@@ -357,13 +648,27 @@ const HomePage = () => {
                 isDark ? 'border-slate-700' : 'border-slate-700'
               }`}>
                 <div className="flex items-center gap-2">
-                  <button className="p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                  <button
+                    onClick={() => setShowUploadZone(!showUploadZone)}
+                    disabled={isCreating}
+                    className="p-2 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Upload files"
+                  >
                     <Plus className="w-5 h-5 text-slate-400" />
                   </button>
-                  <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors">
-                    <Paperclip className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-400">Attach</span>
-                  </button>
+                  <AttachmentMenu
+                    attachedCount={attachedFiles.filter(f => !f.error).length}
+                    onUploadFromDevice={() => setShowUploadZone(!showUploadZone)}
+                    onImportFromGitHub={() => {
+                      setGitHubModalMode('connected');
+                      setShowGitHubModal(true);
+                    }}
+                    onPasteGitHubUrl={() => {
+                      setGitHubModalMode('url');
+                      setShowGitHubModal(true);
+                    }}
+                    disabled={isCreating}
+                  />
                   <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors">
                     <Palette className="w-4 h-4 text-slate-400" />
                     <span className="text-sm text-slate-400">Theme</span>

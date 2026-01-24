@@ -290,6 +290,15 @@ export class AgentExecutionService {
     // Store the execution ID for use in callbacks
     const executionId = agentExecution.id;
 
+    // Emit agent started event IMMEDIATELY so frontend shows working indicator
+    // This must happen before streaming begins
+    this.wsGateway.emitAgentStarted(
+      executeDto.projectId,
+      executionId,
+      executeDto.agentType,
+      template.name || executeDto.agentType,
+    );
+
     // Increment user's monthly execution count
     await this.prisma.user.update({
       where: { id: userId },

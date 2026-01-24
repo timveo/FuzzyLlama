@@ -28,8 +28,13 @@ model User {
   resetTokenExpiry DateTime?
 
   // OAuth
-  githubId      String?  @unique
-  googleId      String?  @unique
+  githubId           String?  @unique
+  googleId           String?  @unique
+
+  // GitHub OAuth token storage
+  githubAccessToken  String?  // Encrypted OAuth access token
+  githubTokenExpiry  DateTime?
+  githubUsername     String?
 
   // Subscription
   planTier      PlanTier @default(FREE)
@@ -44,15 +49,16 @@ model User {
   onboardedAt   DateTime?      // When first-time onboarding was completed
 
   // Relations
-  projects      Project[]
-  organizations OrganizationMember[]
-  decisions     Decision[]
-  documents     Document[]
+  projects       Project[]
+  organizations  OrganizationMember[]
+  decisions      Decision[]
+  documents      Document[]
   specifications Specification[] @relation("SpecificationCreator")
-  gatesApproved Gate[]
-  tasksAssigned Task[] @relation("TaskAssignedTo")
-  tasksCreated  Task[] @relation("TaskCreatedBy")
-  feedback      UserFeedback[] @relation("UserFeedback")
+  gatesApproved  Gate[]
+  tasksAssigned  Task[] @relation("TaskAssignedTo")
+  tasksCreated   Task[] @relation("TaskCreatedBy")
+  feedback       UserFeedback[] @relation("UserFeedback")
+  uploadedAssets ProjectAsset[] @relation("UserAssets")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -159,6 +165,7 @@ model Project {
   gates            Gate[] @relation("ProjectGates")
   events           ProjectEvent[] @relation("ProjectEvents")
   feedback         UserFeedback[] @relation("ProjectFeedback")
+  assets           ProjectAsset[] @relation("ProjectAssets")
   // codeEmbeddings   CodeEmbedding[] @relation("ProjectCodeEmbeddings") // Temporarily disabled
 
   createdAt DateTime @default(now())
@@ -195,6 +202,167 @@ enum DeploymentMode {
   OPTIONAL     // Ask at G8 if ready to deploy
   REQUIRED     // Full G8-G9 execution
   UNDETERMINED // Not yet determined, ask at G8
+}
+
+// ============================================================================
+// PROJECT ASSETS (UX Designs, Mockups, Screenshots)
+// ============================================================================
+
+model ProjectAsset {
+  id           String      @id @default(cuid())
+  projectId    String
+  project      Project     @relation("ProjectAssets", fields: [projectId], references: [id], onDelete: Cascade)
+
+  assetType    AssetType
+  sourceType   AssetSource @default(LOCAL_UPLOAD)
+
+  filename     String      // Unique filename in storage
+  originalName String      // Original filename from upload
+  mimeType     String
+  fileSize     Int         // Size in bytes
+  storagePath  String      // Path in R2 storage
+  storageKey   String      // Full R2 key
+
+  description  String?
+
+  // GitHub source metadata (when sourceType = GITHUB)
+  githubOwner  String?
+  githubRepo   String?
+  githubPath   String?
+  githubSha    String?
+
+  uploadedById String
+  uploadedBy   User        @relation("UserAssets", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([projectId])
+  @@index([uploadedById])
+  @@index([sourceType])
+}
+
+enum AssetType {
+  DESIGN_MOCKUP   // UX/UI designs, wireframes
+  SCREENSHOT      // Screenshots of existing apps
+  REFERENCE       // Reference images from other apps
+  LOGO            // Brand assets
+  CODE_FILE       // Code files from GitHub
+  CONFIG_FILE     // Configuration files
+  OTHER
+}
+
+enum AssetSource {
+  LOCAL_UPLOAD
+  GITHUB
+}
+
+// ============================================================================
+// UNIVERSAL INPUT ANALYSIS
+// ============================================================================
+
+model InputAnalysis {
+  id           String   @id @default(cuid())
+  sessionId    String   @unique  // Links to upload session
+  projectId    String?  // Set when project is created from analysis
+
+  // Classification results
+  completeness CompletenessLevel
+  uiFramework  String?
+  uiFrameworkVersion String?
+  backendFramework String?
+  backendFrameworkVersion String?
+  orm          String?
+  databaseType String?
+  authType     String?
+  validationLibrary String?
+  packageManager String?
+
+  // File counts
+  totalFiles   Int      @default(0)
+  codeFiles    Int      @default(0)
+  configFiles  Int      @default(0)
+  docFiles     Int      @default(0)
+  assetFiles   Int      @default(0)
+
+  // Detected artifacts (JSON)
+  artifacts    Json?    // DetectedArtifacts structure
+
+  // Analysis results (JSON) - stored for reference
+  uiAnalysis      Json?    // UI analysis results
+  backendAnalysis Json?    // Backend analysis results
+  crossAnalysis   Json?    // Cross-analysis results
+
+  // Gate plan (JSON)
+  gatePlan     Json?    // GatePlan with recommendations
+
+  // User-confirmed decisions (JSON)
+  confirmedDecisions Json?  // ConfirmedGatePlan
+
+  // Computed gate context (JSON)
+  gateContext  Json?    // GateContext for workflow execution
+
+  // Status
+  status       InputAnalysisStatus @default(PENDING)
+  confidence   Float    @default(0)
+  error        String?
+
+  // Timing
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+
+  // Relations
+  analyzedAssets InputAnalysisAsset[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([projectId])
+  @@index([status])
+}
+
+model InputAnalysisAsset {
+  id              String   @id @default(cuid())
+  inputAnalysisId String
+  inputAnalysis   InputAnalysis @relation(fields: [inputAnalysisId], references: [id], onDelete: Cascade)
+
+  assetId         String   // Reference to ProjectAsset
+  filePath        String   // Original file path
+  fileSize        Int
+  mimeType        String?
+
+  // Classification for this file
+  fileCategory    String?  // code, config, doc, asset, etc.
+  detectedRole    String?  // controller, service, component, schema, etc.
+
+  createdAt       DateTime @default(now())
+
+  @@index([inputAnalysisId])
+  @@index([assetId])
+}
+
+enum CompletenessLevel {
+  PROMPT_ONLY     // No files, just text
+  UI_ONLY         // Frontend only
+  BACKEND_ONLY    // Backend only
+  FULL_STACK      // Both frontend and backend
+  CONTRACTS_ONLY  // Specs without implementation
+  DOCS_ONLY       // Documentation only
+}
+
+enum InputAnalysisStatus {
+  PENDING
+  CLASSIFYING
+  ANALYZING_UI
+  ANALYZING_BACKEND
+  CROSS_ANALYZING
+  GENERATING_PLAN
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  COMPLETE
+  FAILED
 }
 
 enum Phase {

@@ -19,6 +19,25 @@ export interface GitHubExportResult {
   error?: string;
 }
 
+export interface GitHubContentItem {
+  name: string;
+  path: string;
+  sha: string;
+  size: number;
+  type: 'file' | 'dir';
+  download_url: string | null;
+}
+
+export interface GitHubFileContent {
+  name: string;
+  path: string;
+  sha: string;
+  size: number;
+  content: string;
+  encoding: string;
+  download_url: string;
+}
+
 @Injectable()
 export class GitHubService {
   constructor(
@@ -446,5 +465,161 @@ npm run test
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '')
       .substring(0, 100);
+  }
+
+  // ==================== File Browsing Methods ====================
+
+  /**
+   * Get repository contents (files and directories)
+   */
+  async getRepositoryContents(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    path = '',
+  ): Promise<GitHubContentItem[]> {
+    try {
+      const octokit = this.getOctokit(accessToken);
+      const { data } = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path,
+      });
+
+      // If it's a single file, wrap it in an array
+      if (!Array.isArray(data)) {
+        return [
+          {
+            name: data.name,
+            path: data.path,
+            sha: data.sha,
+            size: data.size,
+            type: data.type as 'file' | 'dir',
+            download_url: data.download_url,
+          },
+        ];
+      }
+
+      return data.map((item) => ({
+        name: item.name,
+        path: item.path,
+        sha: item.sha,
+        size: item.size,
+        type: item.type as 'file' | 'dir',
+        download_url: item.download_url,
+      }));
+    } catch (error) {
+      if (error.status === 404) {
+        throw new BadRequestException(`Path not found: ${path}`);
+      }
+      throw new BadRequestException('Failed to get repository contents: ' + error.message);
+    }
+  }
+
+  /**
+   * Get raw file content from repository
+   */
+  async getFileContent(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    filePath: string,
+  ): Promise<GitHubFileContent> {
+    try {
+      const octokit = this.getOctokit(accessToken);
+      const { data } = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: filePath,
+      });
+
+      if (Array.isArray(data)) {
+        throw new BadRequestException('Path is a directory, not a file');
+      }
+
+      if (data.type !== 'file') {
+        throw new BadRequestException('Path is not a file');
+      }
+
+      return {
+        name: data.name,
+        path: data.path,
+        sha: data.sha,
+        size: data.size,
+        content: data.content,
+        encoding: data.encoding,
+        download_url: data.download_url || '',
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error.status === 404) {
+        throw new BadRequestException(`File not found: ${filePath}`);
+      }
+      throw new BadRequestException('Failed to get file content: ' + error.message);
+    }
+  }
+
+  /**
+   * Download raw file content (decoded)
+   */
+  async downloadFileContent(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    filePath: string,
+  ): Promise<Buffer> {
+    try {
+      const octokit = this.getOctokit(accessToken);
+      const { data } = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: filePath,
+        mediaType: {
+          format: 'raw',
+        },
+      });
+
+      // When using raw format, data is the file content directly
+      if (typeof data === 'string') {
+        return Buffer.from(data, 'utf-8');
+      }
+
+      // For binary files
+      return Buffer.from(data as unknown as ArrayBuffer);
+    } catch (error) {
+      if (error.status === 404) {
+        throw new BadRequestException(`File not found: ${filePath}`);
+      }
+      throw new BadRequestException('Failed to download file: ' + error.message);
+    }
+  }
+
+  /**
+   * Parse GitHub URL to extract owner and repo
+   */
+  parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+    // Handle various GitHub URL formats:
+    // https://github.com/owner/repo
+    // https://github.com/owner/repo.git
+    // https://github.com/owner/repo/tree/branch/path
+    // https://github.com/owner/repo/blob/branch/path
+    const patterns = [
+      /github\.com[/:]([^/]+)\/([^/.]+)(?:\.git)?(?:\/|$)/,
+      /github\.com\/([^/]+)\/([^/]+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return {
+          owner: match[1],
+          repo: match[2].replace(/\.git$/, ''),
+        };
+      }
+    }
+
+    return null;
   }
 }
