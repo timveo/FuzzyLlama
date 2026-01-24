@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { PaperAirplaneIcon, StopIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon } from '@heroicons/react/24/outline';
 import { CpuChipIcon } from '@heroicons/react/24/outline';
 import { workflowApi } from '../../api/workflow';
 import { agentsApi } from '../../api/agents';
 import { gatesApi } from '../../api/gates';
-import { documentsApi } from '../../api/documents';
 import { projectsApi } from '../../api/projects';
 
 type ThemeMode = 'dark' | 'light';
@@ -348,10 +347,9 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
       if (cancelled || hasFetchedInitialResponse.current) return;
 
       try {
-        // Fetch history, documents, gates, and persisted chat events in parallel
-        const [history, documents, gates, chatEvents] = await Promise.all([
+        // Fetch history, gates, and persisted chat events in parallel
+        const [history, gates, chatEvents] = await Promise.all([
           agentsApi.getHistory(projectId),
-          documentsApi.list(projectId).catch(() => []),
           gatesApi.list(projectId).catch(() => []),
           projectsApi.getEvents(projectId, 'ChatMessage').catch(() => []),
         ]);
@@ -422,96 +420,31 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
             }
           }
 
-          // Check document and gate status
-          const hasIntakeDoc = documents.some(d => d.title === 'Project Intake');
-          const hasPRD = documents.some(d => d.title === 'Product Requirements Document');
+          // Get current status from backend - single source of truth
+          // This ALWAYS adds the current status as the last message
+          try {
+            const status = await projectsApi.getStatus(projectId);
+            console.log('[ChatHistory] Current status from backend:', status);
 
-          const g1Gate = gates.find(g => g.gateType === 'G1_PENDING');
-          const g2Gate = gates.find(g => g.gateType === 'G2_PENDING');
-          const g3Gate = gates.find(g => g.gateType === 'G3_PENDING');
+            if (status.statusMessage) {
+              const gateNumber = status.currentGate.match(/G(\d)/)?.[1] || '';
+              const gateLabel = gateNumber ? `G${gateNumber}` : status.currentGate;
+              const isReady = status.gateStatus === 'IN_REVIEW';
 
-          const isG1Approved = g1Gate?.status === 'APPROVED';
-          const isG2Approved = g2Gate?.status === 'APPROVED';
-          const isG3Approved = g3Gate?.status === 'APPROVED';
-
-          // Add contextual status messages based on current state
-          // These fill gaps where WebSocket messages weren't stored
-
-          // If intake exists but G1 not approved, prompt for approval
-          if (hasIntakeDoc && !isG1Approved) {
-            // Check if we already have an intake-ready message
-            const hasIntakeReadyMsg = historyMessages.some(m =>
-              m.content.includes('Project Intake') && m.content.includes('approve')
-            );
-            if (!hasIntakeReadyMsg) {
+              // Always add current status - it will be shown as the latest message
               historyMessages.push({
-                id: 'intake-ready',
+                id: `status-${status.currentGate}-${Date.now()}`,
                 role: 'assistant' as const,
-                content: `Your **Project Intake** document is ready for review in the Docs tab.\n\nPlease review it and type **"approve"** to proceed, or let me know if you'd like any changes.`,
+                content: `## ${gateLabel} ${isReady ? 'Ready for Review' : 'In Progress'}
+
+${status.statusMessage}
+
+${status.userAction ? `**Next step:** ${status.userAction}` : ''}`,
                 timestamp: new Date(),
               });
             }
-          }
-
-          // If G1 approved and PRD exists but G2 not approved, prompt for G2 approval
-          if (isG1Approved && hasPRD && !isG2Approved) {
-            // Check if we already have a G2 ready message
-            const hasG2ReadyMsg = historyMessages.some(m =>
-              m.content.includes('PRD') && m.content.includes('approve') && m.content.includes('G3')
-            );
-            if (!hasG2ReadyMsg) {
-              historyMessages.push({
-                id: 'prd-ready-history',
-                role: 'assistant' as const,
-                content: `## G2 Ready for Review - PRD Complete
-
-The **Product Requirements Document** is ready in the **Docs tab**.
-
-Please review it and type **"approve"** to proceed to G3 (Architecture), or ask questions about the requirements.`,
-                timestamp: new Date(),
-              });
-            }
-          }
-
-          // If G2 approved but G3 work not complete, show G3 status
-          if (isG2Approved && !isG3Approved) {
-            const hasArchDoc = documents.some(d => d.title === 'System Architecture' || d.title === 'Architecture Document' || d.documentType === 'ARCHITECTURE');
-            const isG3InReview = g3Gate?.status === 'IN_REVIEW';
-            // Check for specific G3 ready message (not just any message mentioning G3/Architecture)
-            const hasG3ReadyMsg = historyMessages.some(m =>
-              m.content.includes('G3 Ready') ||
-              (m.content.includes('Architecture') && m.content.includes('approve') && m.content.includes('G4'))
-            );
-            if (!hasG3ReadyMsg) {
-              // If architecture doc exists OR gate is IN_REVIEW, show ready message
-              if (hasArchDoc || isG3InReview) {
-                historyMessages.push({
-                  id: 'g3-ready-history',
-                  role: 'assistant' as const,
-                  content: `## G3 Ready for Review - Architecture Complete
-
-The **System Architecture** document is ready in the **Docs tab**.
-
-Please review it and type **"approve"** to proceed to G4 (Design), or ask questions about the architecture.`,
-                  timestamp: new Date(),
-                });
-              } else {
-                historyMessages.push({
-                  id: 'g3-in-progress',
-                  role: 'assistant' as const,
-                  content: `## G3 In Progress - Architecture
-
-The **Architect agent** is designing the system architecture. This includes:
-- OpenAPI specification
-- Database schema (Prisma)
-- Zod validation schemas
-- Architecture documentation
-
-Check the **Docs tab** for progress.`,
-                  timestamp: new Date(),
-                });
-              }
-            }
+          } catch (statusError) {
+            console.warn('[ChatHistory] Failed to get status, falling back to basic message:', statusError);
           }
 
           if (historyMessages.length > 0) {
@@ -527,8 +460,16 @@ Check the **Docs tab** for progress.`,
               if (lastMsg && lastMsg.role === msg.role) {
                 const similarity = getSimilarity(lastMsg.content, msg.content);
                 if (similarity > 0.8) {
-                  // Keep the longer/more detailed message
-                  if (msg.content.length > lastMsg.content.length) {
+                  // When messages are similar, always prefer the status-* message (current state from backend)
+                  // Otherwise keep the longer/more detailed message
+                  const msgIsStatus = msg.id.startsWith('status-');
+                  const lastIsStatus = lastMsg.id.startsWith('status-');
+                  if (msgIsStatus && !lastIsStatus) {
+                    // Replace old message with current status
+                    deduplicatedMessages[deduplicatedMessages.length - 1] = msg;
+                  } else if (!msgIsStatus && lastIsStatus) {
+                    // Keep the status message, skip this old one
+                  } else if (msg.content.length > lastMsg.content.length) {
                     deduplicatedMessages[deduplicatedMessages.length - 1] = msg;
                   }
                   continue;
@@ -749,7 +690,8 @@ Check the **Docs tab** for progress.`,
             {/* Streaming content or background work indicator */}
             <div className={`px-3 py-2 text-xs leading-relaxed ${isDark ? 'text-white' : 'text-slate-800'}`}>
               {isBackgroundAgent(activeAgent.agentType) ? (
-                // Background agents: show friendly message, document will appear in Docs tab
+                // Background agents: show dynamic progress message from WebSocket,
+                // falling back to static message if not available
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
@@ -763,7 +705,7 @@ Check the **Docs tab** for progress.`,
                       ))}
                     </div>
                     <span className={`text-[10px] ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>
-                      {getBackgroundAgentMessage(activeAgent.agentType)}
+                      {activeAgent.taskDescription || getBackgroundAgentMessage(activeAgent.agentType)}
                     </span>
                   </div>
                   <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -921,8 +863,8 @@ Check the **Docs tab** for progress.`,
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className={`p-3 border-t ${isDark ? 'border-slate-700/50' : 'border-teal-200'}`}>
+      {/* Input - always interactive, never blocked */}
+      <div className={`p-3 border-t relative z-50 ${isDark ? 'border-slate-700/50' : 'border-teal-200'}`}>
         <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${isDark ? 'bg-slate-700/50' : 'bg-white border border-teal-200'}`}>
           <input
             ref={inputRef}
@@ -931,19 +873,12 @@ Check the **Docs tab** for progress.`,
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Type your response..."
-            disabled={isStreaming || isAgentWorking}
             autoFocus
-            className={`flex-1 bg-transparent text-xs focus:outline-none ${isDark ? 'text-white placeholder-teal-300/50' : 'text-teal-900 placeholder-teal-400'} ${(isStreaming || isAgentWorking) ? 'opacity-50' : ''}`}
+            className={`flex-1 bg-transparent text-xs focus:outline-none pointer-events-auto ${isDark ? 'text-white placeholder-teal-300/50' : 'text-teal-900 placeholder-teal-400'}`}
           />
-          {isStreaming || isAgentWorking ? (
-            <button onClick={() => setIsStreaming(false)} className="w-7 h-7 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center">
-              <StopIcon className="w-3 h-3" />
-            </button>
-          ) : (
-            <button onClick={handleSend} className={`w-7 h-7 rounded-full text-white flex items-center justify-center ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}>
-              <PaperAirplaneIcon className="w-3 h-3" />
-            </button>
-          )}
+          <button onClick={handleSend} className={`w-7 h-7 rounded-full text-white flex items-center justify-center pointer-events-auto ${isDark ? 'bg-teal-950' : 'bg-teal-600'}`}>
+            <PaperAirplaneIcon className="w-3 h-3" />
+          </button>
         </div>
       </div>
     </div>

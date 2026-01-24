@@ -65,6 +65,41 @@ export class DocumentsController {
     return this.documentsService.getDocumentStats(projectId, user.id);
   }
 
+  // ============================================================
+  // DESIGN CONCEPTS - Must be before :id catch-all route
+  // ============================================================
+
+  @Get('designs/:projectId')
+  @ApiOperation({ summary: 'Get all design concepts for a project' })
+  @ApiResponse({ status: 200, description: 'Design concepts retrieved successfully' })
+  async getDesignConcepts(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.documentsService.getDesignConcepts(projectId, user.id);
+  }
+
+  @Get('designs/:projectId/selected')
+  @ApiOperation({ summary: 'Get the selected design concept for a project' })
+  @ApiResponse({ status: 200, description: 'Selected design concept retrieved' })
+  async getSelectedDesignConcept(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.documentsService.getSelectedDesignConcept(projectId, user.id);
+  }
+
+  @Post('designs/:conceptId/select')
+  @ApiOperation({ summary: 'Select a design concept as the chosen design' })
+  @ApiResponse({ status: 200, description: 'Design concept selected successfully' })
+  async selectDesignConcept(
+    @Param('conceptId') conceptId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.documentsService.selectDesignConcept(conceptId, user.id);
+  }
+
+  // Generic document by ID - must be LAST to avoid catching specific routes
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific document by ID' })
   @ApiResponse({ status: 200, description: 'Document retrieved successfully' })

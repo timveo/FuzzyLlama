@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { EventStoreService } from '../../events/event-store.service';
 import { Prisma } from '@prisma/client';
 import {
   getGateConfig,
@@ -38,11 +39,18 @@ const GATE_PROGRESSION = [
 const VALID_APPROVAL_KEYWORDS = ['approved', 'yes', 'approve', 'accept'];
 const INVALID_APPROVAL_KEYWORDS = ['ok', 'sure', 'fine', 'alright'];
 
+// Note: Status messages are derived dynamically by ProjectsService.getStatus()
+// which is the single source of truth for project status. No need to store
+// statusMessage/userAction in the database - it's computed from gate state.
+
 @Injectable()
 export class GateStateMachineService {
   private readonly logger = new Logger(GateStateMachineService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventStore: EventStoreService,
+  ) {}
 
   /**
    * Initialize gates for a new project
@@ -113,7 +121,9 @@ export class GateStateMachineService {
           where: { projectId, gateType: nextPendingType },
         });
         if (nextGate) {
-          this.logger.debug(`getCurrentGate: ProjectState has ${currentGateType}, returning next pending ${nextPendingType}`);
+          this.logger.debug(
+            `getCurrentGate: ProjectState has ${currentGateType}, returning next pending ${nextPendingType}`,
+          );
           return nextGate;
         }
       }
@@ -335,11 +345,24 @@ export class GateStateMachineService {
       },
     });
 
+    // Note: Status messages are derived by ProjectsService.getStatus() from gate state
+    // No need to write statusMessage to DB here
+
     this.logger.log({
       message: 'Gate transitioned to review',
       projectId,
       gateId: gate.id,
       gateType,
+    });
+
+    // Log gate transition to review event
+    await this.eventStore.appendEvent(projectId, {
+      type: 'GateTransitionedToReview',
+      data: {
+        gateType,
+        gateId: gate.id,
+        description: reviewData?.description || gate.description,
+      },
     });
   }
 
@@ -419,6 +442,7 @@ export class GateStateMachineService {
         }
 
         // Update project state to the next actionable gate
+        // Note: Status messages are derived by ProjectsService.getStatus() from gate state
         await tx.project.update({
           where: { id: projectId },
           data: {
@@ -470,6 +494,18 @@ export class GateStateMachineService {
       userId,
     });
 
+    // Log gate approval event
+    await this.eventStore.appendEvent(projectId, {
+      type: 'GateApproved',
+      data: {
+        gateType,
+        gateId: gate.id,
+        nextGate: result.nextGate || 'PROJECT_COMPLETE',
+        reviewNotes: reviewNotes || null,
+      },
+      userId,
+    });
+
     return result;
   }
 
@@ -511,6 +547,17 @@ export class GateStateMachineService {
       gateType,
       userId,
       reason: blockingReason,
+    });
+
+    // Log gate rejection event
+    await this.eventStore.appendEvent(projectId, {
+      type: 'GateRejected',
+      data: {
+        gateType,
+        gateId: gate.id,
+        reason: blockingReason,
+      },
+      userId,
     });
   }
 

@@ -162,6 +162,7 @@ model Project {
   agents           Agent[] @relation("AgentExecutions")
   documents        Document[] @relation("ProjectDocuments")
   specifications   Specification[] @relation("ProjectSpecifications")
+  designConcepts   DesignConcept[] @relation("ProjectDesignConcepts")
   gates            Gate[] @relation("ProjectGates")
   events           ProjectEvent[] @relation("ProjectEvents")
   feedback         UserFeedback[] @relation("ProjectFeedback")
@@ -190,6 +191,12 @@ model ProjectState {
   currentGate     String
   currentAgent    String?
   percentComplete Int     @default(0)
+
+  // Human-readable status message - the single source of truth for UI
+  // Backend updates this whenever state changes, frontend just displays it
+  statusMessage   String?
+  // What action the user should take (e.g., "approve", "review", "wait")
+  userAction      String?
 
   // Deployment mode captured from intake (determines G9 behavior)
   deploymentMode  DeploymentMode @default(UNDETERMINED)
@@ -1360,6 +1367,34 @@ enum DocumentType {
   CODE
   DESIGN
   OTHER
+}
+
+// Design concepts created by UX/UI Designer agent
+// Each concept is a complete HTML preview that can be rendered in the UI
+model DesignConcept {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation("ProjectDesignConcepts", fields: [projectId], references: [id], onDelete: Cascade)
+
+  name        String   // e.g., "Conservative", "Modern", "Bold"
+  description String?  // Brief description of the design approach
+  html        String   @db.Text  // Complete HTML for iframe preview
+
+  // Selection tracking
+  isSelected  Boolean  @default(false)  // User's chosen design
+
+  // Metadata
+  style       String?  // e.g., "conservative", "modern", "bold"
+  colorScheme String?  // e.g., "blue", "green", "purple"
+
+  agentId     String?  // Reference to the agent execution that created this
+  gateId      String?  // Reference to the gate (G4)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([isSelected])
 }
 
 model Specification {

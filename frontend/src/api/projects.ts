@@ -70,4 +70,17 @@ export const projectsApi = {
     const response = await apiClient.get(`/projects/${id}/events${params}`);
     return response.data;
   },
+
+  // Get current project status - single source of truth for chat
+  getStatus: async (id: string): Promise<{
+    currentGate: string;
+    gateStatus: string;
+    statusMessage: string;
+    userAction: string | null;
+    isAgentWorking: boolean;
+    workingAgent: string | null;
+  }> => {
+    const response = await apiClient.get(`/projects/${id}/status`);
+    return response.data;
+  },
 };

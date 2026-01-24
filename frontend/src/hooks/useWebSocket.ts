@@ -26,9 +26,17 @@ interface OrchestratorMessageEvent {
   timestamp: string;
 }
 
+interface AgentProgressEvent {
+  agentId: string;
+  agentType: string;
+  message: string;
+  timestamp: string;
+}
+
 interface WebSocketEvents {
   onAgentStarted?: (event: AgentEvent) => void;
   onAgentChunk?: (event: AgentEvent) => void;
+  onAgentProgress?: (event: AgentProgressEvent) => void;
   onAgentCompleted?: (event: AgentEvent) => void;
   onAgentFailed?: (event: AgentEvent) => void;
   onGateReady?: (event: any) => void;
@@ -143,6 +151,11 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
 
     socket.on('agent:chunk', (event) => {
       eventsRef.current?.onAgentChunk?.(event);
+    });
+
+    socket.on('agent:progress', (event) => {
+      console.log('Received agent:progress event:', event);
+      eventsRef.current?.onAgentProgress?.(event);
     });
 
     socket.on('agent:completed', (event) => {

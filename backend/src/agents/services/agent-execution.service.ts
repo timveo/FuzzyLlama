@@ -299,6 +299,15 @@ export class AgentExecutionService {
       template.name || executeDto.agentType,
     );
 
+    // Emit initial progress message based on agent type
+    const progressMessage = this.getAgentProgressMessage(executeDto.agentType, 'started');
+    this.wsGateway.emitAgentProgress(
+      executeDto.projectId,
+      executionId,
+      executeDto.agentType,
+      progressMessage,
+    );
+
     // Increment user's monthly execution count
     await this.prisma.user.update({
       where: { id: userId },
@@ -363,16 +372,65 @@ export class AgentExecutionService {
 
     // Execute AI prompt with streaming (fire-and-forget, don't await)
     // This allows us to return the execution ID immediately while streaming continues
+
+    // Progress timeout: if no chunks received within 2 minutes, mark as failed
+    let lastChunkTime = Date.now();
+    let chunkCount = 0;
+    const PROGRESS_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+
+    const progressTimeoutId = setInterval(async () => {
+      const timeSinceLastChunk = Date.now() - lastChunkTime;
+      if (timeSinceLastChunk > PROGRESS_TIMEOUT_MS) {
+        clearInterval(progressTimeoutId);
+        this.logger.error(
+          `[${executeDto.agentType}] Progress timeout: no chunks received in ${Math.round(timeSinceLastChunk / 1000)}s (received ${chunkCount} chunks total)`,
+        );
+
+        // Check if agent is still running (hasn't completed/failed yet)
+        const agent = await this.prisma.agent.findUnique({
+          where: { id: executionId },
+          select: { status: true },
+        });
+
+        if (agent?.status === 'RUNNING') {
+          await this.prisma.agent.update({
+            where: { id: executionId },
+            data: {
+              status: 'FAILED',
+              outputResult: `Agent timed out: no response received for ${Math.round(timeSinceLastChunk / 1000)} seconds. The AI API may be experiencing issues.`,
+            },
+          });
+
+          streamCallback.onError(new Error('Agent timed out waiting for AI response'));
+          this.wsGateway.emitAgentFailed(
+            executeDto.projectId,
+            executionId,
+            'Agent timed out - no response from AI provider',
+          );
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
     this.aiProvider
       .executePromptStream(
         systemPrompt,
         executeDto.userPrompt,
         {
           onChunk: (chunk: string) => {
+            // Update progress tracking
+            lastChunkTime = Date.now();
+            chunkCount++;
+
             // Forward chunk to callback
             streamCallback.onChunk(chunk);
           },
           onComplete: async (response) => {
+            // Clear progress timeout - we received a complete response
+            clearInterval(progressTimeoutId);
+            this.logger.log(
+              `[${executeDto.agentType}] Completed with ${chunkCount} chunks, ${response.content.length} chars`,
+            );
+
             // Update agent execution record
             await this.prisma.agent.update({
               where: { id: executionId },
@@ -436,6 +494,14 @@ export class AgentExecutionService {
               this.logger.warn('Agent memory save failed (non-critical):', error);
             }
 
+            // Emit finalizing progress before post-processing
+            this.wsGateway.emitAgentProgress(
+              executeDto.projectId,
+              executionId,
+              executeDto.agentType,
+              this.getAgentProgressMessage(executeDto.agentType, 'finalizing'),
+            );
+
             // Post-processing: Generate documents and handle handoffs (critical - report failures)
             const postProcessResult = await this.postProcessAgentCompletion(
               executionId,
@@ -493,6 +559,9 @@ export class AgentExecutionService {
             streamCallback.onComplete(response);
           },
           onError: async (error) => {
+            // Clear progress timeout
+            clearInterval(progressTimeoutId);
+
             // Update agent execution with error
             await this.prisma.agent.update({
               where: { id: executionId },
@@ -510,6 +579,9 @@ export class AgentExecutionService {
         template.maxTokens,
       )
       .catch((error) => {
+        // Clear progress timeout
+        clearInterval(progressTimeoutId);
+
         console.error('Streaming execution error:', error);
         streamCallback.onError(error);
       });
@@ -598,6 +670,14 @@ export class AgentExecutionService {
     } catch (error) {
       this.logger.warn('Agent memory save failed (non-critical):', error);
     }
+
+    // Emit finalizing progress before post-processing
+    this.wsGateway.emitAgentProgress(
+      executeDto.projectId,
+      executionId,
+      executeDto.agentType,
+      this.getAgentProgressMessage(executeDto.agentType, 'finalizing'),
+    );
 
     // Post-processing: Generate documents and handle handoffs (critical - report failures)
     const postProcessResult = await this.postProcessAgentCompletion(
@@ -926,15 +1006,26 @@ ${template.prompt.context}
 
     // 1b. Create proof artifacts for document-producing agents
     // These prove that the agent completed its work and documents were created
-    const documentProofAgents: Record<string, { gateType: string; proofType: string }> = {
-      ARCHITECT: { gateType: 'G3_PENDING', proofType: 'spec_validation' },
-      UX_UI_DESIGNER: { gateType: 'G4_PENDING', proofType: 'screenshot' },
+    // Maps agent types to their proof type for automatic proof generation
+    const agentProofTypes: Record<string, string> = {
+      ARCHITECT: 'spec_validation',
+      UX_UI_DESIGNER: 'screenshot',
+      QA_ENGINEER: 'test_results',
+      SECURITY_ENGINEER: 'scan_report',
+      DEVOPS_ENGINEER: 'deployment_log',
     };
 
-    if (documentProofAgents[agentType] && result.documentsCreated.length > 0) {
-      const { gateType, proofType } = documentProofAgents[agentType];
+    const proofType = agentProofTypes[agentType];
+    if (proofType && result.documentsCreated.length > 0) {
       try {
-        const gateId = await this.getGateId(projectId, gateType);
+        // Get current gate from project state (handles agents like DEVOPS that work on multiple gates)
+        const projectState = await this.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { state: { select: { currentGate: true } } },
+        });
+        const currentGate = projectState?.state?.currentGate || 'G3_PENDING';
+
+        const gateId = await this.getGateId(projectId, currentGate);
         if (gateId) {
           // Create content summary from documents created
           const contentSummary = `${agentType} completed. Documents created: ${result.documentsCreated.join(', ')}`;
@@ -947,7 +1038,7 @@ ${template.prompt.context}
             data: {
               projectId,
               gateId,
-              gate: gateType,
+              gate: currentGate,
               proofType: proofType as any,
               filePath: `docs/${agentType.toLowerCase()}-output.json`,
               fileHash,
@@ -956,14 +1047,14 @@ ${template.prompt.context}
               createdBy: userId,
             },
           });
-          this.logger.log(`[${agentType}] Created ${proofType} proof artifact for ${gateType}`);
+          this.logger.log(`[${agentType}] Created ${proofType} proof artifact for ${currentGate}`);
         }
       } catch (error) {
         addError(
           'Proof Artifact Creation',
           `Failed to create proof artifact for ${agentType}: ${error.message}`,
           'warning',
-          { agentType, gateType, proofType },
+          { agentType, proofType },
         );
       }
     }
@@ -1351,5 +1442,75 @@ ${newTableContent}
     });
 
     console.log(`[AgentLog] Updated Agent Log: ${agentDisplay} at ${gateType} - ${outcome}`);
+  }
+
+  /**
+   * Get human-readable progress message for agent activity
+   * Used to show users what agents are working on
+   */
+  private getAgentProgressMessage(
+    agentType: string,
+    phase: 'started' | 'processing' | 'finalizing',
+  ): string {
+    const messages: Record<string, Record<string, string>> = {
+      PRODUCT_MANAGER: {
+        started: 'Analyzing project requirements...',
+        processing: 'Writing product requirements document...',
+        finalizing: 'Finalizing PRD...',
+      },
+      PRODUCT_MANAGER_ONBOARDING: {
+        started: 'Gathering project details...',
+        processing: 'Processing your responses...',
+        finalizing: 'Preparing intake summary...',
+      },
+      ARCHITECT: {
+        started: 'Analyzing system requirements...',
+        processing: 'Designing system architecture...',
+        finalizing: 'Documenting architecture decisions...',
+      },
+      UX_UI_DESIGNER: {
+        started: 'Reviewing user requirements...',
+        processing: 'Creating design specifications...',
+        finalizing: 'Finalizing design system...',
+      },
+      FRONTEND_DEVELOPER: {
+        started: 'Setting up frontend structure...',
+        processing: 'Building UI components...',
+        finalizing: 'Completing frontend implementation...',
+      },
+      BACKEND_DEVELOPER: {
+        started: 'Setting up backend structure...',
+        processing: 'Building API endpoints...',
+        finalizing: 'Completing backend implementation...',
+      },
+      QA_ENGINEER: {
+        started: 'Analyzing test requirements...',
+        processing: 'Creating test cases...',
+        finalizing: 'Finalizing test plan...',
+      },
+      SECURITY_ENGINEER: {
+        started: 'Scanning for vulnerabilities...',
+        processing: 'Performing security audit...',
+        finalizing: 'Documenting security findings...',
+      },
+      DEVOPS_ENGINEER: {
+        started: 'Preparing deployment configuration...',
+        processing: 'Setting up infrastructure...',
+        finalizing: 'Completing deployment setup...',
+      },
+      ORCHESTRATOR: {
+        started: 'Coordinating project workflow...',
+        processing: 'Processing your request...',
+        finalizing: 'Preparing response...',
+      },
+    };
+
+    const agentMessages = messages[agentType] || {
+      started: 'Starting work...',
+      processing: 'Processing...',
+      finalizing: 'Finalizing...',
+    };
+
+    return agentMessages[phase] || agentMessages.started;
   }
 }

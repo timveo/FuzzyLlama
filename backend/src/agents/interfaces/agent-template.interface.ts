@@ -17,6 +17,8 @@ export interface AgentTemplate {
   defaultModel: string;
   maxTokens: number;
   handoffFormat: AgentHandoffFormat;
+  /** Enable tool use (MCP tools) for this agent during execution */
+  useTools?: boolean;
 }
 
 export interface AgentExecutionContext {

@@ -18,24 +18,26 @@ export class DocumentsService {
    * This ensures only user-facing content is saved to documents
    */
   private cleanAgentOutput(output: string): string {
-    return output
-      // Remove <thinking> tags and their content
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-      // Remove MCP/tool call XML tags with attributes (e.g., <invoke name="...">, <parameter name="...">)
-      .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/gi, '')
-      .replace(/<parameter[^>]*>[\s\S]*?<\/parameter>/gi, '')
-      // Remove standalone tool tags on their own lines (catches incomplete tags)
-      .replace(/^.*<invoke[^>]*>.*$/gm, '')
-      .replace(/^.*<parameter[^>]*>.*$/gm, '')
-      // Remove simple tool call tags (e.g., <get_documents>, <get_context_for_story>)
-      .replace(/<[a-z_]+>[\s\S]*?<\/[a-z_]+>/gi, '')
-      // Remove any standalone opening/closing tool tags
-      .replace(/<\/?[a-z_]+>/gi, '')
-      // Remove lines that look like preamble before the actual document content
-      .replace(/^(I'll|Let me|Now let me|Based on)[^\n]*$/gm, '')
-      // Clean up excessive whitespace left behind
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+    return (
+      output
+        // Remove <thinking> tags and their content
+        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+        // Remove MCP/tool call XML tags with attributes (e.g., <invoke name="...">, <parameter name="...">)
+        .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/gi, '')
+        .replace(/<parameter[^>]*>[\s\S]*?<\/parameter>/gi, '')
+        // Remove standalone tool tags on their own lines (catches incomplete tags)
+        .replace(/^.*<invoke[^>]*>.*$/gm, '')
+        .replace(/^.*<parameter[^>]*>.*$/gm, '')
+        // Remove simple tool call tags (e.g., <get_documents>, <get_context_for_story>)
+        .replace(/<[a-z_]+>[\s\S]*?<\/[a-z_]+>/gi, '')
+        // Remove any standalone opening/closing tool tags
+        .replace(/<\/?[a-z_]+>/gi, '')
+        // Remove lines that look like preamble before the actual document content
+        .replace(/^(I'll|Let me|Now let me|Based on)[^\n]*$/gm, '')
+        // Clean up excessive whitespace left behind
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    );
   }
 
   async create(createDocumentDto: CreateDocumentDto, userId: string) {
@@ -457,7 +459,8 @@ export class DocumentsService {
           type: 'TEST_PLAN',
           title: 'Test Plan and Coverage Report',
           content:
-            this.extractSection(cleanedOutput, ['# Test Plan', '# Testing', '## Test Coverage']) || cleanedOutput,
+            this.extractSection(cleanedOutput, ['# Test Plan', '# Testing', '## Test Coverage']) ||
+            cleanedOutput,
         });
         break;
 
@@ -468,8 +471,11 @@ export class DocumentsService {
           type: 'DEPLOYMENT_GUIDE',
           title: 'Deployment Guide',
           content:
-            this.extractSection(cleanedOutput, ['# Deployment', '# Deploy', '## Deployment Guide']) ||
-            cleanedOutput,
+            this.extractSection(cleanedOutput, [
+              '# Deployment',
+              '# Deploy',
+              '## Deployment Guide',
+            ]) || cleanedOutput,
         });
         break;
 
@@ -525,6 +531,125 @@ export class DocumentsService {
       }
     }
     return null;
+  }
+
+  // ============================================================
+  // DESIGN CONCEPTS
+  // ============================================================
+
+  /**
+   * Get all design concepts for a project
+   */
+  async getDesignConcepts(projectId: string, userId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException('You can only view design concepts for your own projects');
+    }
+
+    return this.prisma.designConcept.findMany({
+      where: { projectId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Get the selected design concept for a project
+   */
+  async getSelectedDesignConcept(projectId: string, userId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException('You can only view design concepts for your own projects');
+    }
+
+    return this.prisma.designConcept.findFirst({
+      where: { projectId, isSelected: true },
+    });
+  }
+
+  /**
+   * Select a design concept (mark it as chosen, unselect others)
+   */
+  async selectDesignConcept(conceptId: string, userId: string) {
+    const concept = await this.prisma.designConcept.findUnique({
+      where: { id: conceptId },
+      include: { project: true },
+    });
+
+    if (!concept) {
+      throw new NotFoundException('Design concept not found');
+    }
+
+    if (concept.project.ownerId !== userId) {
+      throw new ForbiddenException('You can only select design concepts for your own projects');
+    }
+
+    // Unselect all other concepts for this project
+    await this.prisma.designConcept.updateMany({
+      where: { projectId: concept.projectId },
+      data: { isSelected: false },
+    });
+
+    // Select this concept
+    return this.prisma.designConcept.update({
+      where: { id: conceptId },
+      data: { isSelected: true },
+    });
+  }
+
+  /**
+   * Create design concepts from agent output
+   * Parses structured JSON output from UX/UI Designer agent
+   */
+  async createDesignConceptsFromAgent(
+    projectId: string,
+    agentId: string,
+    concepts: Array<{
+      name: string;
+      description?: string;
+      html: string;
+      style?: string;
+      colorScheme?: string;
+    }>,
+  ) {
+    // Delete existing concepts for this project (fresh set from agent)
+    await this.prisma.designConcept.deleteMany({
+      where: { projectId },
+    });
+
+    // Create new concepts
+    const created = await Promise.all(
+      concepts.map((concept, index) =>
+        this.prisma.designConcept.create({
+          data: {
+            projectId,
+            agentId,
+            name: concept.name,
+            description: concept.description,
+            html: concept.html,
+            style: concept.style,
+            colorScheme: concept.colorScheme,
+            isSelected: index === 0, // Select first by default
+          },
+        }),
+      ),
+    );
+
+    this.logger.log(`Created ${created.length} design concepts for project ${projectId}`);
+    return created;
   }
 
   /**

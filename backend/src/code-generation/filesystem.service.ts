@@ -254,7 +254,7 @@ export class FileSystemService {
         timeout: options?.timeout || 120000, // Default 2 minutes
         env: { ...process.env, ...options?.env },
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-        shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/bash',
+        shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
       });
 
       return {
