@@ -495,7 +495,19 @@ export function getAgentTaskDescription(agentType: string, gateType: string): st
       G3_PENDING: 'Design system architecture and generate OpenAPI, Prisma, and Zod specs',
     },
     UX_UI_DESIGNER: {
-      G4_PENDING: 'Create 3 design options and develop a design system',
+      G4_PENDING: `Create 3 VIEWABLE HTML design options. OUTPUT ACTUAL HTML CODE - do not describe designs.
+
+CRITICAL REQUIREMENTS:
+1. Output 3 complete HTML files using markdown code fences with filenames:
+   \`\`\`html:designs/option-1-conservative.html
+   <!DOCTYPE html>...
+   \`\`\`
+2. Each must be a WORKING HTML page (Tailwind CSS via CDN, Alpine.js for interactivity)
+3. Include responsive design (mobile, tablet, desktop)
+4. Follow WCAG 2.1 AA accessibility
+5. After HTML files, output a Design System document
+
+DO NOT write "I'll create..." or describe what you plan to do. START with the HTML code immediately.`,
     },
     FRONTEND_DEVELOPER: {
       G5_PENDING: 'Implement frontend from specs and design system',

@@ -134,18 +134,36 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   emitAgentChunk(projectId: string, agentId: string, chunk: string) {
-    this.server.to(`project:${projectId}`).emit('agent:chunk', {
-      agentId,
-      chunk,
-      timestamp: new Date().toISOString(),
-    });
+    // Strip <thinking> tags from chunks - these are internal reasoning not meant for users
+    // We need to handle partial tags that might come across chunk boundaries
+    const cleanedChunk = chunk
+      .replace(/<thinking>/gi, '')
+      .replace(/<\/thinking>/gi, '');
+
+    // Only emit if there's content left after cleaning
+    if (cleanedChunk) {
+      this.server.to(`project:${projectId}`).emit('agent:chunk', {
+        agentId,
+        chunk: cleanedChunk,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   emitAgentCompleted(projectId: string, agentId: string, result: any, agentType?: string) {
+    // Strip <thinking> tags from result content if present
+    let cleanedResult = result;
+    if (result && typeof result.content === 'string') {
+      cleanedResult = {
+        ...result,
+        content: result.content.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').trim(),
+      };
+    }
+
     this.server.to(`project:${projectId}`).emit('agent:completed', {
       agentId,
       agentType,
-      result,
+      result: cleanedResult,
       timestamp: new Date().toISOString(),
     });
 
@@ -215,10 +233,13 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   ) {
     const timestamp = new Date().toISOString();
 
+    // Strip <thinking> tags - these are internal reasoning not meant for users
+    const cleanedContent = content.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').trim();
+
     this.server.to(`project:${projectId}`).emit('chat:message', {
       id: messageId,
       role,
-      content,
+      content: cleanedContent,
       timestamp,
     });
 

@@ -17,6 +17,7 @@ import { gatesApi } from '../api/gates';
 import { journeyApi } from '../api/journey';
 import { workflowApi } from '../api/workflow';
 import { documentsApi } from '../api/documents';
+import { agentsApi } from '../api/agents';
 // import { assetsApi, type ProjectAsset } from '../api/assets';
 import type { Document } from '../types';
 import { useThemeStore } from '../stores/theme';
@@ -2881,10 +2882,35 @@ export default function UnifiedDashboard() {
   // WebSocket event handlers
   const handleAgentStarted = useCallback((event: { agentType?: string; taskDescription?: string }) => {
     console.log('Agent started:', event);
-    setActiveAgent({
-      agentType: event.agentType || 'UNKNOWN',
-      taskDescription: event.taskDescription,
+
+    // Prioritize non-ORCHESTRATOR agents since they do the actual work
+    // ORCHESTRATOR coordinates and sends chat messages, but we want to show the worker agent
+    setActiveAgent((currentAgent) => {
+      const newAgentType = event.agentType || 'UNKNOWN';
+
+      // If no current agent, or current agent is ORCHESTRATOR and new one isn't, use new agent
+      if (
+        !currentAgent ||
+        (currentAgent.agentType === 'ORCHESTRATOR' && newAgentType !== 'ORCHESTRATOR')
+      ) {
+        return {
+          agentType: newAgentType,
+          taskDescription: event.taskDescription,
+        };
+      }
+
+      // If current agent is a worker and new one is ORCHESTRATOR, keep current
+      if (currentAgent.agentType !== 'ORCHESTRATOR' && newAgentType === 'ORCHESTRATOR') {
+        return currentAgent;
+      }
+
+      // Otherwise use the new agent (both are workers or both are orchestrators)
+      return {
+        agentType: newAgentType,
+        taskDescription: event.taskDescription,
+      };
     });
+
     setStreamingChunks([]);
     setIsStreamingDocument(false); // Reset document detection for new agent
     setIsAgentWorking(true);
@@ -3049,6 +3075,36 @@ export default function UnifiedDashboard() {
       setShowResumePrompt(true);
     }
   }, [urlProjectId, urlIsNew, currentProjectId, activeProject, setSearchParams]);
+
+  // Check for running agents when loading a project
+  // This handles the race condition where agent starts before WebSocket connects
+  useEffect(() => {
+    if (!currentProjectId) return;
+
+    const checkRunningAgents = async () => {
+      try {
+        const history = await agentsApi.getHistory(currentProjectId);
+        const runningAgent = history.find((exec: { status: string; agentType: string }) => exec.status === 'RUNNING');
+
+        if (runningAgent) {
+          console.log('Found running agent on load:', runningAgent.agentType);
+          setActiveAgent({
+            agentType: runningAgent.agentType,
+            taskDescription: 'Working...',
+          });
+          setIsAgentWorking(true);
+        }
+      } catch (error) {
+        console.error('Failed to check running agents:', error);
+      }
+    };
+
+    // Check immediately and again after a short delay (for race conditions)
+    checkRunningAgents();
+    const timer = setTimeout(checkRunningAgents, 2000);
+
+    return () => clearTimeout(timer);
+  }, [currentProjectId]);
 
   // Update project name when project data loads and save to project store
   useEffect(() => {
