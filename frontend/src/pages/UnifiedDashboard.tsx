@@ -17,6 +17,7 @@ import { gatesApi } from '../api/gates';
 import { journeyApi } from '../api/journey';
 import { workflowApi } from '../api/workflow';
 import { documentsApi } from '../api/documents';
+// import { assetsApi, type ProjectAsset } from '../api/assets';
 import type { Document } from '../types';
 import { useThemeStore } from '../stores/theme';
 import { useAuthStore } from '../stores/auth';
@@ -2990,6 +2991,21 @@ export default function UnifiedDashboard() {
     });
   }, []);
 
+  // Handle orchestrator message (assumptions from Universal Input Handler)
+  const handleOrchestratorMessage = useCallback((event: { message: string; messageType: string; timestamp: string }) => {
+    console.log('Orchestrator message received:', event);
+    // Convert orchestrator message to chat message format
+    setChatMessages(prev => {
+      const newMessage = {
+        id: `orchestrator-${Date.now()}`,
+        role: 'assistant' as const,
+        content: event.message,
+        timestamp: event.timestamp,
+      };
+      return [...prev, newMessage];
+    });
+  }, []);
+
   // Connect to WebSocket when we have a project
   useWebSocket(currentProjectId || undefined, {
     onAgentStarted: handleAgentStarted,
@@ -2999,6 +3015,7 @@ export default function UnifiedDashboard() {
     onGateReady: handleGateReady,
     onDocumentCreated: handleDocumentCreated,
     onChatMessage: handleChatMessage,
+    onOrchestratorMessage: handleOrchestratorMessage,
   });
 
   // Handle URL parameters for project selection

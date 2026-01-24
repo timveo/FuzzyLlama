@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { TokenStorageService } from './token-storage.service';
 import { RegisterDto } from './dto/register.dto';
@@ -19,6 +19,20 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { UserProfile } from '../common/types/user.types';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+
+export interface GitHubProfile {
+  id: string;
+  username: string;
+  displayName: string;
+  emails?: { value: string }[];
+  photos?: { value: string }[];
+}
+
+export interface GitHubConnectionStatus {
+  connected: boolean;
+  username?: string;
+  avatarUrl?: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -316,5 +330,214 @@ export class AuthService {
     await this.tokenStorage.storeRefreshToken(userId, tokenId, refreshToken);
 
     return { accessToken, refreshToken };
+  }
+
+  // ==================== GitHub OAuth Methods ====================
+
+  /**
+   * Handle GitHub OAuth callback - create or link user account
+   */
+  async handleGitHubOAuth(
+    profile: GitHubProfile,
+    accessToken: string,
+  ): Promise<AuthResponseDto> {
+    const email = profile.emails?.[0]?.value;
+    const avatarUrl = profile.photos?.[0]?.value;
+
+    // Check if user already exists by GitHub ID
+    let user = await this.prisma.user.findUnique({
+      where: { githubId: profile.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        planTier: true,
+      },
+    });
+
+    if (!user && email) {
+      // Check if user exists by email (link accounts)
+      user = await this.prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          planTier: true,
+        },
+      });
+
+      if (user) {
+        // Link existing account to GitHub
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            githubId: profile.id,
+            githubUsername: profile.username,
+            githubAccessToken: this.encryptToken(accessToken),
+            avatarUrl: avatarUrl || undefined,
+          },
+        });
+      }
+    }
+
+    if (!user) {
+      // Create new user
+      if (!email) {
+        throw new BadRequestException(
+          'GitHub account must have a public email address',
+        );
+      }
+
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name: profile.displayName || profile.username,
+          avatarUrl,
+          githubId: profile.id,
+          githubUsername: profile.username,
+          githubAccessToken: this.encryptToken(accessToken),
+          planTier: 'FREE',
+          monthlyAgentExecutions: 0,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          planTier: true,
+        },
+      });
+    } else {
+      // Update GitHub token for existing user
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          githubAccessToken: this.encryptToken(accessToken),
+          githubUsername: profile.username,
+        },
+      });
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user.id, user.email);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        planTier: user.planTier,
+      },
+    };
+  }
+
+  /**
+   * Store GitHub access token (encrypted) for an existing user
+   */
+  async storeGitHubToken(userId: string, accessToken: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        githubAccessToken: this.encryptToken(accessToken),
+      },
+    });
+  }
+
+  /**
+   * Get decrypted GitHub access token for a user
+   */
+  async getGitHubToken(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubAccessToken: true },
+    });
+
+    if (!user?.githubAccessToken) {
+      return null;
+    }
+
+    return this.decryptToken(user.githubAccessToken);
+  }
+
+  /**
+   * Disconnect GitHub account from user
+   */
+  async disconnectGitHub(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true, githubId: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Don't allow disconnect if user has no password (OAuth-only account)
+    if (!user.passwordHash && user.githubId) {
+      throw new BadRequestException(
+        'Cannot disconnect GitHub from OAuth-only account. Set a password first.',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        githubId: null,
+        githubAccessToken: null,
+        githubUsername: null,
+        githubTokenExpiry: null,
+      },
+    });
+  }
+
+  /**
+   * Get GitHub connection status for a user
+   */
+  async getGitHubConnectionStatus(userId: string): Promise<GitHubConnectionStatus> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        githubId: true,
+        githubUsername: true,
+        avatarUrl: true,
+      },
+    });
+
+    if (!user || !user.githubId) {
+      return { connected: false };
+    }
+
+    return {
+      connected: true,
+      username: user.githubUsername || undefined,
+      avatarUrl: user.avatarUrl || undefined,
+    };
+  }
+
+  // ==================== Token Encryption Helpers ====================
+
+  private getEncryptionKey(): Buffer {
+    const secret = this.configService.get<string>('JWT_SECRET') || 'default-secret';
+    return scryptSync(secret, 'salt', 32);
+  }
+
+  private encryptToken(token: string): string {
+    const iv = randomBytes(16);
+    const key = this.getEncryptionKey();
+    const cipher = createCipheriv('aes-256-cbc', key, iv);
+    let encrypted = cipher.update(token, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return `${iv.toString('hex')}:${encrypted}`;
+  }
+
+  private decryptToken(encryptedToken: string): string {
+    const [ivHex, encrypted] = encryptedToken.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const key = this.getEncryptionKey();
+    const decipher = createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
   }
 }

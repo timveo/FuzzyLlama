@@ -254,14 +254,58 @@ export class StorageService {
   async deleteProject(projectId: string): Promise<number> {
     const files = await this.list(`artifacts/${projectId}/`);
     const generatedFiles = await this.list(`generated/${projectId}/`);
+    const assetFiles = await this.list(`assets/${projectId}/`);
 
-    const allFiles = [...files, ...generatedFiles];
+    const allFiles = [...files, ...generatedFiles, ...assetFiles];
 
     await Promise.all(allFiles.map((file) => this.delete(file.key)));
 
     this.logger.log(`Deleted ${allFiles.length} files for project ${projectId}`);
 
     return allFiles.length;
+  }
+
+  /**
+   * Move/copy an object from one key to another
+   * (R2/S3 doesn't have native move, so we copy then delete)
+   */
+  async moveObject(sourceKey: string, destKey: string): Promise<void> {
+    try {
+      // Download the source file
+      const data = await this.download(sourceKey);
+
+      // Get the content type from the source key extension
+      const contentType = this.getContentTypeForFile(sourceKey);
+
+      // Upload to destination
+      await this.upload(destKey, data, { contentType });
+
+      // Delete the source file
+      await this.delete(sourceKey);
+
+      this.logger.log(`Moved: ${sourceKey} -> ${destKey}`);
+    } catch (error) {
+      this.logger.error(`Failed to move ${sourceKey} to ${destKey}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload an asset file with metadata
+   */
+  async uploadAsset(
+    key: string,
+    data: Buffer,
+    contentType: string,
+    metadata?: Record<string, string>,
+  ): Promise<string> {
+    return this.upload(key, data, {
+      contentType,
+      metadata: {
+        ...metadata,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
   }
 
   /**

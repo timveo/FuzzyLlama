@@ -10,6 +10,7 @@ import { EventStoreService } from '../../events/event-store.service';
 import { SessionContextService } from '../../session-context/session-context.service';
 import { GitIntegrationService } from '../../code-generation/git-integration.service';
 import { getAgentsForGate, getAgentTaskDescription, isParallelGate } from '../../gates/gate-config';
+import { GateContext, GateAction } from '../../universal-input/dto/gate-recommendation.dto';
 
 /**
  * WorkflowCoordinator orchestrates the complete G0-G9 workflow
@@ -30,6 +31,20 @@ export class WorkflowCoordinatorService {
     private readonly sessionContext: SessionContextService,
     private readonly gitIntegration: GitIntegrationService,
   ) {}
+
+  /**
+   * Store requirements in session context for later reference
+   */
+  async storeRequirements(projectId: string, requirements: string): Promise<void> {
+    await this.sessionContext.saveContext({
+      projectId,
+      sessionId: projectId, // Use projectId as sessionId for project-wide context
+      key: 'initial_requirements',
+      contextType: 'working_set',
+      contextData: { requirements },
+      ttlSeconds: 86400 * 30, // 30 days
+    });
+  }
 
   /**
    * Generate a gate transition message using the Orchestrator agent
@@ -2270,8 +2285,9 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
       },
     );
 
-    // Emit agent started event to frontend
-    this.wsGateway.emitAgentStarted(projectId, agentExecutionId, agentType, taskDescription);
+    // Note: emitAgentStarted is now called inside executeAgentStream immediately after
+    // the execution record is created, ensuring the frontend shows the working indicator
+    // before any streaming begins
   }
 
   /**
@@ -2733,5 +2749,476 @@ This is an automatic checkpoint commit created after gate approval.`;
 
     // Execute gate agents (this will start fresh agent executions)
     await this.executeGateAgents(projectId, gateType, userId);
+  }
+
+  // ============================================================================
+  // UNIVERSAL INPUT HANDLER SUPPORT
+  // Start workflow with pre-analyzed context from file uploads
+  // ============================================================================
+
+  /**
+   * Start a project workflow with GateContext from Universal Input Handler
+   * This bypasses G1 (scope is defined by file analysis) and uses user-confirmed
+   * gate decisions to skip/validate/delta/full each gate.
+   */
+  async startWorkflowWithContext(
+    projectId: string,
+    userId: string,
+    gateContext: GateContext,
+  ): Promise<{
+    projectId: string;
+    currentGate: string;
+    message: string;
+  }> {
+    console.log(`[WorkflowCoordinator] Starting workflow with GateContext for project ${projectId}`);
+    console.log(`[WorkflowCoordinator] Gate routing:`, gateContext.routing);
+
+    // Store gate context in session for later reference
+    await this.sessionContext.saveContext({
+      projectId,
+      sessionId: projectId, // Use projectId as sessionId for project-wide context
+      key: 'gate_context',
+      contextType: 'working_set',
+      contextData: gateContext,
+      ttlSeconds: 86400,
+    });
+
+    // Initialize project gates
+    await this.orchestrator.initializeProject(projectId, userId);
+
+    // G1 is always skipped when using GateContext (analysis replaces scope definition)
+    // Mark G1 as approved automatically
+    await this.gateStateMachine.transitionToReview(projectId, 'G1_PENDING', {
+      description: 'Scope defined by file analysis',
+    });
+    await this.gateStateMachine.approveGate(
+      projectId,
+      'G1_PENDING',
+      userId,
+      'auto-approved',
+      'Scope defined by Universal Input Handler analysis',
+    );
+
+    // Log event
+    await this.eventStore.appendEvent(projectId, {
+      type: 'WorkflowStartedWithContext',
+      data: {
+        classification: gateContext.classification,
+        skipGates: gateContext.routing.skipGates,
+        deltaGates: gateContext.routing.deltaGates,
+        focusAreas: gateContext.routing.focusAreas,
+      },
+      userId,
+    });
+
+    // Generate and emit assumptions to the chat interface
+    await this.emitAssumptionsFromContext(projectId, gateContext);
+
+    // Determine first gate to execute (skip G1, check G2 action)
+    const firstGate = await this.getNextGateWithContext(projectId, 'G1_PENDING', gateContext, userId);
+
+    if (firstGate) {
+      // Start executing the first gate
+      await this.executeGateWithContext(projectId, firstGate, userId, gateContext);
+    }
+
+    return {
+      projectId,
+      currentGate: firstGate || 'G2_PENDING',
+      message: `Workflow started with pre-analyzed context. ${gateContext.routing.skipGates.length} gates will be skipped.`,
+    };
+  }
+
+  /**
+   * Generate and emit assumptions to the chat interface based on GateContext
+   * These assumptions are displayed in the Orchestrator chat for user review
+   */
+  private async emitAssumptionsFromContext(
+    projectId: string,
+    gateContext: GateContext,
+  ): Promise<void> {
+    const assumptions: string[] = [];
+
+    // Classification assumptions
+    const { classification } = gateContext;
+    if (classification.completeness) {
+      const completenessLabels: Record<string, string> = {
+        'prompt-only': 'This is a new project starting from scratch',
+        'ui-only': 'You have provided frontend/UI code that needs a backend',
+        'backend-only': 'You have provided backend code that needs a frontend',
+        'full-stack': 'You have provided a full-stack application',
+        'contracts-only': 'You have provided API contracts/schemas',
+        'docs-only': 'You have provided documentation/requirements',
+      };
+      const label = completenessLabels[classification.completeness];
+      if (label) assumptions.push(label);
+    }
+
+    if (classification.uiFramework && classification.uiFramework !== 'unknown') {
+      assumptions.push(`Your frontend uses ${classification.uiFramework}`);
+    }
+
+    if (classification.backendFramework && classification.backendFramework !== 'unknown') {
+      assumptions.push(`Your backend uses ${classification.backendFramework}`);
+    }
+
+    if (classification.orm && classification.orm !== 'unknown' && classification.orm !== 'none') {
+      assumptions.push(`Your database layer uses ${classification.orm}`);
+    }
+
+    // Gate routing assumptions
+    const { routing } = gateContext;
+    if (routing.skipGates.length > 0) {
+      const skippedGateNames = routing.skipGates.map(g => {
+        const names: Record<string, string> = {
+          G1: 'Scope Definition',
+          G2: 'Product Requirements',
+          G3: 'Architecture',
+          G4: 'Design',
+          G5: 'Development',
+          G6: 'QA',
+          G7: 'Security',
+          G8: 'Pre-Deployment',
+          G9: 'Production',
+        };
+        return names[g] || g;
+      });
+      assumptions.push(`I'll skip these phases since they're already covered: ${skippedGateNames.join(', ')}`);
+    }
+
+    if (routing.deltaGates.length > 0) {
+      assumptions.push(`I'll only generate what's missing for: ${routing.deltaGates.join(', ')}`);
+    }
+
+    if (routing.focusAreas.length > 0) {
+      assumptions.push(`Key focus areas identified: ${routing.focusAreas.join(', ')}`);
+    }
+
+    // Security issues assumption
+    if (gateContext.extractedArtifacts?.securityIssues?.length) {
+      const count = gateContext.extractedArtifacts.securityIssues.length;
+      const critical = gateContext.extractedArtifacts.securityIssues.filter(
+        i => i.severity === 'critical' || i.severity === 'high'
+      ).length;
+      if (critical > 0) {
+        assumptions.push(`I found ${count} security issues (${critical} critical/high priority) that I'll address`);
+      } else {
+        assumptions.push(`I found ${count} security issues to address`);
+      }
+    }
+
+    // Format as a chat message from the Orchestrator
+    if (assumptions.length > 0) {
+      const assumptionsMessage = `Based on my analysis of your uploaded files, here's what I understand:\n\n${assumptions.map(a => `• ${a}`).join('\n')}\n\nI'll proceed with these assumptions. Let me know if any of these are incorrect and I'll adjust my approach.`;
+
+      // Emit as an orchestrator message via WebSocket
+      this.wsGateway.emitOrchestratorMessage(projectId, assumptionsMessage, 'assumptions');
+    }
+  }
+
+  /**
+   * Get the next gate to execute, respecting skip decisions from GateContext
+   */
+  private async getNextGateWithContext(
+    projectId: string,
+    currentGate: string,
+    gateContext: GateContext,
+    userId: string,
+  ): Promise<string | null> {
+    const gateOrder = [
+      'G1_PENDING',
+      'G2_PENDING',
+      'G3_PENDING',
+      'G4_PENDING',
+      'G5_PENDING',
+      'G6_PENDING',
+      'G7_PENDING',
+      'G8_PENDING',
+      'G9_PENDING',
+    ];
+
+    const currentIndex = gateOrder.indexOf(currentGate);
+    if (currentIndex === -1 || currentIndex === gateOrder.length - 1) {
+      return null;
+    }
+
+    // Find next gate that isn't skipped
+    for (let i = currentIndex + 1; i < gateOrder.length; i++) {
+      const nextGate = gateOrder[i];
+      const gateKey = nextGate.replace('_PENDING', ''); // e.g., 'G2'
+
+      if (!gateContext.routing.skipGates.includes(gateKey)) {
+        return nextGate;
+      }
+
+      // If gate is skipped, auto-approve it
+      console.log(`[WorkflowCoordinator] Auto-skipping gate ${gateKey} per user decision`);
+      await this.autoSkipGate(projectId, nextGate, userId, gateContext);
+    }
+
+    return null; // All remaining gates are skipped
+  }
+
+  /**
+   * Auto-skip a gate (mark as approved without executing agents)
+   */
+  private async autoSkipGate(
+    projectId: string,
+    gateType: string,
+    userId: string,
+    gateContext: GateContext,
+  ): Promise<void> {
+    const gateKey = gateType.replace('_PENDING', '');
+
+    // Ensure gate exists
+    await this.gateStateMachine.ensureGateExists(projectId, gateType);
+
+    // Mark as approved with skip note
+    await this.gateStateMachine.transitionToReview(projectId, gateType, {
+      description: `Skipped per user decision: ${gateContext.decisions[gateKey]?.reason || 'Artifact already exists'}`,
+    });
+    await this.gateStateMachine.approveGate(
+      projectId,
+      gateType,
+      userId,
+      'skipped',
+      `Gate skipped per user decision from Universal Input Handler`,
+    );
+
+    // Log event
+    await this.eventStore.appendEvent(projectId, {
+      type: 'GateSkipped',
+      data: {
+        gateType,
+        reason: gateContext.decisions[gateKey]?.reason,
+        action: gateContext.decisions[gateKey]?.action,
+      },
+      userId,
+    });
+
+    // Notify frontend via gate approved event
+    this.wsGateway.emitGateApproved(projectId, gateType, gateType, 'system');
+  }
+
+  /**
+   * Execute a gate with context-aware behavior
+   */
+  async executeGateWithContext(
+    projectId: string,
+    gateType: string,
+    userId: string,
+    gateContext: GateContext,
+  ): Promise<void> {
+    const gateKey = gateType.replace('_PENDING', '');
+    const decision = gateContext.decisions[gateKey];
+    const action: GateAction = decision?.action || 'full';
+
+    console.log(`[WorkflowCoordinator] Executing gate ${gateKey} with action: ${action}`);
+
+    switch (action) {
+      case 'skip':
+        // Should have been handled by getNextGateWithContext, but handle here too
+        await this.autoSkipGate(projectId, gateType, userId, gateContext);
+        break;
+
+      case 'validate':
+        // Run agents in validation mode (review existing, don't regenerate)
+        await this.executeGateInValidationMode(projectId, gateType, userId, gateContext);
+        break;
+
+      case 'delta':
+        // Run agents in delta mode (fill gaps only)
+        await this.executeGateInDeltaMode(projectId, gateType, userId, gateContext);
+        break;
+
+      case 'full':
+      default:
+        // Full execution (standard behavior)
+        await this.executeGateAgents(projectId, gateType, userId);
+        break;
+    }
+  }
+
+  /**
+   * Execute gate in validation mode - agents review existing artifacts without regenerating
+   */
+  private async executeGateInValidationMode(
+    projectId: string,
+    gateType: string,
+    userId: string,
+    gateContext: GateContext,
+  ): Promise<void> {
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return;
+
+    const projectType = project.type || 'traditional';
+    const agents = getAgentsForGate(projectType, gateType);
+
+    if (agents.length === 0) {
+      console.log(`[WorkflowCoordinator] No agents for validation mode on ${gateType}`);
+      return;
+    }
+
+    console.log(`[WorkflowCoordinator] Running ${agents.length} agent(s) in VALIDATION mode`);
+
+    // Get handoff context with extracted artifacts
+    const handoffContext = await this.getHandoffContextWithExtracted(projectId, gateType, gateContext);
+
+    // Execute agents with validation instructions
+    for (const agentType of agents) {
+      const taskDescription = getAgentTaskDescription(agentType, gateType);
+      const validationPrompt = this.buildValidationPrompt(taskDescription, handoffContext, gateContext);
+
+      await this.executeSingleAgent(projectId, agentType, gateType, userId, validationPrompt);
+    }
+
+    await this.checkAndTransitionGate(projectId, gateType, userId);
+  }
+
+  /**
+   * Execute gate in delta mode - agents fill gaps only
+   */
+  private async executeGateInDeltaMode(
+    projectId: string,
+    gateType: string,
+    userId: string,
+    gateContext: GateContext,
+  ): Promise<void> {
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return;
+
+    const projectType = project.type || 'traditional';
+    const agents = getAgentsForGate(projectType, gateType);
+
+    if (agents.length === 0) {
+      console.log(`[WorkflowCoordinator] No agents for delta mode on ${gateType}`);
+      return;
+    }
+
+    console.log(`[WorkflowCoordinator] Running ${agents.length} agent(s) in DELTA mode`);
+
+    // Get handoff context with extracted artifacts
+    const handoffContext = await this.getHandoffContextWithExtracted(projectId, gateType, gateContext);
+
+    // Execute agents with delta instructions
+    for (const agentType of agents) {
+      const taskDescription = getAgentTaskDescription(agentType, gateType);
+      const deltaPrompt = this.buildDeltaPrompt(taskDescription, handoffContext, gateContext);
+
+      await this.executeSingleAgent(projectId, agentType, gateType, userId, deltaPrompt);
+    }
+
+    await this.checkAndTransitionGate(projectId, gateType, userId);
+  }
+
+  /**
+   * Get handoff context enriched with extracted artifacts from analysis
+   */
+  private async getHandoffContextWithExtracted(
+    projectId: string,
+    gateType: string,
+    gateContext: GateContext,
+  ): Promise<string> {
+    const baseContext = await this.getHandoffContext(projectId, gateType);
+
+    // Add extracted artifacts to context
+    let enrichedContext = baseContext;
+
+    if (gateContext.extractedArtifacts.openApiSpec) {
+      enrichedContext += `\n\n## Extracted OpenAPI Specification\nAn OpenAPI spec was extracted from the uploaded code:\n\`\`\`json\n${JSON.stringify(gateContext.extractedArtifacts.openApiSpec, null, 2).slice(0, 5000)}\n\`\`\``;
+    }
+
+    if (gateContext.extractedArtifacts.prismaSchema) {
+      enrichedContext += `\n\n## Extracted Database Schema\nA Prisma schema was extracted/converted from the uploaded code:\n\`\`\`prisma\n${gateContext.extractedArtifacts.prismaSchema.slice(0, 3000)}\n\`\`\``;
+    }
+
+    if (gateContext.extractedArtifacts.uiRequirements?.length) {
+      const endpoints = gateContext.extractedArtifacts.uiRequirements
+        .map((e) => `- ${e.method} ${e.path}`)
+        .join('\n');
+      enrichedContext += `\n\n## UI API Requirements\nThe following API endpoints are called by the uploaded UI code:\n${endpoints}`;
+    }
+
+    if (gateContext.extractedArtifacts.securityIssues?.length) {
+      const issues = gateContext.extractedArtifacts.securityIssues
+        .map((i) => `- [${i.severity.toUpperCase()}] ${i.title}: ${i.description}`)
+        .join('\n');
+      enrichedContext += `\n\n## Security Issues Detected\nThe following security issues were found in the uploaded code:\n${issues}`;
+    }
+
+    enrichedContext += `\n\n## Project Classification\n- Completeness: ${gateContext.classification.completeness}`;
+    if (gateContext.classification.uiFramework) {
+      enrichedContext += `\n- UI Framework: ${gateContext.classification.uiFramework}`;
+    }
+    if (gateContext.classification.backendFramework) {
+      enrichedContext += `\n- Backend Framework: ${gateContext.classification.backendFramework}`;
+    }
+    if (gateContext.classification.orm) {
+      enrichedContext += `\n- ORM: ${gateContext.classification.orm}`;
+    }
+
+    return enrichedContext;
+  }
+
+  /**
+   * Build prompt for validation mode
+   */
+  private buildValidationPrompt(
+    taskDescription: string,
+    handoffContext: string,
+    gateContext: GateContext,
+  ): string {
+    return `## VALIDATION MODE
+
+You are reviewing EXISTING artifacts, NOT creating new ones.
+
+**Your Task:** ${taskDescription}
+
+**Mode:** VALIDATION - The user has uploaded code/documents that already address this gate's requirements. Your job is to:
+1. Review the existing artifacts for completeness
+2. Verify they meet quality standards
+3. Identify any minor gaps or issues
+4. Provide a brief validation report
+
+DO NOT regenerate or significantly rewrite existing content. Only make minimal corrections if absolutely necessary.
+
+**Context from Analysis:**
+${handoffContext}
+
+**Focus Areas from User:**
+${gateContext.routing.focusAreas.join(', ') || 'None specified'}
+
+Please provide your validation assessment.`;
+  }
+
+  /**
+   * Build prompt for delta mode
+   */
+  private buildDeltaPrompt(
+    taskDescription: string,
+    handoffContext: string,
+    gateContext: GateContext,
+  ): string {
+    return `## DELTA MODE
+
+You are FILLING GAPS in existing artifacts, NOT starting from scratch.
+
+**Your Task:** ${taskDescription}
+
+**Mode:** DELTA - The user has uploaded code/documents that partially address this gate's requirements. Your job is to:
+1. Identify what already exists and is complete
+2. Find specific gaps that need to be filled
+3. Generate ONLY the missing pieces
+4. Integrate new content seamlessly with existing content
+
+DO NOT regenerate content that already exists and is adequate.
+
+**Context from Analysis:**
+${handoffContext}
+
+**Known Gaps to Address:**
+${gateContext.routing.focusAreas.join(', ') || 'Review and identify gaps'}
+
+Please fill in the missing pieces only.`;
   }
 }

@@ -287,6 +287,24 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
     });
   }
 
+  /**
+   * Emit an orchestrator message to the chat interface
+   * Used for assumptions, status updates, and system messages
+   */
+  emitOrchestratorMessage(
+    projectId: string,
+    message: string,
+    messageType: 'assumptions' | 'status' | 'info' | 'warning' = 'info',
+  ) {
+    this.server.to(`project:${projectId}`).emit('orchestrator:message', {
+      message,
+      messageType,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(`Orchestrator message (${messageType}) sent to project ${projectId}`);
+  }
+
   // Get active connections for a user
   getUserConnections(userId: string): number {
     return this.userSockets.get(userId)?.size || 0;

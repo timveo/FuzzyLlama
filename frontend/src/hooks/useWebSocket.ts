@@ -20,6 +20,12 @@ interface ChatMessageEvent {
   timestamp: string;
 }
 
+interface OrchestratorMessageEvent {
+  message: string;
+  messageType: 'assumptions' | 'status' | 'info' | 'warning';
+  timestamp: string;
+}
+
 interface WebSocketEvents {
   onAgentStarted?: (event: AgentEvent) => void;
   onAgentChunk?: (event: AgentEvent) => void;
@@ -31,6 +37,7 @@ interface WebSocketEvents {
   onDocumentCreated?: (event: any) => void;
   onNotification?: (event: any) => void;
   onChatMessage?: (event: ChatMessageEvent) => void;
+  onOrchestratorMessage?: (event: OrchestratorMessageEvent) => void;
 }
 
 export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
@@ -143,6 +150,13 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
       eventsRef.current?.onAgentCompleted?.(event);
     });
 
+    // Also handle completed_with_warnings as a completion event
+    socket.on('agent:completed_with_warnings', (event) => {
+      console.log('Received agent:completed_with_warnings event:', event);
+      // Treat this as a completed event so UI updates properly
+      eventsRef.current?.onAgentCompleted?.(event);
+    });
+
     socket.on('agent:failed', (event) => {
       console.log('Received agent:failed event:', event);
       eventsRef.current?.onAgentFailed?.(event);
@@ -173,6 +187,11 @@ export function useWebSocket(projectId?: string, events?: WebSocketEvents) {
     socket.on('chat:message', (event) => {
       console.log('Received chat:message event:', event);
       eventsRef.current?.onChatMessage?.(event);
+    });
+
+    socket.on('orchestrator:message', (event) => {
+      console.log('Received orchestrator:message event:', event);
+      eventsRef.current?.onOrchestratorMessage?.(event);
     });
 
     // Cleanup on unmount

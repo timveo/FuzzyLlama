@@ -73,6 +73,66 @@ const isIntakeDocument = (content: string): boolean => {
   );
 };
 
+// Helper to detect gate transition messages and extract which gate they refer to
+// Returns the gate number if it's a gate transition message, null otherwise
+const getGateTransitionNumber = (content: string): number | null => {
+  // Patterns for "moving to gate X" or "gate X starting" type messages
+  const patterns = [
+    /moving to.*gate\s*(\d)/i,
+    /gate\s*(\d).*starting/i,
+    /entering.*gate\s*(\d)/i,
+    /proceeding to.*gate\s*(\d)/i,
+    /we're moving to.*gate\s*(\d)/i,
+    /transitioning to.*gate\s*(\d)/i,
+    /gate\s*(\d)\s*\(requirements\)/i,
+    /gate\s*(\d)\s*\(architecture\)/i,
+    /gate\s*(\d)\s*\(design\)/i,
+    /gate\s*(\d)\s*\(development\)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+
+  return null;
+};
+
+// Type definition for gate object
+interface GateInfo {
+  gateType: string;
+  status: string;
+}
+
+// Check if a gate transition message is stale based on current gate status
+// A message about "moving to gate X" is stale if gate X is already APPROVED
+const isStaleGateTransition = (content: string, gates: GateInfo[]): boolean => {
+  const gateNumber = getGateTransitionNumber(content);
+  if (gateNumber === null) return false;
+
+  // Map gate number to gate type
+  const gateTypeMap: Record<number, string> = {
+    1: 'G1_PENDING',
+    2: 'G2_PENDING',
+    3: 'G3_PENDING',
+    4: 'G4_PENDING',
+    5: 'G5_PENDING',
+    6: 'G6_PENDING',
+    7: 'G7_PENDING',
+    8: 'G8_PENDING',
+    9: 'G9_PENDING',
+  };
+
+  const gateType = gateTypeMap[gateNumber];
+  if (!gateType) return false;
+
+  const gate = gates.find(g => g.gateType === gateType);
+  // If the gate is APPROVED, this transition message is stale
+  return gate?.status === 'APPROVED';
+};
+
 // Helper to detect if message contains raw MCP XML tool calls
 // These should not be displayed in the chat - they're internal agent operations
 const hasMcpToolCalls = (content: string): boolean => {
@@ -296,10 +356,12 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
           projectsApi.getEvents(projectId, 'ChatMessage').catch(() => []),
         ]);
 
-        // Get all COMPLETED executions with results (onboarding + orchestrator)
-        const conversationalAgents = ['PRODUCT_MANAGER_ONBOARDING', 'ORCHESTRATOR'];
+        // Get all COMPLETED executions with results
+        // IMPORTANT: Only load PM_ONBOARDING (intake conversation)
+        // DO NOT load ORCHESTRATOR - those messages contain stale gate transition info
+        // The current gate status is determined from the database (gates array) and shown via status messages
         const completedExecutions = history.filter(
-          exec => conversationalAgents.includes(exec.agentType) &&
+          exec => exec.agentType === 'PRODUCT_MANAGER_ONBOARDING' &&
                   exec.status === 'COMPLETED' &&
                   exec.outputResult
         );
@@ -319,9 +381,15 @@ export const OrchestratorChat: React.FC<OrchestratorChatProps> = ({
           const historyMessages: ChatMessage[] = [];
 
           // Add persisted chat messages first
+          // IMPORTANT: Filter out stale gate transition messages based on current gate status
           for (const event of chatEvents) {
             const eventData = event.eventData as { role?: string; content?: string };
             if (eventData.content) {
+              // Skip stale gate transition messages (e.g., "Moving to Gate 2" when G2 is already approved)
+              if (isStaleGateTransition(eventData.content, gates)) {
+                console.log('[ChatHistory] Filtered stale gate message:', eventData.content.substring(0, 50));
+                continue;
+              }
               historyMessages.push({
                 id: event.id,
                 role: (eventData.role as 'assistant' | 'system') || 'assistant',

@@ -1,8 +1,15 @@
 import apiClient from '../lib/api-client';
+import type { GateContext } from './universal-input';
 
 export interface WorkflowStartData {
   projectId: string;
   requirements: string;
+}
+
+export interface WorkflowStartWithContextData {
+  projectId: string;
+  requirements: string;
+  gateContext: GateContext;
 }
 
 export interface WorkflowStatus {
@@ -66,6 +73,12 @@ export const workflowApi = {
       projectId,
       message,
     });
+    return response.data;
+  },
+
+  // Start workflow with pre-analyzed GateContext from Universal Input Handler
+  startWithContext: async (data: WorkflowStartWithContextData): Promise<{ projectId: string; currentGate: string; message: string }> => {
+    const response = await apiClient.post('/agents/workflow/start-with-context', data);
     return response.data;
   },
 };

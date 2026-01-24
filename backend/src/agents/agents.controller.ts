@@ -212,4 +212,59 @@ export class AgentsController {
     await this.workflowCoordinator.retryGateAgents(projectId, body.gateType, user.id);
     return { success: true, message: `Retrying agents for ${body.gateType}` };
   }
+
+  @Post('workflow/start-with-context')
+  @ApiOperation({ summary: 'Start project workflow with pre-analyzed GateContext' })
+  @ApiResponse({ status: 200, description: 'Workflow started with context successfully' })
+  async startWorkflowWithContext(
+    @Body()
+    body: {
+      projectId: string;
+      requirements: string;
+      gateContext: {
+        classification: {
+          completeness: string;
+          hasUI: boolean;
+          hasBackend: boolean;
+          uiFramework?: string;
+          backendFramework?: string;
+          orm?: string;
+        };
+        extractedArtifacts: {
+          openApiSpec?: object;
+          prismaSchema?: string;
+          uiRequirements?: Array<{ method: string; path: string }>;
+          securityIssues?: Array<{
+            severity: string;
+            category: string;
+            title: string;
+            description: string;
+            file?: string;
+            line?: number;
+            recommendation: string;
+          }>;
+        };
+        decisions: Record<string, { action: string; reason?: string }>;
+        routing: {
+          skipGates: string[];
+          deltaGates: string[];
+          validateGates: string[];
+          fullGates: string[];
+          focusAreas: string[];
+        };
+        assetIds: string[];
+      };
+    },
+    @CurrentUser() user: RequestUser,
+  ) {
+    // Store requirements in project metadata
+    await this.workflowCoordinator.storeRequirements(body.projectId, body.requirements);
+
+    // Start workflow with pre-analyzed context
+    return this.workflowCoordinator.startWorkflowWithContext(
+      body.projectId,
+      user.id,
+      body.gateContext as any,
+    );
+  }
 }
