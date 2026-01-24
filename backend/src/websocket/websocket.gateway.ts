@@ -136,9 +136,7 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   emitAgentChunk(projectId: string, agentId: string, chunk: string) {
     // Strip <thinking> tags from chunks - these are internal reasoning not meant for users
     // We need to handle partial tags that might come across chunk boundaries
-    const cleanedChunk = chunk
-      .replace(/<thinking>/gi, '')
-      .replace(/<\/thinking>/gi, '');
+    const cleanedChunk = chunk.replace(/<thinking>/gi, '').replace(/<\/thinking>/gi, '');
 
     // Only emit if there's content left after cleaning
     if (cleanedChunk) {
@@ -148,6 +146,26 @@ export class AppWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
         timestamp: new Date().toISOString(),
       });
     }
+  }
+
+  /**
+   * Emit agent progress update - high-level task status for user visibility
+   * Used to show users what agents are working on during execution
+   */
+  emitAgentProgress(
+    projectId: string,
+    agentId: string,
+    agentType: string,
+    progressMessage: string,
+  ) {
+    this.server.to(`project:${projectId}`).emit('agent:progress', {
+      agentId,
+      agentType,
+      message: progressMessage,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.debug(`Agent progress: ${agentType} - ${progressMessage}`);
   }
 
   emitAgentCompleted(projectId: string, agentId: string, result: any, agentType?: string) {

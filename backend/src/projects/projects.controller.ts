@@ -153,4 +153,13 @@ export class ProjectsController {
   ) {
     return this.projectsService.getEvents(id, user.id, eventType);
   }
+
+  @Get(':id/status')
+  @ApiOperation({ summary: 'Get current project status message (single source of truth for chat)' })
+  @ApiResponse({ status: 200, description: 'Current project status' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  async getStatus(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.projectsService.getStatus(id, user.id);
+  }
 }

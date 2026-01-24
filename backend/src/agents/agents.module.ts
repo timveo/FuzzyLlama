@@ -7,6 +7,11 @@ import { ToolEnabledAIProviderService } from './services/tool-enabled-ai-provide
 import { OrchestratorService } from './services/orchestrator.service';
 import { WorkflowCoordinatorService } from './services/workflow-coordinator.service';
 import { AgentRetryService } from './services/agent-retry.service';
+import { FeedbackService } from './services/feedback.service';
+import { GateAgentExecutorService } from './services/gate-agent-executor.service';
+import { ChatMessageService } from './services/chat-message.service';
+import { OnboardingService } from './services/onboarding.service';
+import { GateOrchestrationService } from './services/gate-orchestration.service';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { GatesModule } from '../gates/gates.module';
@@ -40,6 +45,11 @@ import { McpModule } from '../mcp/mcp.module';
     OrchestratorService,
     WorkflowCoordinatorService,
     AgentRetryService,
+    FeedbackService,
+    GateAgentExecutorService,
+    ChatMessageService,
+    OnboardingService,
+    GateOrchestrationService,
   ],
   exports: [
     AgentExecutionService,
@@ -48,6 +58,11 @@ import { McpModule } from '../mcp/mcp.module';
     ToolEnabledAIProviderService,
     OrchestratorService,
     WorkflowCoordinatorService,
+    FeedbackService,
+    GateAgentExecutorService,
+    ChatMessageService,
+    OnboardingService,
+    GateOrchestrationService,
   ],
 })
 export class AgentsModule {}

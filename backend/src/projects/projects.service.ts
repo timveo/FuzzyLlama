@@ -363,4 +363,124 @@ export class ProjectsService {
       orderBy: { createdAt: 'asc' },
     });
   }
+
+  /**
+   * Get current project status - single source of truth for chat UI
+   * Derives the appropriate message from current gate and status
+   */
+  async getStatus(id: string, userId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      include: {
+        state: true,
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException('You do not have access to this project');
+    }
+
+    // Get current gate status
+    const currentGateType = project.state?.currentGate || 'G1_PENDING';
+    const currentGate = await this.prisma.gate.findFirst({
+      where: { projectId: id, gateType: currentGateType },
+    });
+
+    // Check for running agents
+    const runningAgent = await this.prisma.agent.findFirst({
+      where: {
+        projectId: id,
+        status: 'RUNNING',
+        createdAt: { gt: new Date(Date.now() - 10 * 60 * 1000) }, // Within last 10 min
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Gate-specific status messages
+    const gateMessages: Record<string, { inReview: string; inProgress: string; userAction: string }> = {
+      G1_PENDING: {
+        inReview: 'Project Intake is ready for review in the Docs tab.',
+        inProgress: 'Gathering project requirements...',
+        userAction: 'Review the intake document and type "approve" to proceed.',
+      },
+      G2_PENDING: {
+        inReview: 'Product Requirements Document (PRD) is ready for review in the Docs tab.',
+        inProgress: 'Product Manager is creating the PRD...',
+        userAction: 'Review the PRD and type "approve" to proceed to Architecture.',
+      },
+      G3_PENDING: {
+        inReview: 'System Architecture is ready for review in the Docs tab.',
+        inProgress: 'Architect is designing the system...',
+        userAction: 'Review the architecture and type "approve" to proceed to Design.',
+      },
+      G4_PENDING: {
+        inReview: '3 design concepts are ready for review in the Preview tab.',
+        inProgress: 'UX/UI Designer is creating design concepts...',
+        userAction: 'Review the designs, select your favorite, and type "approve" to proceed.',
+      },
+      G5_PENDING: {
+        inReview: 'Development is complete. Code is ready for review in the Code tab.',
+        inProgress: 'Developers are building the application...',
+        userAction: 'Review the code and type "approve" to proceed to Testing.',
+      },
+      G6_PENDING: {
+        inReview: 'Test results are ready for review.',
+        inProgress: 'QA Engineer is running tests...',
+        userAction: 'Review test results and type "approve" to proceed to Security.',
+      },
+      G7_PENDING: {
+        inReview: 'Security audit is complete.',
+        inProgress: 'Security Engineer is performing audit...',
+        userAction: 'Review security findings and type "approve" to proceed to Deployment.',
+      },
+      G8_PENDING: {
+        inReview: 'Deployment configuration is ready.',
+        inProgress: 'DevOps Engineer is preparing deployment...',
+        userAction: 'Review deployment plan and type "approve" to deploy.',
+      },
+      G9_PENDING: {
+        inReview: 'Application is deployed and ready for final review.',
+        inProgress: 'Deploying application...',
+        userAction: 'Verify deployment and type "approve" to complete the project.',
+      },
+    };
+
+    const gateConfig = gateMessages[currentGateType];
+    const isInReview = currentGate?.status === 'IN_REVIEW';
+    const isAgentWorking = !!runningAgent;
+
+    let statusMessage: string;
+    let userAction: string | null;
+
+    if (currentGateType === 'PROJECT_COMPLETE') {
+      statusMessage = 'Project complete! Your application is deployed and ready.';
+      userAction = null;
+    } else if (isInReview && gateConfig) {
+      statusMessage = gateConfig.inReview;
+      userAction = gateConfig.userAction;
+    } else if (isAgentWorking) {
+      const agentName = runningAgent.agentType?.replace(/_/g, ' ') || 'Agent';
+      statusMessage = `${agentName} is working...`;
+      userAction = 'Please wait while the agent completes its work.';
+    } else if (gateConfig) {
+      statusMessage = gateConfig.inProgress;
+      userAction = 'Please wait while agents work on this phase.';
+    } else {
+      statusMessage = `Working on ${currentGateType}...`;
+      userAction = null;
+    }
+
+    return {
+      currentGate: currentGateType,
+      gateStatus: currentGate?.status || 'PENDING',
+      statusMessage,
+      userAction,
+      isAgentWorking,
+      workingAgent: runningAgent?.agentType || null,
+    };
+  }
 }

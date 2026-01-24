@@ -119,6 +119,9 @@ export class McpToolsService {
         case 'create_task_for_agent':
           result = await this.createTaskForAgent(args);
           break;
+        case 'save_design_concept':
+          result = await this.saveDesignConcept(args);
+          break;
 
         // ========== STATE MANAGEMENT TOOLS ==========
         case 'read_status':
@@ -583,6 +586,67 @@ export class McpToolsService {
       to_agent: args.to_agent,
       task_type: args.task_type,
       message: `Task created for ${args.to_agent}. It will be processed when that agent next runs.`,
+    };
+  }
+
+  /**
+   * Save a design concept with HTML mockup
+   * Used by UX_UI_DESIGNER agent to save design options
+   */
+  private async saveDesignConcept(args: {
+    projectId: string;
+    agentId?: string;
+    name: string;
+    description?: string;
+    style: 'conservative' | 'modern' | 'bold';
+    colorScheme?: string;
+    html: string;
+  }): Promise<any> {
+    // Validate HTML has basic structure
+    if (!args.html || args.html.length < 200) {
+      return {
+        success: false,
+        error: 'HTML must be at least 200 characters. Please provide a complete HTML document.',
+      };
+    }
+
+    if (!args.html.includes('<!DOCTYPE html>') && !args.html.includes('<html')) {
+      return {
+        success: false,
+        error: 'HTML must be a complete document starting with <!DOCTYPE html> or <html>.',
+      };
+    }
+
+    // Count existing designs to determine if this is first (select it by default)
+    const existingCount = await this.prisma.designConcept.count({
+      where: { projectId: args.projectId },
+    });
+
+    // Create the design concept
+    const concept = await this.prisma.designConcept.create({
+      data: {
+        projectId: args.projectId,
+        agentId: args.agentId || 'UX_UI_DESIGNER',
+        gateId: 'G4_PENDING',
+        name: args.name,
+        description: args.description,
+        style: args.style,
+        colorScheme: args.colorScheme,
+        html: args.html,
+        isSelected: existingCount === 0, // First design is selected by default
+      },
+    });
+
+    this.logger.log(
+      `[saveDesignConcept] Saved design "${args.name}" for project ${args.projectId} (${existingCount + 1} total)`,
+    );
+
+    return {
+      success: true,
+      conceptId: concept.id,
+      name: concept.name,
+      designNumber: existingCount + 1,
+      message: `Design "${args.name}" saved successfully (${existingCount + 1}/3)`,
     };
   }
 

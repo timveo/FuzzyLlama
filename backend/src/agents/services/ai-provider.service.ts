@@ -15,8 +15,8 @@ export interface AIProviderResponse {
 
 export interface AIProviderStreamCallback {
   onChunk: (chunk: string) => void;
-  onComplete: (response: AIProviderResponse) => void;
-  onError: (error: Error) => void;
+  onComplete: (response: AIProviderResponse) => void | Promise<void>;
+  onError: (error: Error) => void | Promise<void>;
 }
 
 // Timeout constants (in milliseconds)

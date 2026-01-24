@@ -553,7 +553,7 @@ export interface ToolUseDefinition extends ToolDefinition {
   category: ToolCategory;
 }
 
-export type ToolCategory = 'context' | 'spec' | 'decision' | 'document' | 'handoff' | 'task';
+export type ToolCategory = 'context' | 'spec' | 'decision' | 'document' | 'handoff' | 'task' | 'design';
 
 /**
  * Tools available during agent execution via Claude's tool_use feature
@@ -799,6 +799,44 @@ export const TOOL_USE_DEFINITIONS: ToolUseDefinition[] = [
       },
       required: ['to_agent', 'task_type', 'title', 'description'],
     },
+    enabledForToolUse: true,
+  },
+
+  // === Design Tools ===
+  {
+    name: 'save_design_concept',
+    description:
+      'Save a design concept with HTML mockup. Call this once for each design (3 total: Conservative, Modern, Bold). Each design should have distinct colors, layout, and feel.',
+    category: 'design',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Design name (e.g., "Conservative", "Modern", "Bold")',
+        },
+        description: {
+          type: 'string',
+          description: 'Brief description of the design approach and visual direction',
+        },
+        style: {
+          type: 'string',
+          enum: ['conservative', 'modern', 'bold'],
+          description: 'Design style category',
+        },
+        colorScheme: {
+          type: 'string',
+          description: 'Primary color scheme (e.g., "blue", "teal", "purple")',
+        },
+        html: {
+          type: 'string',
+          description:
+            'Complete HTML document with Tailwind CSS. Must include <!DOCTYPE html> and be 80-120 lines.',
+        },
+      },
+      required: ['name', 'style', 'html'],
+    },
+    allowedAgents: ['UX_UI_DESIGNER'],
     enabledForToolUse: true,
   },
 ];

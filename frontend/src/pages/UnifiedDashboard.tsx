@@ -634,73 +634,49 @@ const WorkspacePanel = ({ activeTab, onTabChange, theme, projectId, autoSelectDo
 const UIPreviewContent = ({ theme, projectId }: { theme: ThemeMode; projectId: string | null }) => {
   const [selectedDesignIndex, setSelectedDesignIndex] = useState(0);
   const isDark = theme === 'dark';
+  const queryClient = useQueryClient();
 
-  // Fetch DESIGN type documents for this project
-  // Fetch all docs and filter client-side to avoid type issues with new DESIGN type
-  const { data: designDocuments, isLoading } = useQuery({
-    queryKey: ['preview-designs', projectId],
+  // Fetch design concepts directly from the DesignConcept table
+  const { data: designConcepts, isLoading, error } = useQuery({
+    queryKey: ['design-concepts', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      // Fetch all documents and filter for DESIGN type
-      const allDocs = await documentsApi.list(projectId);
-      const designDocs = allDocs.filter((d: { documentType: string }) => d.documentType === 'DESIGN');
-      return designDocs;
+      console.log('[UIPreview] Fetching design concepts for project:', projectId);
+      const result = await documentsApi.getDesignConcepts(projectId);
+      console.log('[UIPreview] Received design concepts:', result?.length, result);
+      return result;
     },
     enabled: !!projectId,
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 10000, // Cache for 10 seconds
+    refetchInterval: 15000, // Auto-refresh every 15 seconds while on this tab
   });
 
-  // Get the design document (usually "UX/UI Design System")
-  const designDoc = designDocuments?.[0];
-  const designContent = designDoc?.content;
+  // Log any query errors
+  if (error) {
+    console.error('[UIPreview] Error fetching design concepts:', error);
+  }
 
-  // Parse design options from the document content
-  // The UX/UI Designer creates multiple design options as HTML blocks
-  const designOptions = useMemo(() => {
-    if (!designContent) return [];
+  // Select design mutation
+  const selectDesignMutation = useMutation({
+    mutationFn: (conceptId: string) => documentsApi.selectDesignConcept(conceptId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['design-concepts', projectId] });
+    },
+  });
 
-    const options: Array<{ name: string; html: string }> = [];
+  // Get current design
+  const currentDesign = designConcepts?.[selectedDesignIndex];
 
-    // Look for HTML blocks in the content - try multiple patterns
-    // Pattern 1: ```html blocks with Option headers
-    const htmlBlockRegex = /(?:#+\s*(?:Option|Design)\s*(\d+)[^\n]*\n)?```html\s*\n([\s\S]*?)```/gi;
-    let match;
-    let optionNum = 1;
+  // Check if the design HTML is complete enough to display
+  const isDesignComplete = useMemo(() => {
+    if (!currentDesign?.html) return false;
+    const html = currentDesign.html;
+    const hasStructure = html.includes('<div') || html.includes('<section') || html.includes('<main') || html.includes('<body');
+    const hasSubstantialContent = html.length > 200;
+    return hasStructure && hasSubstantialContent;
+  }, [currentDesign?.html]);
 
-    while ((match = htmlBlockRegex.exec(designContent)) !== null) {
-      const num = match[1] || optionNum;
-      options.push({
-        name: `Design ${num}`,
-        html: match[2].trim(),
-      });
-      optionNum++;
-    }
-
-    // Pattern 2: If no ```html blocks, look for full HTML documents
-    if (options.length === 0) {
-      const htmlDocRegex = /<html[\s\S]*?<\/html>/gi;
-      while ((match = htmlDocRegex.exec(designContent)) !== null) {
-        options.push({
-          name: `Design ${options.length + 1}`,
-          html: match[0],
-        });
-      }
-    }
-
-    // Pattern 3: If still no matches, treat the whole content as HTML if it looks like HTML
-    if (options.length === 0 && designContent.includes('<') && designContent.includes('>')) {
-      options.push({
-        name: 'Design Preview',
-        html: designContent,
-      });
-    }
-
-    return options;
-  }, [designContent]);
-
-  const currentDesign = designOptions[selectedDesignIndex];
-
-  // Show placeholder if no designs yet
+  // Show placeholder if no designs yet or still loading
   if (!projectId || isLoading) {
     return (
       <div className="h-full flex flex-col">
@@ -718,7 +694,10 @@ const UIPreviewContent = ({ theme, projectId }: { theme: ThemeMode; projectId: s
     );
   }
 
-  if (!designDoc || designOptions.length === 0) {
+  // Show waiting state if no designs or design is incomplete
+  const hasDesigns = designConcepts && designConcepts.length > 0;
+  if (!hasDesigns || !isDesignComplete) {
+    const isInProgress = hasDesigns && !isDesignComplete;
     return (
       <div className="h-full flex flex-col">
         <div className={`flex-1 rounded-2xl overflow-hidden ${isDark ? 'border bg-slate-900/50 border-slate-700/50' : 'border border-slate-200 bg-white'}`}>
@@ -727,9 +706,13 @@ const UIPreviewContent = ({ theme, projectId }: { theme: ThemeMode; projectId: s
               <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${isDark ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
                 <ComputerDesktopIcon className={`w-10 h-10 ${isDark ? 'text-teal-400' : 'text-teal-500'}`} />
               </div>
-              <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-slate-700'}`}>UI Preview</h3>
+              <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                {isInProgress ? 'Creating Designs...' : 'UI Preview'}
+              </h3>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Design previews will appear here after the UX/UI Designer agent runs (G4).
+                {isInProgress
+                  ? 'The UX/UI Designer is creating your design mockups. This will update automatically when ready.'
+                  : 'Design previews will appear here after the UX/UI Designer agent runs (G4).'}
               </p>
             </div>
           </div>
@@ -737,6 +720,15 @@ const UIPreviewContent = ({ theme, projectId }: { theme: ThemeMode; projectId: s
       </div>
     );
   }
+
+  // Handle design selection change
+  const handleDesignChange = (index: number) => {
+    setSelectedDesignIndex(index);
+    const concept = designConcepts[index];
+    if (concept && !concept.isSelected) {
+      selectDesignMutation.mutate(concept.id);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -750,15 +742,15 @@ const UIPreviewContent = ({ theme, projectId }: { theme: ThemeMode; projectId: s
           </div>
           <div className={`flex-1 rounded-lg px-4 py-2 flex items-center justify-center ${isDark ? 'bg-slate-900/50' : 'bg-white border border-slate-200'}`}>
             <span className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>preview://</span>
-            {designOptions.length > 1 ? (
+            {designConcepts.length > 1 ? (
               <select
                 value={selectedDesignIndex}
-                onChange={(e) => setSelectedDesignIndex(Number(e.target.value))}
+                onChange={(e) => handleDesignChange(Number(e.target.value))}
                 className={`text-sm font-medium bg-transparent border-none outline-none cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}
               >
-                {designOptions.map((option, idx) => (
-                  <option key={idx} value={idx} className={isDark ? 'bg-slate-800' : 'bg-white'}>
-                    {option.name}
+                {designConcepts.map((concept, idx) => (
+                  <option key={concept.id} value={idx} className={isDark ? 'bg-slate-800' : 'bg-white'}>
+                    {concept.name}{concept.isSelected ? ' ✓' : ''}
                   </option>
                 ))}
               </select>
@@ -2943,9 +2935,23 @@ export default function UnifiedDashboard() {
     }
   }, [activeAgent, isBackgroundAgent, streamingChunks, isStreamingDocument]);
 
+  const handleAgentProgress = useCallback((event: { agentId?: string; agentType?: string; message?: string }) => {
+    console.log('Agent progress:', event);
+    // Update the active agent's task description with the progress message
+    if (event.message) {
+      setActiveAgent(prev => {
+        if (!prev) return prev;
+        // Only update if it's the same agent type
+        if (event.agentType && prev.agentType === event.agentType) {
+          return { ...prev, taskDescription: event.message };
+        }
+        return prev;
+      });
+    }
+  }, []);
+
   const handleAgentCompleted = useCallback((event: { agentId?: string; agentType?: string; result?: unknown }) => {
     console.log('Agent completed:', event);
-    setIsAgentWorking(false);
 
     // Store the event for the chat component to process
     if (event.agentId) {
@@ -2963,13 +2969,29 @@ export default function UnifiedDashboard() {
       queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
     }
 
-    // Keep the agent visible briefly to show completion
-    setTimeout(() => {
-      setActiveAgent(null);
-      setStreamingChunks([]);
-      setIsStreamingDocument(false);
-      // Gate approvals happen via chat conversation, not modal popup
-    }, 2000);
+    // Only clear working state if this is the currently active agent
+    // This prevents ORCHESTRATOR completion from hiding a worker agent's progress
+    setActiveAgent((currentAgent) => {
+      if (!currentAgent) return null;
+
+      // If the completed agent matches the current active agent, clear it after delay
+      if (currentAgent.agentType === event.agentType) {
+        setIsAgentWorking(false);
+        setTimeout(() => {
+          setActiveAgent((prev) => {
+            // Only clear if still the same agent (another might have started)
+            if (prev?.agentType === event.agentType) {
+              setStreamingChunks([]);
+              setIsStreamingDocument(false);
+              return null;
+            }
+            return prev;
+          });
+        }, 2000);
+      }
+
+      return currentAgent;
+    });
   }, [currentProjectId, searchParams, queryClient]);
 
   const handleAgentFailed = useCallback((event: { error?: string }) => {
@@ -3036,6 +3058,7 @@ export default function UnifiedDashboard() {
   useWebSocket(currentProjectId || undefined, {
     onAgentStarted: handleAgentStarted,
     onAgentChunk: handleAgentChunk,
+    onAgentProgress: handleAgentProgress,
     onAgentCompleted: handleAgentCompleted,
     onAgentFailed: handleAgentFailed,
     onGateReady: handleGateReady,
@@ -3084,7 +3107,14 @@ export default function UnifiedDashboard() {
     const checkRunningAgents = async () => {
       try {
         const history = await agentsApi.getHistory(currentProjectId);
-        const runningAgent = history.find((exec: { status: string; agentType: string }) => exec.status === 'RUNNING');
+        // Find a RUNNING agent that was created recently (within last 10 minutes)
+        // This prevents showing "working" state for stale agents that got stuck
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const runningAgent = history.find((exec) => {
+          if (exec.status !== 'RUNNING') return false;
+          const createdAt = new Date(exec.createdAt);
+          return createdAt > tenMinutesAgo;
+        });
 
         if (runningAgent) {
           console.log('Found running agent on load:', runningAgent.agentType);
@@ -3093,6 +3123,10 @@ export default function UnifiedDashboard() {
             taskDescription: 'Working...',
           });
           setIsAgentWorking(true);
+        } else {
+          // No active running agents - clear any stale working state
+          setIsAgentWorking(false);
+          setActiveAgent(null);
         }
       } catch (error) {
         console.error('Failed to check running agents:', error);

@@ -178,6 +178,8 @@ export class ToolEnabledAIProviderService {
     try {
       // Get tools from centralized definitions
       const tools = getAnthropicTools(agentType);
+      this.logger.log(`[Tool-Enabled] Agent ${agentType} has ${tools.length} tools available: ${tools.map(t => t.name).join(', ')}`);
+
       const messages: Anthropic.MessageParam[] = [
         {
           role: 'user',
@@ -194,6 +196,7 @@ export class ToolEnabledAIProviderService {
       // Tool use loop with streaming
       while (iterations < this.MAX_TOOL_ITERATIONS) {
         iterations++;
+        this.logger.log(`[Tool-Enabled] Starting iteration ${iterations} for ${agentType}`);
 
         const stream = await this.anthropic.messages.stream({
           model,
@@ -202,6 +205,8 @@ export class ToolEnabledAIProviderService {
           tools,
           messages,
         });
+
+        this.logger.log(`[Tool-Enabled] Stream created for ${agentType}, processing events...`);
 
         let currentToolUse: { id: string; name: string; input: string } | null = null;
         const responseContent: Anthropic.ContentBlock[] = [];
@@ -273,10 +278,16 @@ export class ToolEnabledAIProviderService {
 
           for (const toolUse of toolUses) {
             this.logger.log(`Agent ${agentType} calling tool: ${toolUse.name}`);
+            const toolInput = toolUse.input as Record<string, any>;
+
+            // Provide user-friendly progress updates for specific tools
+            if (toolUse.name === 'save_design_concept' && toolInput.name) {
+              callback.onChunk(`\n📐 Saving "${toolInput.name}" design concept...\n`);
+            }
 
             const result = await this.executeToolCall(
               toolUse.name,
-              toolUse.input as Record<string, any>,
+              toolInput,
               projectId,
               agentType,
             );
@@ -287,7 +298,17 @@ export class ToolEnabledAIProviderService {
               content: JSON.stringify(result),
             });
 
-            callback.onChunk(`[${toolUse.name} completed]\n`);
+            // Provide user-friendly completion messages for specific tools
+            if (toolUse.name === 'save_design_concept' && toolInput.name) {
+              const resultObj = result as { success?: boolean; error?: string };
+              if (resultObj.success) {
+                callback.onChunk(`✅ "${toolInput.name}" design saved successfully!\n`);
+              } else {
+                callback.onChunk(`❌ Failed to save "${toolInput.name}": ${resultObj.error || 'Unknown error'}\n`);
+              }
+            } else {
+              callback.onChunk(`[${toolUse.name} completed]\n`);
+            }
           }
 
           messages.push({
@@ -319,7 +340,8 @@ export class ToolEnabledAIProviderService {
 
       this.logger.log(`[Tool-Enabled] Final content length: ${fullContent.length}`);
 
-      callback.onComplete({
+      // Await onComplete in case it's async (e.g., for saving to DB)
+      await callback.onComplete({
         content: fullContent,
         model,
         usage: {
@@ -329,7 +351,7 @@ export class ToolEnabledAIProviderService {
         finishReason: 'end_turn',
       });
     } catch (error) {
-      callback.onError(error as Error);
+      await callback.onError(error as Error);
     }
   }
 
