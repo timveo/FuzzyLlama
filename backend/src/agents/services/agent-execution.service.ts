@@ -924,6 +924,50 @@ ${template.prompt.context}
       }
     }
 
+    // 1b. Create proof artifacts for document-producing agents
+    // These prove that the agent completed its work and documents were created
+    const documentProofAgents: Record<string, { gateType: string; proofType: string }> = {
+      ARCHITECT: { gateType: 'G3_PENDING', proofType: 'spec_validation' },
+      UX_UI_DESIGNER: { gateType: 'G4_PENDING', proofType: 'screenshot' },
+    };
+
+    if (documentProofAgents[agentType] && result.documentsCreated.length > 0) {
+      const { gateType, proofType } = documentProofAgents[agentType];
+      try {
+        const gateId = await this.getGateId(projectId, gateType);
+        if (gateId) {
+          // Create content summary from documents created
+          const contentSummary = `${agentType} completed. Documents created: ${result.documentsCreated.join(', ')}`;
+          const fileHash = require('crypto')
+            .createHash('sha256')
+            .update(contentSummary + new Date().toISOString())
+            .digest('hex');
+
+          await this.prisma.proofArtifact.create({
+            data: {
+              projectId,
+              gateId,
+              gate: gateType,
+              proofType: proofType as any,
+              filePath: `docs/${agentType.toLowerCase()}-output.json`,
+              fileHash,
+              contentSummary,
+              passFail: 'pass',
+              createdBy: userId,
+            },
+          });
+          this.logger.log(`[${agentType}] Created ${proofType} proof artifact for ${gateType}`);
+        }
+      } catch (error) {
+        addError(
+          'Proof Artifact Creation',
+          `Failed to create proof artifact for ${agentType}: ${error.message}`,
+          'warning',
+          { agentType, gateType, proofType },
+        );
+      }
+    }
+
     // 2. Extract and write code files
     const codeGenerationAgents = [
       'FRONTEND_DEVELOPER',

@@ -13,6 +13,31 @@ export class DocumentsService {
     private documentGit: DocumentGitService,
   ) {}
 
+  /**
+   * Clean agent output by removing internal reasoning and tool calls
+   * This ensures only user-facing content is saved to documents
+   */
+  private cleanAgentOutput(output: string): string {
+    return output
+      // Remove <thinking> tags and their content
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      // Remove MCP/tool call XML tags with attributes (e.g., <invoke name="...">, <parameter name="...">)
+      .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/gi, '')
+      .replace(/<parameter[^>]*>[\s\S]*?<\/parameter>/gi, '')
+      // Remove standalone tool tags on their own lines (catches incomplete tags)
+      .replace(/^.*<invoke[^>]*>.*$/gm, '')
+      .replace(/^.*<parameter[^>]*>.*$/gm, '')
+      // Remove simple tool call tags (e.g., <get_documents>, <get_context_for_story>)
+      .replace(/<[a-z_]+>[\s\S]*?<\/[a-z_]+>/gi, '')
+      // Remove any standalone opening/closing tool tags
+      .replace(/<\/?[a-z_]+>/gi, '')
+      // Remove lines that look like preamble before the actual document content
+      .replace(/^(I'll|Let me|Now let me|Based on)[^\n]*$/gm, '')
+      // Clean up excessive whitespace left behind
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   async create(createDocumentDto: CreateDocumentDto, userId: string) {
     // Verify project ownership
     const project = await this.prisma.project.findUnique({
@@ -400,6 +425,9 @@ export class DocumentsService {
   ): Array<{ type: string; title: string; content: string }> {
     const documents: Array<{ type: string; title: string; content: string }> = [];
 
+    // Clean the output first - remove thinking tags, tool calls, etc.
+    const cleanedOutput = this.cleanAgentOutput(output);
+
     switch (agentType) {
       case 'PRODUCT_MANAGER':
         // Extract PRD document - User Stories should be included IN the PRD, not as separate doc
@@ -407,7 +435,7 @@ export class DocumentsService {
         documents.push({
           type: 'REQUIREMENTS',
           title: 'Product Requirements Document',
-          content: output, // Include full PRD output - User Stories are part of it
+          content: cleanedOutput,
         });
         // NOTE: User Stories are NOT extracted as a separate document
         // They are a section within the PRD as per standard PRD format
@@ -419,7 +447,7 @@ export class DocumentsService {
         documents.push({
           type: 'ARCHITECTURE',
           title: 'System Architecture',
-          content: output, // Include full output - API specs and DB schema are embedded
+          content: cleanedOutput,
         });
         break;
 
@@ -429,7 +457,7 @@ export class DocumentsService {
           type: 'TEST_PLAN',
           title: 'Test Plan and Coverage Report',
           content:
-            this.extractSection(output, ['# Test Plan', '# Testing', '## Test Coverage']) || output,
+            this.extractSection(cleanedOutput, ['# Test Plan', '# Testing', '## Test Coverage']) || cleanedOutput,
         });
         break;
 
@@ -440,8 +468,8 @@ export class DocumentsService {
           type: 'DEPLOYMENT_GUIDE',
           title: 'Deployment Guide',
           content:
-            this.extractSection(output, ['# Deployment', '# Deploy', '## Deployment Guide']) ||
-            output,
+            this.extractSection(cleanedOutput, ['# Deployment', '# Deploy', '## Deployment Guide']) ||
+            cleanedOutput,
         });
         break;
 
@@ -451,7 +479,7 @@ export class DocumentsService {
         documents.push({
           type: 'DESIGN',
           title: 'UX/UI Design System',
-          content: output,
+          content: cleanedOutput,
         });
         break;
 
@@ -464,7 +492,7 @@ export class DocumentsService {
         documents.push({
           type: 'CODE',
           title: `${agentType} Implementation`,
-          content: output,
+          content: cleanedOutput,
         });
         break;
 
@@ -478,7 +506,7 @@ export class DocumentsService {
         documents.push({
           type: 'OTHER',
           title: `${agentType} Output`,
-          content: output,
+          content: cleanedOutput,
         });
     }
 

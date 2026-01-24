@@ -93,9 +93,42 @@ export class GateStateMachineService {
 
   /**
    * Get current active gate for a project
-   * Returns the highest numbered gate that has work in progress or is pending review
+   * Uses ProjectState.currentGate as the source of truth
    */
   async getCurrentGate(projectId: string): Promise<any> {
+    // First, get the authoritative current gate from ProjectState
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { state: true },
+    });
+
+    if (project?.state?.currentGate) {
+      const currentGateType = project.state.currentGate;
+
+      // If it's a _COMPLETE marker, find the next _PENDING gate
+      if (currentGateType.endsWith('_COMPLETE')) {
+        const gateNumber = parseInt(currentGateType.charAt(1));
+        const nextPendingType = `G${gateNumber + 1}_PENDING`;
+        const nextGate = await this.prisma.gate.findFirst({
+          where: { projectId, gateType: nextPendingType },
+        });
+        if (nextGate) {
+          this.logger.debug(`getCurrentGate: ProjectState has ${currentGateType}, returning next pending ${nextPendingType}`);
+          return nextGate;
+        }
+      }
+
+      // Return the gate matching ProjectState.currentGate
+      const gate = await this.prisma.gate.findFirst({
+        where: { projectId, gateType: currentGateType },
+      });
+      if (gate) {
+        this.logger.debug(`getCurrentGate: Returning gate from ProjectState: ${currentGateType}`);
+        return gate;
+      }
+    }
+
+    // Fallback: Query gates directly (for backwards compatibility)
     const gates = await this.prisma.gate.findMany({
       where: { projectId },
       orderBy: { createdAt: 'asc' },
@@ -366,24 +399,38 @@ export class GateStateMachineService {
       // Lock documents if applicable
       await this.lockDocumentsForGate(projectId, gateType, tx);
 
-      // Create next gate and update project state to point to it
+      // Create next gate(s) and update project state
+      // When approving a _PENDING gate, we create the _COMPLETE marker AND the next _PENDING gate
       const nextGateType = this.getNextGateType(gateType);
       if (nextGateType) {
+        // Create the _COMPLETE marker gate (auto-approved)
         await this.createNextGate(projectId, nextGateType, tx);
 
-        // Update project state to the next gate (not the approved one)
+        // If we just created a _COMPLETE gate, also create the next _PENDING gate
+        // and set THAT as the current gate (users interact with _PENDING gates)
+        let currentGateToSet = nextGateType;
+        if (nextGateType.endsWith('_COMPLETE')) {
+          const followingGate = this.getNextGateType(nextGateType);
+          if (followingGate && followingGate.endsWith('_PENDING')) {
+            await this.createNextGate(projectId, followingGate, tx);
+            currentGateToSet = followingGate;
+            this.logger.log(`Created both ${nextGateType} and ${followingGate} gates`);
+          }
+        }
+
+        // Update project state to the next actionable gate
         await tx.project.update({
           where: { id: projectId },
           data: {
             state: {
               update: {
-                currentGate: nextGateType,
+                currentGate: currentGateToSet,
               },
             },
           },
         });
 
-        return { success: true, nextGate: nextGateType };
+        return { success: true, nextGate: currentGateToSet };
       } else {
         // No next gate - update to the approved gate
         await tx.project.update({

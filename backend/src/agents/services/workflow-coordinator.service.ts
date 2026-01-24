@@ -157,7 +157,8 @@ ${teachingLevel === 'EXPERT' ? '(Be concise and technical, skip basic explanatio
 
 **Your Task:** ${taskInstructions}
 
-Keep your response concise and helpful. Use markdown formatting.`;
+Keep your response concise and helpful. Use markdown formatting.
+IMPORTANT: Do NOT use <thinking> tags or any internal reasoning. Output only the user-facing message.`;
 
     // Execute the Orchestrator agent with streaming
     const agentExecutionId = await this.agentExecution.executeAgentStream(
@@ -173,8 +174,13 @@ Keep your response concise and helpful. Use markdown formatting.`;
           this.wsGateway.emitAgentChunk(projectId, agentExecutionId, chunk);
         },
         onComplete: async (response) => {
+          // Strip <thinking> tags from output - these are internal reasoning
+          const cleanContent = response.content
+            .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+            .trim();
+
           this.wsGateway.emitAgentCompleted(projectId, agentExecutionId, {
-            content: response.content,
+            content: cleanContent,
             usage: response.usage,
             finishReason: response.finishReason,
           });
@@ -182,7 +188,7 @@ Keep your response concise and helpful. Use markdown formatting.`;
           // Emit as a chat message so it appears in the conversation
           // Use a unique message ID based on transition type and timestamp
           const messageId = `orchestrator-${transitionType}-${Date.now()}`;
-          this.wsGateway.emitChatMessage(projectId, messageId, response.content);
+          this.wsGateway.emitChatMessage(projectId, messageId, cleanContent);
         },
         onError: (error) => {
           console.error('Orchestrator message generation error:', error);
@@ -366,7 +372,7 @@ Begin by warmly acknowledging their project idea, then ask your FIRST question a
       },
     });
 
-    // Check current gate status
+    // Get current gate from source of truth (ProjectState.currentGate)
     const currentGate = await this.gateStateMachine.getCurrentGate(projectId);
 
     // Detect approval keywords
@@ -534,35 +540,41 @@ Begin by warmly acknowledging their project idea, then ask your FIRST question a
 
     const userPrompt = `${conversationContext}User: ${message}
 
-=== CRITICAL: QUESTION TRACKING ===
+=== CRITICAL: QUESTION TRACKING (READ CAREFULLY!) ===
 
-Questions answered so far: ${questionsAnsweredSoFar}
+Questions answered so far: ${questionsAnsweredSoFar} out of 5
 User is NOW answering question: #${currentQuestionBeingAnswered}
 Next question to ask: #${nextQuestionToAsk}
 
-The 5 REQUIRED questions (you MUST ask ALL of them):
+The 5 REQUIRED questions (you MUST ask ALL of them in order):
 1. Existing Code - "Do you have any existing code for this project?"
 2. Technical Background - "What's your technical background?"
 3. Success Criteria - "What does 'done' look like for you?"
 4. Constraints - "Any constraints? (timeline, budget, tech requirements)"
 5. Deployment - "How do you want to deploy this?"
 
-=== YOUR TASK ===
+=== YOUR TASK FOR THIS RESPONSE ===
 
 ${
   nextQuestionToAsk <= 5
-    ? `You have ${5 - questionsAnsweredSoFar} more questions to ask.
+    ? `**STATUS: INCOMPLETE - ${5 - questionsAnsweredSoFar} questions remaining**
 
-1. Acknowledge the user's answer to question #${currentQuestionBeingAnswered} briefly (1 sentence)
+You MUST:
+1. Briefly acknowledge the user's answer to question #${currentQuestionBeingAnswered} (1 sentence max)
 2. Ask question #${nextQuestionToAsk} in a conversational way
 
-DO NOT output the intake document yet. DO NOT skip questions.`
-    : `All 5 questions have been answered! Now output the complete Project Intake document inside a markdown code fence.
+**FORBIDDEN:** Do NOT output the intake document yet. Do NOT use \`\`\`markdown. Do NOT skip to the end.
+
+The intake document can ONLY be created after question #5 is answered. You are currently on question #${currentQuestionBeingAnswered}.`
+    : `**STATUS: COMPLETE - All 5 questions answered!**
+
+Now output the complete Project Intake document inside a markdown code fence.
 
 IMPORTANT: Output ONLY the document. No additional text after the closing \`\`\`.`
 }
 
-Remember: NEVER output the intake document until you have received answers to ALL 5 questions.`;
+=== STRICT RULE ===
+If nextQuestionToAsk <= 5, you MUST ask the next question. Creating the intake document early will break the system.`;
 
     // executeAgentStream now returns the ID immediately, streaming happens in background
     const agentExecutionId = await this.agentExecution.executeAgentStream(
@@ -579,12 +591,6 @@ Remember: NEVER output the intake document until you have received answers to AL
           this.wsGateway.emitAgentChunk(projectId, agentExecutionId, chunk);
         },
         onComplete: async (response) => {
-          this.wsGateway.emitAgentCompleted(projectId, agentExecutionId, {
-            content: response.content,
-            usage: response.usage,
-            finishReason: response.finishReason,
-          });
-
           // Check if the intake document was generated AND all 5 questions were answered
           // The document should only be created after user answers all 5 questions
           // questionsAnsweredSoFar is before this response, so after this response we have +1 more
@@ -592,13 +598,43 @@ Remember: NEVER output the intake document until you have received answers to AL
           const questionsAfterThisResponse = questionsAnsweredSoFar + 1;
           const enoughQuestionsAnswered = questionsAfterThisResponse >= 5; // All 5 questions answered
 
+          let contentToSend = response.content;
+
+          if (hasIntakeDocument && !enoughQuestionsAnswered) {
+            // Agent tried to complete early - strip the intake document and add recovery message
+            console.warn(
+              `Agent output intake document too early! Only ${questionsAfterThisResponse} questions answered. Stripping document and recovering.`,
+            );
+
+            // Strip the markdown code fence containing the intake document
+            contentToSend = response.content
+              .replace(/```markdown[\s\S]*?```/g, '')
+              .replace(/```[\s\S]*# Project Intake:[\s\S]*?```/g, '')
+              .trim();
+
+            // If nothing left after stripping, generate a recovery question
+            const questionTexts = [
+              "What does 'done' look like for you? What are your success criteria?",
+              'Any constraints I should know about? (timeline, budget, tech requirements)',
+              'How do you want to deploy this? Local only, optional cloud, or required cloud deployment?',
+            ];
+            const questionIndex = nextQuestionToAsk - 3; // Q3, Q4, Q5 map to index 0, 1, 2
+            if (!contentToSend || contentToSend.length < 20) {
+              contentToSend =
+                questionIndex >= 0 && questionIndex < questionTexts.length
+                  ? `Got it! ${questionTexts[questionIndex]}`
+                  : 'Thanks for that! Let me ask you a few more questions to make sure I understand your project.';
+            }
+          }
+
+          this.wsGateway.emitAgentCompleted(projectId, agentExecutionId, {
+            content: contentToSend,
+            usage: response.usage,
+            finishReason: response.finishReason,
+          });
+
           if (hasIntakeDocument && enoughQuestionsAnswered) {
             await this.handleOnboardingComplete(projectId, userId, response.content);
-          } else if (hasIntakeDocument && !enoughQuestionsAnswered) {
-            // Agent tried to complete early - log this as an issue
-            console.warn(
-              `Agent output intake document too early! Only ${questionsAnsweredSoFar + 1} questions answered.`,
-            );
           }
         },
         onError: (error) => {
@@ -1409,13 +1445,37 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
    * Save the PRD document and notify the user it's ready for G2 review
    * Uses upsert logic to update existing PRD or create new one
    */
+  /**
+   * Strip internal reasoning and tool calls from agent output before saving
+   */
+  private cleanAgentOutput(content: string): string {
+    return content
+      // Remove <thinking> tags and their content
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      // Remove MCP/tool call XML tags
+      .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/gi, '')
+      .replace(/<parameter[^>]*>[\s\S]*?<\/parameter>/gi, '')
+      // Remove standalone tool tags on their own lines
+      .replace(/^.*<invoke[^>]*>.*$/gm, '')
+      .replace(/^.*<parameter[^>]*>.*$/gm, '')
+      // Remove other common internal tool tags
+      .replace(/<get_documents>[\s\S]*?<\/get_documents>/gi, '')
+      .replace(/<get_context_for_story>[\s\S]*?<\/get_context_for_story>/gi, '')
+      // Clean up excessive whitespace left behind
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   private async savePRDDocument(
     projectId: string,
     userId: string,
     prdContent: string,
   ): Promise<void> {
+    // Clean thinking tags from content before saving
+    const cleanedContent = this.cleanAgentOutput(prdContent);
+
     console.log(
-      `[PRD Save] Saving PRD document for project: ${projectId}, content length: ${prdContent.length}`,
+      `[PRD Save] Saving PRD document for project: ${projectId}, content length: ${cleanedContent.length}`,
     );
 
     // Check if PRD already exists (to update instead of creating duplicate)
@@ -1433,7 +1493,7 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
       document = await this.prisma.document.update({
         where: { id: existingPRD.id },
         data: {
-          content: prdContent,
+          content: cleanedContent,
           version: existingPRD.version + 1,
           updatedAt: new Date(),
         },
@@ -1446,7 +1506,7 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
           projectId,
           title: 'Product Requirements Document',
           documentType: 'REQUIREMENTS',
-          content: prdContent,
+          content: cleanedContent,
           version: 1,
           createdById: userId,
         },
@@ -1461,9 +1521,22 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
       documentType: document.documentType,
     });
 
-    // Transition G2 gate to IN_REVIEW
-    // Note: G2_PENDING should exist after G1 was approved
+    // Ensure G2_PENDING gate exists and transition to IN_REVIEW
     try {
+      await this.gateStateMachine.ensureGateExists(projectId, 'G2_PENDING');
+
+      // Update ProjectState to point to G2_PENDING
+      await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+          state: {
+            update: {
+              currentGate: 'G2_PENDING',
+            },
+          },
+        },
+      });
+
       await this.gateStateMachine.transitionToReview(projectId, 'G2_PENDING', {
         description: 'G2 - Product Requirements Document ready for review',
       });
@@ -1507,7 +1580,10 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
       }
     }
 
-    console.log('Creating Project Intake document, content length:', intakeContent.length);
+    // Clean thinking tags from content before saving
+    const cleanedIntakeContent = this.cleanAgentOutput(intakeContent);
+
+    console.log('Creating Project Intake document, content length:', cleanedIntakeContent.length);
 
     // Check if intake document already exists (to update instead of creating duplicate)
     const existingIntake = await this.prisma.document.findFirst({
@@ -1524,7 +1600,7 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
       document = await this.prisma.document.update({
         where: { id: existingIntake.id },
         data: {
-          content: intakeContent,
+          content: cleanedIntakeContent,
           version: existingIntake.version + 1,
           updatedAt: new Date(),
         },
@@ -1537,7 +1613,7 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
           projectId,
           title: 'Project Intake',
           documentType: 'REQUIREMENTS',
-          content: intakeContent,
+          content: cleanedIntakeContent,
           version: 1,
           createdById: userId,
         },
@@ -1825,6 +1901,21 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
 
         if (!existingPRD) {
           console.log('Auto-starting PRD creation after G1 approval');
+
+          // Create G2_PENDING gate and update ProjectState IMMEDIATELY
+          // This ensures getCurrentGate() returns G2 during PRD creation
+          await this.gateStateMachine.ensureGateExists(projectId, 'G2_PENDING');
+          await this.prisma.project.update({
+            where: { id: projectId },
+            data: {
+              state: {
+                update: {
+                  currentGate: 'G2_PENDING',
+                },
+              },
+            },
+          });
+          console.log('Created G2_PENDING gate and updated ProjectState');
 
           // Emit agent starting event IMMEDIATELY so user sees feedback in chat
           // Generate a placeholder ID - the real one comes when agent actually starts
@@ -2118,6 +2209,20 @@ Create a single, complete PRD document. Do NOT repeat sections. Output only the 
       await this.gateStateMachine.ensureGateExists(projectId, gateType);
     }
 
+    // Always update ProjectState.currentGate to this gate (the active _PENDING gate)
+    // This ensures the UI and chat context reflect the correct current gate
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        state: {
+          update: {
+            currentGate: gateType,
+          },
+        },
+      },
+    });
+    console.log(`[WorkflowCoordinator] Updated ProjectState.currentGate to ${gateType}`);
+
     // Get agents for this gate based on project type
     const agents = getAgentsForGate(projectType, gateType);
 
@@ -2306,10 +2411,11 @@ ${taskDescription}
 
 ${handoffContext}
 
-## Instructions
-Complete your assigned task based on the project context and previous agent work.
-Generate all required deliverables and output them in the appropriate format.
-If you need to create documents, use markdown code fences with the document title.`;
+## Output Rules
+- START your response with the actual deliverable content (code, documents, etc.)
+- Do NOT include preamble like "I'll create...", "Let me...", "Based on..."
+- Do NOT use <thinking> tags or internal reasoning in output
+- Use markdown code fences with filenames for all code/documents`;
   }
 
   /**
@@ -2464,19 +2570,66 @@ If you need to create documents, use markdown code fences with the document titl
     gateType: string,
     userId: string,
   ): Promise<void> {
-    // Get all deliverables for this project
-    const deliverables = await this.prisma.deliverable.findMany({
-      where: { projectId },
+    // Get the agents responsible for this gate
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { type: true },
     });
+    const projectType = project?.type || 'traditional';
+    const gateAgents = getAgentsForGate(projectType, gateType);
+
+    // Get deliverables owned by agents for this gate
+    const deliverables = await this.prisma.deliverable.findMany({
+      where: {
+        projectId,
+        ...(gateAgents.length > 0 ? { owner: { in: gateAgents } } : {}),
+      },
+    });
+
+    // If no deliverables found for this gate's agents, check for documents instead
+    let hasDocuments = false;
+    if (deliverables.length === 0) {
+      console.log(
+        `[WorkflowCoordinator] Gate ${gateType}: No deliverables found for agents ${gateAgents.join(', ')}, checking for documents`,
+      );
+
+      // Check if there are relevant documents created for this gate
+      const gateDocTypes: Record<string, string> = {
+        G2_PENDING: 'REQUIREMENTS',
+        G3_PENDING: 'ARCHITECTURE',
+        G4_PENDING: 'DESIGN',
+      };
+
+      const expectedType = gateDocTypes[gateType];
+      if (expectedType) {
+        const docs = await this.prisma.document.findMany({
+          where: {
+            projectId,
+            documentType: expectedType as any,
+          },
+        });
+
+        if (docs.length > 0) {
+          console.log(
+            `[WorkflowCoordinator] Gate ${gateType}: Found ${docs.length} ${expectedType} document(s), transitioning to review`,
+          );
+          hasDocuments = true;
+        } else {
+          console.log(`[WorkflowCoordinator] Gate ${gateType}: No documents found, waiting...`);
+          return;
+        }
+      }
+    }
 
     const incompleteCount = deliverables.filter((d) => d.status !== 'complete').length;
     const totalCount = deliverables.length;
 
     console.log(
-      `[WorkflowCoordinator] Gate ${gateType}: ${totalCount - incompleteCount}/${totalCount} deliverables complete`,
+      `[WorkflowCoordinator] Gate ${gateType}: ${totalCount - incompleteCount}/${totalCount} deliverables complete for agents ${gateAgents.join(', ')}`,
     );
 
-    if (incompleteCount === 0 && totalCount > 0) {
+    // Transition if either: all deliverables complete, OR no deliverables but we have documents
+    if ((incompleteCount === 0 && totalCount > 0) || hasDocuments) {
       // All deliverables complete - transition to review
       console.log(
         `[WorkflowCoordinator] All deliverables complete, transitioning ${gateType} to review`,
