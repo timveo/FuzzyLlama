@@ -1161,7 +1161,7 @@ ${handoffContext}
           return this.gateAgentExecutor.executeSingleAgent(pId, aType, gType, uId, freshContext);
         },
         getRetryCount: (pId, aType, gType) => this.getAgentRetryCount(pId, aType, gType),
-        markDeliverablesComplete: async (pId, _aType) => {
+        markDeliverablesComplete: async (_pId, _aType) => {
           // Mark the fix task as complete
           await this.prisma.task.update({
             where: { id: task.id },

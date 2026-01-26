@@ -14,7 +14,6 @@ import {
   GATE_REQUIRED_PROOFS,
   COVERAGE_THRESHOLD_PERCENT,
   getGateConfig,
-  GateDeliverable,
 } from './gate-config';
 import { ProofArtifact, ProofType } from '@prisma/client';
 import { FileSystemService } from '../code-generation/filesystem.service';
